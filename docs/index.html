@@ -1,0 +1,956 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#0f7a68">
+<link rel="manifest" href="manifest.webmanifest">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>OPIc 30</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: phone-first single column with a bottom tab bar; on desktop the tabs become a left rail and content sits in a 720px column. */
+:root{
+  --bg:#f2f5f4; --panel:#ffffff; --ink:#172220; --mute:#5f6f6b; --line:#d9e1de;
+  --accent:#0f7a68; --accent-ink:#ffffff; --accent-soft:#dcefea;
+  --warn:#b7791f; --warn-soft:#fbf1dc; --bad:#b4433a; --bad-soft:#f9e3e0; --good:#2f7d4f; --good-soft:#dff1e4;
+  --display:"Bricolage Grotesque","Noto Sans KR",system-ui,sans-serif;
+  --body:"Noto Sans KR",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1514; --panel:#182020; --ink:#e8efec; --mute:#9aaaa5; --line:#2a3634;
+  --accent:#3fbba3; --accent-ink:#06211c; --accent-soft:#163b35;
+  --warn:#e0a94a; --warn-soft:#3a2d12; --bad:#e2756b; --bad-soft:#3f1f1c; --good:#6cc48c; --good-soft:#193726; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1514; --panel:#182020; --ink:#e8efec; --mute:#9aaaa5; --line:#2a3634;
+  --accent:#3fbba3; --accent-ink:#06211c; --accent-soft:#163b35;
+  --warn:#e0a94a; --warn-soft:#3a2d12; --bad:#e2756b; --bad-soft:#3f1f1c; --good:#6cc48c; --good-soft:#193726; color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{margin:0;text-wrap:balance;line-height:1.2}
+h1{font-family:var(--display);font-size:26px;font-weight:700}
+h2{font-family:var(--display);font-size:20px;font-weight:700}
+h3{font-size:15px;font-weight:700}
+p{margin:0}
+a{color:var(--accent)}
+.app{min-height:100%;display:flex;flex-direction:column}
+.main{flex:1;width:100%;max-width:760px;margin:0 auto;padding-inline:16px;padding-block:18px 140px;display:flex;flex-direction:column;gap:18px}
+.nav{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:6px 4px;padding-bottom:calc(6px + env(safe-area-inset-bottom,0px));z-index:5}
+.nav button{background:none;border:0;padding:6px 1px;border-radius:10px;font-size:10px;white-space:nowrap;color:var(--mute);display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;min-width:40px;flex:1}
+.nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav button.on{color:var(--accent);background:var(--accent-soft)}
+.nav button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+@media (min-width:900px){
+  .app{flex-direction:row}
+  .nav{position:sticky;top:env(safe-area-inset-top,0px);left:auto;right:auto;bottom:auto;height:100vh;flex-direction:column;justify-content:flex-start;gap:4px;border-top:0;border-right:1px solid var(--line);padding:22px 10px;width:112px;flex:none}
+  .nav button{width:100%;font-size:12px;padding:10px 6px}
+  .main{padding-block:28px 60px}
+}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.btn{appearance:none;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:9px 14px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:transform .08s ease}
+.btn:active{transform:scale(.98)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.ghost{background:transparent}
+.btn.sm{padding:5px 10px;font-size:13px;border-radius:8px}
+.btn[disabled]{opacity:.5;cursor:default}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:500;background:var(--accent-soft);color:var(--accent)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.good{background:var(--good-soft);color:var(--good)}
+.chip.neutral{background:var(--bg);color:var(--mute);border:1px solid var(--line)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--mute)}
+.small{font-size:13px}
+textarea{width:100%;min-height:150px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--bg);line-height:1.6}
+textarea:focus,input:focus,select:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
+input[type=text],select{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--bg)}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--mute)}
+.q{font-family:var(--display);font-size:19px;font-weight:500;line-height:1.35}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;min-width:0}
+.stat b{display:block;font-family:var(--display);font-size:24px;line-height:1.1}
+.stat span{font-size:12px;color:var(--mute)}
+.plan{display:flex;flex-direction:column;gap:8px}
+.plan .item{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);cursor:pointer}
+.plan .item .box{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);display:grid;place-items:center;flex:none}
+.plan .item.done .box{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.plan .item.done .t{text-decoration:line-through;color:var(--mute)}
+.plan .min{font-family:var(--mono);font-size:12px;color:var(--mute);margin-left:auto;flex:none}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.topic{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:4px;min-width:0}
+.topic:hover{border-color:var(--accent)}
+.topic .en{font-family:var(--display);font-weight:700}
+.topic .ko{font-size:12.5px;color:var(--mute)}
+.timer{font-family:var(--mono);font-size:34px;font-weight:500;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.timer.over{color:var(--warn)}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .5s linear}
+.fb{display:flex;flex-direction:column;gap:14px}
+.fb .lvl{display:flex;align-items:baseline;gap:10px}
+.fb .lvl b{font-family:var(--display);font-size:40px;line-height:1}
+.fix{border-left:3px solid var(--bad);padding:6px 12px;display:flex;flex-direction:column;gap:3px;background:var(--bg);border-radius:0 10px 10px 0}
+.fix .o{text-decoration:line-through;color:var(--mute)}
+.fix .b{font-weight:500}
+.fix .w{font-size:13px;color:var(--mute)}
+.model{background:var(--bg);border-radius:10px;padding:12px;line-height:1.7;white-space:pre-wrap}
+.kx{display:flex;flex-direction:column;gap:4px}
+.kx div{display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
+.kx .en{font-weight:500}
+.kx .ko{font-size:13px;color:var(--mute)}
+.flash{perspective:1000px;min-height:200px;cursor:pointer}
+.flash .in{position:relative;width:100%;min-height:200px;transition:transform .45s;transform-style:preserve-3d}
+.flash.flip .in{transform:rotateY(180deg)}
+.flash .face{position:absolute;inset:0;backface-visibility:hidden;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:10px;padding:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px}
+.flash .back{transform:rotateY(180deg);background:var(--accent-soft)}
+.flash .big{font-family:var(--display);font-size:22px;font-weight:700}
+@media (prefers-reduced-motion:reduce){.flash .in{transition:none}}
+.list{display:flex;flex-direction:column;gap:8px}
+.li{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.li .d{font-family:var(--mono);font-size:12px;color:var(--mute);flex:none}
+.note{font-size:13px;color:var(--mute);background:var(--bg);border-radius:10px;padding:10px 12px;display:flex;gap:8px;align-items:flex-start}
+.note.ai{background:var(--warn-soft);color:var(--warn)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:9}
+.toast.show{opacity:1}
+.cks{display:flex;flex-wrap:wrap;gap:6px}
+.cks label{display:inline-flex;gap:5px;align-items:center;border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:13px;cursor:pointer;background:var(--panel)}
+.cks label:has(input:checked){background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.cks input{margin:0;accent-color:var(--accent)}
+.thinking{display:inline-flex;gap:4px;align-items:center}
+.thinking i{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite}
+.thinking i:nth-child(2){animation-delay:.2s}.thinking i:nth-child(3){animation-delay:.4s}
+@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+svg.chart{width:100%;height:auto;display:block}
+.spk{appearance:none;border:1px solid var(--line);background:var(--panel);border-radius:999px;width:34px;height:34px;display:inline-grid;place-items:center;cursor:pointer;flex:none;color:var(--accent)}
+.spk.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.spk svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sent{padding:8px 10px;border-radius:8px;cursor:pointer;line-height:1.6}
+.sent.cur{background:var(--accent-soft)}
+.sent:hover{background:var(--bg)}
+.hidden-q{background:var(--bg);border:1px dashed var(--line);border-radius:12px;padding:28px 16px;text-align:center;color:var(--mute)}
+.mini{position:fixed;left:0;right:0;bottom:calc(58px + env(safe-area-inset-bottom,0px));background:var(--accent);color:var(--accent-ink);padding:8px 14px;display:flex;align-items:center;gap:10px;z-index:6;font-size:13px}
+.mini .now{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini button{background:rgba(255,255,255,.18);border:0;color:inherit;border-radius:8px;padding:5px 10px;cursor:pointer;font-weight:500}
+@media (min-width:900px){.mini{left:112px;bottom:0;padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))}}
+.nowbox{background:var(--accent-soft);border-radius:12px;padding:16px;min-height:96px;display:flex;flex-direction:column;gap:6px}
+.nowbox .en{font-family:var(--display);font-size:19px;font-weight:500;line-height:1.35}
+.bubbles{display:flex;flex-direction:column;gap:10px}
+.bb{max-width:88%;padding:10px 14px;border-radius:16px;line-height:1.55;position:relative}
+.bb.ai{align-self:flex-start;background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:4px}
+.bb.me{align-self:flex-end;background:var(--accent);color:var(--accent-ink);border-bottom-right-radius:4px}
+.bb .ko{display:block;font-size:12.5px;color:var(--mute);margin-top:4px}
+.bb.me .ko{color:var(--accent-ink);opacity:.8}
+.fixc{align-self:flex-end;max-width:88%;background:var(--warn-soft);border-radius:12px;padding:8px 12px;font-size:13px;display:flex;flex-direction:column;gap:3px}
+.fixc .o{text-decoration:line-through;color:var(--mute)}
+.fixc .b{font-weight:500}
+.fixc .w{color:var(--warn)}
+.bubbles.hidetext .bb.ai{color:transparent;user-select:none}
+.bubbles.hidetext .bb.ai .row,.bubbles.hidetext .bb.ai .spk{color:var(--accent)}
+.bubbles.hidetext .bb.ai .btn{color:var(--ink)}
+.scen{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.chatin{position:sticky;bottom:calc(66px + env(safe-area-inset-bottom,0px));background:var(--bg);padding-top:8px}
+@media (min-width:900px){.chatin{bottom:0}}
+.hdr{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+details summary{cursor:pointer;font-weight:500}
+.mocknav{display:flex;gap:4px;flex-wrap:wrap}
+.mocknav i{width:14px;height:6px;border-radius:3px;background:var(--line)}
+.mocknav i.done{background:var(--accent)}.mocknav i.cur{background:var(--warn)}
+</style>
+
+<div class="app">
+  <nav class="nav" id="nav"></nav>
+  <main class="main" id="main"></main>
+</div>
+<div class="mini" id="mini" hidden></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ DATA ============ */
+const LEVELS=["NL","NM","NH","IL","IM1","IM2","IM3","IH","AL"];
+const TARGET="IM3";
+
+const TOPICS=[
+ {id:"intro",en:"Self-introduction",ko:"자기소개",group:"기본",qs:[
+  {t:"intro",q:"Let's start the interview now. Tell me a little bit about yourself.",k:"인터뷰를 시작하겠습니다. 자기소개를 간단히 해 주세요."}]},
+ {id:"home",en:"Home",ko:"거주지 (아파트/주택)",group:"서베이",qs:[
+  {t:"desc",q:"I would like to know where you live. Can you describe your home to me? What does it look like?",k:"어디에 사는지 알고 싶어요. 집을 묘사해 주세요. 어떻게 생겼나요?"},
+  {t:"routine",q:"What do you usually do at home on weekends? Tell me about a typical weekend at home.",k:"주말에 집에서 보통 무엇을 하나요? 전형적인 집에서의 주말을 말해 주세요."},
+  {t:"exp",q:"Tell me about a problem you had at home recently. What was it, and how did you solve it?",k:"최근 집에서 겪은 문제를 말해 주세요. 어떤 문제였고 어떻게 해결했나요?"},
+  {t:"compare",q:"How is your current home different from the one you lived in before?",k:"지금 사는 집은 예전에 살던 집과 어떻게 다른가요?"}]},
+ {id:"movies",en:"Movies",ko:"영화 보기",group:"서베이",qs:[
+  {t:"desc",q:"You indicated that you like watching movies. What kind of movies do you like, and why?",k:"영화 보는 것을 좋아한다고 했죠. 어떤 영화를 좋아하고, 왜 좋아하나요?"},
+  {t:"routine",q:"When and where do you usually watch movies? Who do you go with? Tell me about your typical movie routine.",k:"보통 언제, 어디서 영화를 보나요? 누구와 가나요? 영화 보는 전형적인 루틴을 말해 주세요."},
+  {t:"exp",q:"Tell me about the most memorable movie you have ever seen. What was it about, and why was it memorable?",k:"지금까지 본 가장 기억에 남는 영화를 말해 주세요. 어떤 내용이었고 왜 기억에 남나요?"},
+  {t:"compare",q:"How have movies or movie theaters changed since you were young?",k:"어릴 때와 비교해 영화나 영화관이 어떻게 바뀌었나요?"}]},
+ {id:"park",en:"Parks",ko:"공원 가기",group:"서베이",qs:[
+  {t:"desc",q:"You said you like going to parks. Describe your favorite park. What does it look like?",k:"공원에 가는 것을 좋아한다고 했죠. 가장 좋아하는 공원을 묘사해 주세요. 어떻게 생겼나요?"},
+  {t:"routine",q:"What do you usually do when you go to the park? Who do you go with?",k:"공원에 가면 보통 무엇을 하나요? 누구와 가나요?"},
+  {t:"exp",q:"Tell me about a memorable experience you had at a park.",k:"공원에서 있었던 기억에 남는 경험을 말해 주세요."}]},
+ {id:"concert",en:"Concerts",ko:"콘서트 보기",group:"서베이",qs:[
+  {t:"desc",q:"You indicated that you go to concerts. What kind of concerts do you like to go to?",k:"콘서트에 간다고 했죠. 어떤 콘서트에 가는 것을 좋아하나요?"},
+  {t:"routine",q:"What do you usually do before, during, and after a concert? Describe the whole process.",k:"콘서트 전, 중, 후에 보통 무엇을 하나요? 전체 과정을 설명해 주세요."},
+  {t:"exp",q:"Tell me about the most memorable concert you have been to.",k:"가장 기억에 남는 콘서트를 말해 주세요."}]},
+ {id:"beach",en:"Beach",ko:"해변 가기",group:"서베이",qs:[
+  {t:"desc",q:"You indicated that you go to the beach. Describe a beach you like to visit. What does it look like?",k:"해변에 간다고 했죠. 즐겨 가는 해변을 묘사해 주세요. 어떻게 생겼나요?"},
+  {t:"routine",q:"What do you usually do at the beach? Describe a typical day there.",k:"해변에서 보통 무엇을 하나요? 그곳에서의 전형적인 하루를 설명해 주세요."},
+  {t:"exp",q:"Tell me about a memorable or unexpected experience you had at the beach.",k:"해변에서 있었던 기억에 남거나 예상치 못한 경험을 말해 주세요."}]},
+ {id:"music",en:"Music",ko:"음악 감상",group:"서베이",qs:[
+  {t:"desc",q:"You indicated that you like listening to music. What kind of music do you like, and who are your favorite musicians?",k:"음악 듣는 것을 좋아한다고 했죠. 어떤 음악을 좋아하고, 좋아하는 음악가는 누구인가요?"},
+  {t:"routine",q:"When and where do you usually listen to music? How do you listen to it?",k:"보통 언제, 어디서 음악을 듣나요? 어떤 방법으로 듣나요?"},
+  {t:"exp",q:"How did you first become interested in music? Tell me how your taste in music has changed.",k:"음악에 처음 관심을 갖게 된 계기는요? 음악 취향이 어떻게 변해 왔는지 말해 주세요."}]},
+ {id:"cooking",en:"Cooking",ko:"요리하기",group:"서베이",qs:[
+  {t:"desc",q:"You said you like cooking. What kind of food do you usually cook? Describe one of your favorite dishes.",k:"요리를 좋아한다고 했죠. 보통 어떤 음식을 만드나요? 좋아하는 요리 하나를 설명해 주세요."},
+  {t:"routine",q:"How do you usually cook? Walk me through the steps from shopping to eating.",k:"보통 어떻게 요리하나요? 장보기부터 먹기까지 단계를 설명해 주세요."},
+  {t:"exp",q:"Tell me about a time something went wrong while you were cooking.",k:"요리하다가 뭔가 잘못됐던 경험을 말해 주세요."}]},
+ {id:"reading",en:"Reading",ko:"독서",group:"서베이",qs:[
+  {t:"desc",q:"You indicated that you like reading. What kind of books do you like to read?",k:"독서를 좋아한다고 했죠. 어떤 책을 즐겨 읽나요?"},
+  {t:"routine",q:"When and where do you usually read? Tell me about your reading habits.",k:"보통 언제, 어디서 책을 읽나요? 독서 습관을 말해 주세요."},
+  {t:"exp",q:"Tell me about a book that left a strong impression on you.",k:"강한 인상을 남긴 책에 대해 말해 주세요."}]},
+ {id:"jogging",en:"Jogging / Walking",ko:"조깅·걷기",group:"서베이",qs:[
+  {t:"desc",q:"You said you go jogging. Where do you usually jog? Describe the place.",k:"조깅을 한다고 했죠. 보통 어디서 조깅하나요? 그 장소를 묘사해 주세요."},
+  {t:"routine",q:"Tell me about your jogging routine. How often do you jog, and what do you do before and after?",k:"조깅 루틴을 말해 주세요. 얼마나 자주 하고, 전후에 무엇을 하나요?"},
+  {t:"exp",q:"How did you start jogging? Tell me about the first time you went jogging.",k:"조깅을 어떻게 시작했나요? 처음 조깅했던 때를 말해 주세요."}]},
+ {id:"gym",en:"Gym",ko:"헬스",group:"서베이",qs:[
+  {t:"desc",q:"You indicated that you go to the gym. Describe the gym you go to. What does it look like?",k:"헬스장에 다닌다고 했죠. 다니는 헬스장을 묘사해 주세요. 어떻게 생겼나요?"},
+  {t:"routine",q:"What do you usually do at the gym? Describe your typical workout.",k:"헬스장에서 보통 무엇을 하나요? 전형적인 운동 루틴을 설명해 주세요."},
+  {t:"exp",q:"Tell me about a memorable experience you had at the gym.",k:"헬스장에서 있었던 기억에 남는 경험을 말해 주세요."}]},
+ {id:"bike",en:"Cycling",ko:"자전거",group:"서베이",qs:[
+  {t:"desc",q:"You said you ride a bike. Where do you usually ride, and what does your bike look like?",k:"자전거를 탄다고 했죠. 보통 어디서 타고, 자전거는 어떻게 생겼나요?"},
+  {t:"routine",q:"When do you usually ride your bike? Describe your typical ride.",k:"보통 언제 자전거를 타나요? 전형적인 라이딩을 설명해 주세요."},
+  {t:"exp",q:"Tell me about a memorable or difficult experience you had while riding your bike.",k:"자전거를 타다 겪은 기억에 남거나 힘들었던 경험을 말해 주세요."}]},
+ {id:"dtravel",en:"Domestic travel",ko:"국내 여행",group:"서베이",qs:[
+  {t:"desc",q:"You indicated that you like to travel domestically. Where do you like to go in your country, and why?",k:"국내 여행을 좋아한다고 했죠. 국내에서 어디에 가는 것을 좋아하고, 왜 그런가요?"},
+  {t:"routine",q:"What do you usually do to prepare for a trip? Tell me about your typical travel routine.",k:"여행을 준비할 때 보통 무엇을 하나요? 전형적인 여행 루틴을 말해 주세요."},
+  {t:"exp",q:"Tell me about a memorable trip you took in your country. Where did you go, and what happened?",k:"국내에서 떠난 기억에 남는 여행을 말해 주세요. 어디에 갔고 무슨 일이 있었나요?"}]},
+ {id:"otravel",en:"Overseas travel",ko:"해외 여행",group:"서베이",qs:[
+  {t:"desc",q:"You said you travel abroad. Which countries have you visited, and which did you like the most?",k:"해외 여행을 한다고 했죠. 어느 나라들을 가 봤고, 어디가 가장 좋았나요?"},
+  {t:"routine",q:"What do you usually do before an overseas trip? How do you plan it?",k:"해외 여행 전에 보통 무엇을 하나요? 어떻게 계획하나요?"},
+  {t:"exp",q:"Tell me about a problem you had while traveling abroad and how you handled it.",k:"해외 여행 중 겪은 문제와 그것을 어떻게 처리했는지 말해 주세요."}]},
+ {id:"vacation",en:"Vacation at home",ko:"집에서 보내는 휴가",group:"서베이",qs:[
+  {t:"desc",q:"You said you spend your vacations at home. What do you usually do during a vacation at home?",k:"휴가를 집에서 보낸다고 했죠. 집에서 휴가를 보낼 때 보통 무엇을 하나요?"},
+  {t:"exp",q:"Tell me about your most recent vacation at home. What did you do, day by day?",k:"가장 최근에 집에서 보낸 휴가를 말해 주세요. 날마다 무엇을 했나요?"}]},
+ {id:"housework",en:"Housework",ko:"집안일",group:"돌발",qs:[
+  {t:"desc",q:"What kind of housework do you usually do? Who does the housework at your home?",k:"보통 어떤 집안일을 하나요? 집에서 집안일은 누가 하나요?"},
+  {t:"exp",q:"Tell me about a time you had to do a lot of housework. What did you do?",k:"집안일을 많이 해야 했던 때를 말해 주세요. 무엇을 했나요?"}]},
+ {id:"weather",en:"Weather",ko:"날씨·계절",group:"돌발",qs:[
+  {t:"desc",q:"Tell me about the weather in your country. What are the seasons like?",k:"당신 나라의 날씨를 말해 주세요. 계절은 어떤가요?"},
+  {t:"exp",q:"Tell me about a time the weather caused a problem for you.",k:"날씨 때문에 문제가 생겼던 때를 말해 주세요."}]},
+ {id:"bank",en:"Banks",ko:"은행",group:"돌발",qs:[
+  {t:"desc",q:"Describe a bank in your country. What does it look like, and what do people do there?",k:"당신 나라의 은행을 묘사해 주세요. 어떻게 생겼고, 사람들은 그곳에서 무엇을 하나요?"},
+  {t:"compare",q:"How has banking changed over the past 10 years?",k:"지난 10년 동안 은행 업무가 어떻게 바뀌었나요?"}]},
+ {id:"recycling",en:"Recycling",ko:"재활용",group:"돌발",qs:[
+  {t:"desc",q:"How is recycling done in your country? What do people usually recycle?",k:"당신 나라에서는 재활용을 어떻게 하나요? 사람들은 보통 무엇을 재활용하나요?"},
+  {t:"exp",q:"Tell me about a time you had trouble with recycling.",k:"재활용 때문에 곤란했던 때를 말해 주세요."}]},
+ {id:"internet",en:"Internet",ko:"인터넷",group:"돌발",qs:[
+  {t:"desc",q:"What do you usually do on the internet? Which websites or apps do you use the most?",k:"인터넷으로 보통 무엇을 하나요? 가장 많이 쓰는 웹사이트나 앱은요?"},
+  {t:"compare",q:"How has the internet changed people's lives compared to the past?",k:"인터넷은 과거와 비교해 사람들의 삶을 어떻게 바꿨나요?"}]},
+ {id:"transport",en:"Transportation",ko:"교통",group:"돌발",qs:[
+  {t:"desc",q:"What kind of transportation do people use in your country? How do you usually get around?",k:"당신 나라 사람들은 어떤 교통수단을 이용하나요? 당신은 보통 어떻게 이동하나요?"},
+  {t:"exp",q:"Tell me about a problem you experienced with public transportation.",k:"대중교통에서 겪은 문제를 말해 주세요."}]},
+ {id:"holiday",en:"Holidays",ko:"명절",group:"돌발",qs:[
+  {t:"desc",q:"Tell me about a major holiday in your country. What do people do on that day?",k:"당신 나라의 큰 명절에 대해 말해 주세요. 그날 사람들은 무엇을 하나요?"},
+  {t:"exp",q:"Tell me about a memorable holiday from your childhood.",k:"어린 시절의 기억에 남는 명절을 말해 주세요."}]},
+ {id:"health",en:"Health",ko:"건강",group:"돌발",qs:[
+  {t:"desc",q:"What do you do to stay healthy? Tell me about your healthy habits.",k:"건강을 위해 무엇을 하나요? 건강한 습관을 말해 주세요."},
+  {t:"compare",q:"How are people's ideas about health today different from the past?",k:"오늘날 사람들의 건강에 대한 생각은 과거와 어떻게 다른가요?"}]},
+ {id:"fashion",en:"Fashion",ko:"패션",group:"돌발",qs:[
+  {t:"desc",q:"What kind of clothes do you usually wear? Describe your style.",k:"보통 어떤 옷을 입나요? 스타일을 묘사해 주세요."},
+  {t:"compare",q:"How has fashion in your country changed over the years?",k:"당신 나라의 패션은 세월이 지나며 어떻게 바뀌었나요?"}]},
+ {id:"tech",en:"Technology",ko:"기술·산업",group:"돌발",qs:[
+  {t:"desc",q:"What kind of technology do you use every day? Which device is most important to you?",k:"매일 어떤 기술을 사용하나요? 가장 중요한 기기는 무엇인가요?"},
+  {t:"compare",q:"Tell me about a technology that has changed a lot since you were young.",k:"어릴 때 이후로 많이 바뀐 기술 하나를 말해 주세요."}]},
+ {id:"food",en:"Food",ko:"음식",group:"돌발",qs:[
+  {t:"desc",q:"Tell me about a popular food in your country. What does it taste like?",k:"당신 나라에서 인기 있는 음식을 말해 주세요. 맛은 어떤가요?"},
+  {t:"exp",q:"Tell me about a memorable meal you had recently.",k:"최근에 먹은 기억에 남는 식사를 말해 주세요."}]},
+];
+const QT={intro:"자기소개",desc:"묘사",routine:"습관·루틴",exp:"경험",compare:"비교·변화"};
+
+const ROLEPLAYS=[
+ {id:"rp_movie",k11:"상황을 드릴게요. 친구와 영화를 보고 싶습니다. 영화관에 전화해 영화와 상영 시간에 대해 서너 가지 질문하세요.",k12:"문제가 생겼어요. 영화관에 도착하니 표가 매진됐습니다. 친구에게 상황을 설명하고 대안을 두세 가지 제안하세요.",k13:"매진이나 취소로 계획이 틀어진 적이 있나요? 무슨 일이 있었는지 말해 주세요.",ko:"영화 티켓",q11:"I'd like to give you a situation and ask you to act it out. You want to see a movie with a friend. Call the theater and ask three or four questions about the movie and the showtimes.",
+  q12:"I'm sorry, but there is a problem. When you get to the theater, you find that the tickets are sold out. Explain the situation to your friend and suggest two or three alternatives.",
+  q13:"That's the end of the situation. Have you ever had a plan fall through because of a sold-out event or a cancellation? Tell me what happened."},
+ {id:"rp_travel",k11:"여행을 가고 싶습니다. 여행사에 전화해 여행 패키지에 대해 서너 가지 질문하세요.",k12:"여행을 예약했는데 급한 일이 생겨 갈 수 없습니다. 여행사에 전화해 상황을 설명하고 해결책을 두세 가지 제안하세요.",k13:"여행을 취소하거나 변경해야 했던 적이 있나요? 말해 주세요.",ko:"여행사",q11:"I'd like to give you a situation and ask you to act it out. You want to go on a trip. Call a travel agency and ask three or four questions about a travel package.",
+  q12:"I'm sorry, but there is a problem. You booked the trip, but something urgent came up and you cannot go. Call the agency, explain the situation, and suggest two or three solutions.",
+  q13:"That's the end of the situation. Have you ever had to cancel or change a trip? Tell me about it."},
+ {id:"rp_gym",k11:"헬스장에 등록하고 싶습니다. 헬스장에 전화해 회원권에 대해 서너 가지 질문하세요.",k12:"등록했는데 항상 너무 붐벼서 기구를 쓸 수 없습니다. 매니저에게 문제를 설명하고 해결책을 두세 가지 제안하세요.",k13:"돈을 낸 서비스에 불만족했던 적이 있나요? 무슨 일이 있었고 어떻게 대처했나요?",ko:"헬스장 등록",q11:"I'd like to give you a situation and ask you to act it out. You want to join a gym. Call the gym and ask three or four questions about membership.",
+  q12:"I'm sorry, but there is a problem. You joined the gym, but it is always too crowded and you can't use the machines. Talk to the manager, explain the problem, and suggest two or three solutions.",
+  q13:"That's the end of the situation. Have you ever been unhappy with a service you paid for? What happened, and how did you deal with it?"},
+ {id:"rp_restaurant",k11:"가족과 식당에서 저녁을 먹고 싶습니다. 식당에 전화해 예약을 위해 서너 가지 질문하세요.",k12:"도착하니 예약 기록이 없다고 합니다. 직원에게 상황을 설명하고 해결 방법을 두세 가지 제안하세요.",k13:"식당에서 뭔가 잘못됐던 때를 말해 주세요. 무슨 일이 있었나요?",ko:"식당 예약",q11:"I'd like to give you a situation and ask you to act it out. You want to have dinner with your family at a restaurant. Call the restaurant and ask three or four questions to make a reservation.",
+  q12:"I'm sorry, but there is a problem. When you arrive, the restaurant has no record of your reservation. Explain the situation to the staff and suggest two or three ways to solve it.",
+  q13:"That's the end of the situation. Tell me about a time something went wrong at a restaurant. What happened?"},
+ {id:"rp_phone",k11:"새 휴대폰을 사고 싶습니다. 매장에 가서 점원에게 원하는 휴대폰에 대해 서너 가지 질문하세요.",k12:"구매 후 화면에 흠집이 있는 것을 발견했습니다. 매장에 전화해 문제를 설명하고 해결책을 두세 가지 제안하세요.",k13:"산 물건이 고장 났거나 실망스러웠던 적이 있나요? 무슨 일이 있었는지 말해 주세요.",ko:"휴대폰 구매",q11:"I'd like to give you a situation and ask you to act it out. You want to buy a new phone. Go to a store and ask the clerk three or four questions about the phone you want.",
+  q12:"I'm sorry, but there is a problem. After buying the phone, you find that the screen is scratched. Call the store, explain the problem, and suggest two or three solutions.",
+  q13:"That's the end of the situation. Have you ever bought something that turned out to be broken or disappointing? Tell me what happened."},
+ {id:"rp_friend",k11:"친구가 파티에 초대했습니다. 친구에게 전화해 파티에 대해 서너 가지 질문하세요.",k12:"파티 당일 아파서 갈 수 없습니다. 친구에게 전화해 상황을 설명하고 대안을 두세 가지 제안하세요.",k13:"친구와의 약속을 취소해야 했던 때를 말해 주세요. 무슨 일이 있었고 친구는 어떻게 반응했나요?",ko:"친구와 약속",q11:"I'd like to give you a situation and ask you to act it out. A friend invited you to a party. Call your friend and ask three or four questions about the party.",
+  q12:"I'm sorry, but there is a problem. On the day of the party, you are sick and cannot go. Call your friend, explain the situation, and suggest two or three alternatives.",
+  q13:"That's the end of the situation. Tell me about a time you had to cancel plans with a friend. What happened, and how did your friend react?"},
+];
+
+const ADVANCED=[
+ "Some people say that it is better to live in a big city, while others prefer the countryside. Which do you prefer, and why?",
+ "Compare the way people spend their free time today with the way they did 20 years ago. What has changed?",
+ "What do you think is the biggest challenge facing young people in your country today? Why?",
+ "Many people say technology makes life more convenient but also more stressful. What is your opinion?",
+ "What are some issues or concerns people in your country have about the environment? What is being done about them?",
+ "Compare two kinds of transportation that are popular in your country. What are the advantages and disadvantages of each?",
+];
+
+const ADVANCED_KO=["대도시에 사는 게 낫다는 사람도 있고 시골을 선호하는 사람도 있습니다. 어느 쪽을 선호하고 왜 그런가요?", "오늘날 사람들이 여가를 보내는 방식을 20년 전과 비교해 보세요. 무엇이 달라졌나요?", "당신 나라의 젊은이들이 오늘날 직면한 가장 큰 어려움은 무엇이라고 생각하나요? 왜요?", "기술이 삶을 편리하게 하지만 더 스트레스를 준다는 말이 있습니다. 어떻게 생각하나요?", "당신 나라 사람들이 환경에 대해 갖는 우려는 무엇인가요? 그에 대해 어떤 조치가 취해지고 있나요?", "당신 나라에서 인기 있는 두 가지 교통수단을 비교해 보세요. 각각의 장단점은 무엇인가요?"];
+const CARDS=[
+ {c:"filler",en:"Well, let me think...",ko:"음, 생각 좀 해볼게요 (시간 벌기)"},
+ {c:"filler",en:"That's a good question.",ko:"좋은 질문이네요 (시간 벌기)"},
+ {c:"filler",en:"How should I put it...",ko:"뭐라고 해야 하지..."},
+ {c:"filler",en:"You know what I mean?",ko:"무슨 말인지 아시죠?"},
+ {c:"opener",en:"Okay, so you want to know about my ___.",ko:"오케이, 제 ___에 대해 알고 싶으시군요 (질문 되받기)"},
+ {c:"opener",en:"To be honest, I'm a big fan of ___.",ko:"솔직히 저는 ___을 정말 좋아해요"},
+ {c:"opener",en:"There are a couple of reasons why I like it.",ko:"제가 좋아하는 이유는 두어 가지예요"},
+ {c:"connector",en:"First of all, ... / On top of that, ...",ko:"우선... / 게다가..."},
+ {c:"connector",en:"What I mean is, ...",ko:"제 말은..."},
+ {c:"connector",en:"Speaking of which, ...",ko:"말이 나온 김에..."},
+ {c:"connector",en:"The thing is, ...",ko:"문제는 / 중요한 건..."},
+ {c:"connector",en:"Anyway, long story short, ...",ko:"어쨌든 간단히 말하면..."},
+ {c:"past",en:"It was about two years ago when I ___.",ko:"약 2년 전에 제가 ___했을 때였어요"},
+ {c:"past",en:"Out of the blue, ___.",ko:"갑자기 ___"},
+ {c:"past",en:"At first I thought ___, but it turned out that ___.",ko:"처음엔 ___라고 생각했는데 알고 보니 ___"},
+ {c:"past",en:"I was so relieved / embarrassed / frustrated.",ko:"정말 안도했어요 / 창피했어요 / 답답했어요"},
+ {c:"past",en:"Looking back, it was one of the best days of my life.",ko:"돌이켜보면 인생 최고의 날 중 하나였어요"},
+ {c:"routine",en:"I usually ___ on weekends, or whenever I have free time.",ko:"주말이나 시간 날 때마다 보통 ___해요"},
+ {c:"routine",en:"The first thing I do is ___. After that, ___.",ko:"제일 먼저 ___하고, 그다음엔 ___"},
+ {c:"routine",en:"It helps me relieve stress and recharge.",ko:"스트레스 풀고 재충전하는 데 도움이 돼요"},
+ {c:"desc",en:"It's located in ___, about ___ minutes from my place.",ko:"___에 있고, 집에서 약 ___분 거리예요"},
+ {c:"desc",en:"What I like most about it is ___.",ko:"제가 가장 마음에 드는 점은 ___"},
+ {c:"desc",en:"It's cozy and well-organized.",ko:"아늑하고 잘 정돈되어 있어요"},
+ {c:"desc",en:"There's a huge window that lets in a lot of sunlight.",ko:"햇빛이 많이 들어오는 큰 창문이 있어요"},
+ {c:"compare",en:"Compared to the past, ___ is way more ___.",ko:"예전에 비해 ___이 훨씬 더 ___"},
+ {c:"compare",en:"Back in the day, ... but these days, ...",ko:"예전에는... 그런데 요즘은..."},
+ {c:"compare",en:"The biggest difference is that ___.",ko:"가장 큰 차이는 ___"},
+ {c:"roleplay",en:"Hi, I'm calling to ask about ___.",ko:"안녕하세요, ___에 대해 여쭤보려고 전화했어요"},
+ {c:"roleplay",en:"Could you tell me what time it opens?",ko:"몇 시에 여는지 알려주실 수 있나요?"},
+ {c:"roleplay",en:"I'm afraid there's been a problem with ___.",ko:"___에 문제가 있는 것 같아요"},
+ {c:"roleplay",en:"Would it be possible to ___ instead?",ko:"대신 ___하는 게 가능할까요?"},
+ {c:"roleplay",en:"If that doesn't work, how about ___?",ko:"그게 안 되면 ___은 어떨까요?"},
+ {c:"opinion",en:"In my opinion, ___ / If you ask me, ___.",ko:"제 생각에는 ___"},
+ {c:"opinion",en:"I'm not 100% sure, but I'd say ___.",ko:"확실하진 않지만 ___인 것 같아요"},
+ {c:"opinion",en:"On the other hand, ___.",ko:"반면에 ___"},
+ {c:"closer",en:"So yeah, that's pretty much it.",ko:"네, 대충 그 정도예요 (마무리)"},
+ {c:"closer",en:"That's why I really enjoy ___.",ko:"그래서 제가 ___을 정말 즐기는 거예요"},
+ {c:"closer",en:"I hope that answers your question.",ko:"답변이 됐길 바라요"},
+ {c:"emotion",en:"I was over the moon.",ko:"정말 기뻤어요"},
+ {c:"emotion",en:"It was a total disaster.",ko:"완전 엉망이었어요"},
+ {c:"emotion",en:"It was totally worth it.",ko:"충분히 그럴 가치가 있었어요"},
+ {c:"emotion",en:"I couldn't stop laughing.",ko:"웃음을 멈출 수 없었어요"},
+].map((c,i)=>({id:"c"+i,...c}));
+const CAT={filler:"시간 벌기",opener:"시작",connector:"연결",past:"과거 경험",routine:"루틴",desc:"묘사",compare:"비교",roleplay:"롤플레이",opinion:"의견",closer:"마무리",emotion:"감정"};
+
+/* ============ STATE ============ */
+const DEF={profile:{name:"",job:"회사원 (직장인)",home:"아파트에서 가족과 거주",extra:"",survey:["movies","park","music","jogging","dtravel"]},
+  log:[], scripts:{}, models:{}, texts:[], trans:{}, cards:{}, custom:[], today:{date:"",cards:0,script:0,practice:0}, updatedAt:0};
+let S=structuredClone(DEF);
+let db=null, uid=null, sample=null, docRef=null;
+const todayStr=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+function loadLocal(){try{const r=localStorage.getItem("opic30");if(r)S=Object.assign(structuredClone(DEF),JSON.parse(r))}catch(e){}}
+function save(){S.updatedAt=Date.now();try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}
+  if(docRef){docRef.set(structuredClone(S)).catch(()=>{})}}
+function ensureToday(){if(S.today.date!==todayStr()){S.today={date:todayStr(),cards:0,script:0,practice:0}}}
+
+/* ============ UTIL ============ */
+const $=s=>document.querySelector(s);
+const h=(tag,attrs={},...kids)=>{const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==="class")e.className=v;else if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else if(k==="html")e.innerHTML=v;else if(v!==false&&v!=null)e.setAttribute(k,v)}
+  for(const k of kids.flat()){if(k==null||k===false)continue;e.append(k.nodeType?k:document.createTextNode(String(k)))}return e};
+const put=(el,...k)=>el.append(...k.flat().filter(x=>x!=null&&x!==false));
+let toastT;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),2200)}
+const fmt=s=>String(Math.floor(s/60)).padStart(1,"0")+":"+String(s%60).padStart(2,"0");
+const lvIdx=l=>{const i=LEVELS.indexOf(String(l||"").toUpperCase().replace(/\s/g,""));return i<0?3:i};
+const lvChip=l=>{const i=lvIdx(l);return h("span",{class:"chip "+(i>=6?"good":i>=4?"warn":"bad")},LEVELS[i])};
+const pick=(a,n)=>{const c=[...a];const o=[];while(c.length&&o.length<n)o.push(c.splice(Math.floor(Math.random()*c.length),1)[0]);return o};
+const topicById=id=>TOPICS.find(t=>t.id===id);
+function profileText(){const p=S.profile;return `이름: ${p.name||"(미입력)"} / 직업: ${p.job} / 거주: ${p.home}${p.extra?" / 기타: "+p.extra:""}`}
+
+/* ============ AI ============ */
+const ERR={not_granted:"이 페이지에서 Claude 사용이 허용되지 않았습니다. AI 평가는 꺼져 있어요.",rate_limited:"요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",session_expired:"다시 로그인이 필요해요.",invalid_json:"응답 형식 오류예요. 다시 시도해 주세요.",refused:"이 입력은 평가할 수 없어요. 내용을 바꿔 다시 시도해 주세요.",upstream_error:"연결 문제가 있었어요. 다시 시도해 주세요."};
+const errMsg=e=>ERR[e?.code]||ERR.upstream_error;
+const RUBRIC=`You are an OPIc (ACTFL) rater. The learner is Korean; target level is ${TARGET}. OPIc levels in order: NL, NM, NH, IL, IM1, IM2, IM3, IH, AL.
+Rating guide: IL = short sentences, lists; IM1-2 = full sentences, basic connectors, some past tense errors; IM3 = paragraph-length answers with a clear structure (intro-body-ending), fluent connectors, mostly accurate past tense, personal details; IH = handles complications and unexpected questions, varied vocabulary, past/present/future controlled; AL = narrates in all time frames consistently, supports opinions, native-like idioms.
+Judge primarily on: structure, amount of detail, tense control, connectors/fillers, vocabulary range, and task completion. Ignore spelling and punctuation (the answer was dictated by voice). Explanations for the learner are in Korean (존댓말, 간결하게); example sentences are in English.`;
+
+async function evaluate(question,answer,secs,onText){
+  const prompt=`${RUBRIC}
+
+Question: "${question}"
+Learner profile: ${profileText()}
+Speaking time: about ${secs} seconds (ideal 60-120 seconds).
+Learner's answer (voice-dictated):
+"""
+${answer}
+"""
+
+Reply with ONLY one JSON object:
+{"level":"IM2","score":62,"summary":"한국어 총평 2-3문장","strengths":["한국어로 잘한 점 2-3개"],"fixes":[{"original":"learner's phrase","better":"improved phrase","why":"한국어 설명 한 줄"}],"model_im3":"A model answer at IM3 level, 110-150 words, first person, natural spoken English, using the learner's own details where possible","model_ih":"The same answer upgraded to IH, 150-190 words","expressions":[{"en":"useful expression from the model answers","ko":"한국어 뜻"}]}
+Give 3-5 fixes and 4-6 expressions. "score" is 0-100 within the overall scale (IM3 starts around 65).`;
+  return sample.json(prompt,{onText,cache:false});
+}
+async function genScript(topic,onText){
+  const qs=topic.qs.map((q,i)=>`${i+1}. [${QT[q.t]}] ${q.q}`).join("\n");
+  const prompt=`You write OPIc answer scripts for a Korean learner whose target is ${TARGET} (aim slightly above: solid IM3 bordering IH).
+Learner profile: ${profileText()}
+Topic: ${topic.en} (${topic.ko})
+Write one spoken-style answer for each question below. Each answer: 110-150 words, first person, natural conversational English, clear structure (opener that restates the question → 2-3 details or a short story with when/where/who/what/how I felt → one-line closer). Use fillers and connectors that sound natural (well, actually, to be honest, on top of that, anyway). Past-tense questions must be told as a story in past tense. Use the learner's profile details and invent plausible, specific details (names of places, numbers, feelings) that are easy to memorize and reuse across topics.
+Questions:
+${qs}
+
+Reply with ONLY one JSON object: {"scripts":[{"n":1,"answer":"..."}],"expressions":[{"en":"...","ko":"한국어 뜻"}]}
+Include 6-8 reusable expressions taken from the scripts.`;
+  return sample.json(prompt,{onText,cache:false});
+}
+async function evalMock(items,onText){
+  const body=items.map((it,i)=>`Q${i+1} (${it.kind}): ${it.q}\nA${i+1} (${it.secs}s): ${it.a||"(no answer)"}`).join("\n\n");
+  const prompt=`${RUBRIC}
+
+This is a full 15-question OPIc mock test. Rate the overall level as a real OPIc rater would (the level is driven by the weakest consistent performance, not the best single answer). Then give short per-question feedback.
+Learner profile: ${profileText()}
+
+${body}
+
+Reply with ONLY one JSON object:
+{"level":"IM2","score":60,"summary":"한국어 총평 3-4문장 (레벨 판정 근거, 다음 목표)","top_fixes":["가장 시급한 개선점 3개, 한국어"],"per_question":[{"n":1,"level":"IM2","comment":"한국어 한 줄 코멘트","better":"One improved English sentence the learner could have said"}]}`;
+  return sample.json(prompt,{onText,cache:false});
+}
+
+/* ============ RECORDED AUDIO (Kokoro neural voices, pre-rendered) ============ */
+const AUD={tags:{m:"남성 · Michael",f:"여성 · Heart"},man:{},tag:"m",el:null,ready:false};
+try{const t=localStorage.getItem("opic30_aud");if(t)AUD.tag=t}catch(e){}
+function audEl(){if(!AUD.el){AUD.el=new Audio();AUD.el.preload="auto"}return AUD.el}
+async function loadManifests(){for(const t of [...Object.keys(AUD.tags),"ko"]){try{const r=await fetch("audio/"+t+"/manifest.json");if(r.ok)AUD.man[t]=await r.json()}catch(e){}}AUD.ready=true;if(!AUD.man[AUD.tag]){AUD.tag=Object.keys(AUD.man).find(t=>t!=="ko")||"off"}}
+const audSrc=key=>(AUD.tag!=="off"&&key&&AUD.man[AUD.tag]&&AUD.man[AUD.tag][key])?"audio/"+AUD.tag+"/"+key+".mp3":null;
+const koSrc=key=>(key&&AUD.man.ko&&AUD.man.ko[key])?"audio/ko/"+key+".mp3":null;
+let audCb=null;
+function audPlay(src,{rate=1,onend=null}={}){const a=audEl();audCb=onend;a.onended=()=>{const cb=audCb;audCb=null;cb&&cb()};a.onerror=()=>{const cb=audCb;audCb=null;cb&&cb()};a.src=src;a.playbackRate=rate;a.play().catch(()=>{const cb=audCb;audCb=null;cb&&cb()})}
+function audStop(){audCb=null;try{const a=audEl();a.onended=null;a.pause();a.removeAttribute("src");a.load()}catch(e){}}
+
+/* ============ TTS (듣기) ============ */
+const SPK_ICON='<svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg>';
+const STOP_ICON='<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+const tts={ok:"speechSynthesis" in window,voice:null,rate:1,cur:null,onend:null};
+try{tts.rate=parseFloat(localStorage.getItem("opic30_rate"))||0.95}catch(e){}
+const ttsText=t=>String(t||"").replace(/___/g,"something").replace(/\s*\/\s*/g,", or ").replace(/\.{3}/g,",").replace(/\s+/g," ").trim();
+function ttsVoices(){if(!tts.ok)return[];return speechSynthesis.getVoices().filter(v=>/^en[-_]/i.test(v.lang))}
+const MALE=/\b(guy|davis|christopher|eric|andrew|brian|jason|tony|roger|steffan|ryan|thomas|william|liam|daniel|david|mark|alex|fred|tom|aaron|arthur|james|oliver|rishi|george|matthew|rocko|reed|grandpa|eddy|male|jacob|connor|sam\b|jamie|noah|ethan|lee|hamish|ravi|neerja)\b/i;
+const FEMALE=/\b(aria|jenny|michelle|ana|emma|ava|sonia|libby|natasha|hazel|zira|susan|samantha|karen|moira|tessa|fiona|victoria|allison|nicky|flo|shelley|sandy|grandma|kathy|female|olivia|clara|sara|amy|joanna|salli|ivy|kendra|kimberly|lily|serena|veena)\b/i;
+const vGender=v=>MALE.test(v.name)?"m":FEMALE.test(v.name)?"f":"?";
+const vQuality=v=>/natural|neural|premium|enhanced|online|siri|google|wavenet/i.test(v.name)?2:/compact|espeak|eloquence/i.test(v.name)?0:1;
+const vLabel=v=>v.name.replace(/Microsoft |Google |English \(.*?\) /g,"")+" · "+({m:"남",f:"여","?":"?"}[vGender(v)])+" · "+v.lang.replace("_","-")+(vQuality(v)===2?" ★":"");
+function pickVoice(){const vs=ttsVoices();let want=null;try{want=localStorage.getItem("opic30_voice")}catch(e){}
+  const sorted=[...vs].sort((a,b)=>vQuality(b)-vQuality(a)||(/en[-_]US/i.test(b.lang)?1:0)-(/en[-_]US/i.test(a.lang)?1:0));
+  return vs.find(v=>v.name===want)||sorted[0]||null}
+if(tts.ok){speechSynthesis.onvoiceschanged=()=>{tts.voice=pickVoice();if(view==="listen"||view==="settings")render()};tts.voice=pickVoice()}
+function koVoice(){if(!tts.ok)return null;const vs=speechSynthesis.getVoices().filter(v=>/^ko/i.test(v.lang));return vs.sort((a,b)=>vQuality(b)-vQuality(a))[0]||null}
+function setVoice(name){tts.voice=ttsVoices().find(v=>v.name===name)||tts.voice;try{localStorage.setItem("opic30_voice",name)}catch(e){}}
+function voiceCard(){
+  const vs=ttsVoices();const ua=navigator.userAgent;const os=/iPhone|iPad/.test(ua)?"ios":/Mac/.test(ua)?"mac":/Android/.test(ua)?"android":/Windows/.test(ua)?"win":"other";const isEdge=/Edg\//.test(ua);
+  let filter="all";const sel=h("select",{id:"voice_sel",onchange:e=>{setVoice(e.target.value);toast("음성을 바꿨어요")}});
+  const fill=()=>{const list=vs.filter(v=>filter==="all"||vGender(v)===filter).sort((a,b)=>vQuality(b)-vQuality(a)||a.name.localeCompare(b.name));
+    sel.replaceChildren(...list.map(v=>h("option",{value:v.name,selected:tts.voice&&v.name===tts.voice.name},vLabel(v))));if(!list.length)sel.append(h("option",{},"해당 음성 없음"))};
+  fill();
+  const fb=g=>h("button",{class:"btn sm"+(filter===g?" primary":""),onclick:e=>{filter=g;[...e.target.parentNode.children].forEach(b=>b.classList.remove("primary"));e.target.classList.add("primary");fill()}},g==="all"?"전체":g==="m"?"남성":"여성");
+  const tips={win:isEdge?"Edge에서는 'Online (Natural)' 음성(★)이 가장 자연스러워요. Guy·Christopher·Eric이 남성, Aria·Jenny가 여성입니다.":"Windows에서는 Edge 브라우저로 열면 'Online (Natural)' 음성(★)을 쓸 수 있어 훨씬 자연스러워요. Chrome에서는 설정 → 시간 및 언어 → 음성에서 영어 음성 패키지를 추가하세요.",
+    mac:"Mac은 시스템 설정 → 손쉬운 사용 → 콘텐츠 말하기 → 시스템 음성 → 관리에서 영어 음성의 '향상됨/프리미엄' 버전을 내려받으면 품질이 크게 올라가요. (남성: Tom, Daniel, Alex, Aaron / 여성: Samantha, Ava, Zoe)",
+    ios:"iPhone은 설정 → 손쉬운 사용 → 콘텐츠 말하기 → 음성 → 영어에서 '향상됨' 또는 '프리미엄' 음성을 내려받으세요. (남성: Tom, Daniel, Aaron, Evan / 여성: Samantha, Ava, Zoe)",
+    android:"Android는 설정 → 일반 → 텍스트 음성 변환(TTS) → Google 음성 서비스 → 음성 데이터 설치에서 영어(미국) 고품질 음성을 추가하세요. Chrome에서 Google 음성(★)이 보여야 해요.",
+    other:"브라우저가 제공하는 기기 음성을 사용합니다. ★ 표시가 자연스러운 음성이에요."};
+  const recSel=h("select",{id:"aud_sel",onchange:e=>{AUD.tag=e.target.value;try{localStorage.setItem("opic30_aud",AUD.tag)}catch(x){}toast("음성을 바꿨어요")}},...Object.keys(AUD.man).map(t=>h("option",{value:t,selected:AUD.tag===t},AUD.tags[t]+" (녹음·고음질)")),h("option",{value:"off",selected:AUD.tag==="off"},"기기 내장 음성만 사용"));
+  return h("div",{class:"card"},h("h3",{},"음성 선택"),
+    h("p",{class:"muted small"},"시험 질문·표현카드와 그 한국어 해석은 녹음 음성(AI 성우)으로 재생돼요. 녹음이 없는 모범답안·스크립트·내 자료는 아래 기기 음성을 씁니다."),
+    h("label",{class:"f"},"녹음 음성 (질문·표현카드)",recSel),
+    h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>speak("Hi, I'm calling to ask about the gym membership. Could you tell me what time it opens on weekends?",{key:"rp_gym_11"})},"▶ 녹음 음성 들어보기")),
+    h("p",{class:"eyebrow",style:"margin-top:4px"},"기기 음성 (그 외)"),
+    h("div",{class:"row"},fb("all"),fb("m"),fb("f"),h("span",{class:"muted small"},vs.length+"개 영어 음성")),
+    sel,
+    h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>{const t=AUD.tag;AUD.tag="off";speak("Hi, I'm calling to ask about the gym membership. Could you tell me what time it opens on weekends?",{onend:()=>AUD.tag=t});AUD.tag=t}},"▶ 기기 음성 들어보기"),h("label",{class:"row small",style:"gap:6px"},"속도",rateCtl())),
+    h("div",{class:"note"},tips[os]),
+    vs.length?null:h("p",{class:"small",style:"color:var(--bad)"},"영어 음성을 찾지 못했어요. 위 안내대로 기기에 영어 음성을 설치한 뒤 새로고침하세요."))}
+function ttsStop(){audStop();if(!tts.ok)return;speechSynthesis.cancel();if(tts.cur){tts.cur.btn?.classList.remove("on");if(tts.cur.btn)tts.cur.btn.innerHTML=SPK_ICON}tts.cur=null}
+function speak(text,{btn=null,rate=null,onend=null,key=null}={}){
+  const src=audSrc(key);
+  if(!tts.ok&&!src){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
+  if(tts.cur&&tts.cur.btn===btn&&btn){ttsStop();return}
+  if(player.on&&!player.paused){playerPause()}
+  ttsStop();
+  if(src){tts.cur={u:null,btn};if(btn){btn.classList.add("on");btn.innerHTML=STOP_ICON}
+    audPlay(src,{rate:rate??tts.rate,onend:()=>{if(btn){btn.classList.remove("on");btn.innerHTML=SPK_ICON}tts.cur=null;onend&&onend()}});return}
+  const u=new SpeechSynthesisUtterance(ttsText(text));u.lang=tts.voice?.lang||"en-US";if(tts.voice)u.voice=tts.voice;u.rate=rate??tts.rate;u.pitch=1;
+  tts.cur={u,btn};if(btn){btn.classList.add("on");btn.innerHTML=STOP_ICON}
+  u.onend=u.onerror=()=>{if(tts.cur&&tts.cur.u===u){if(btn){btn.classList.remove("on");btn.innerHTML=SPK_ICON}tts.cur=null;onend&&onend()}};
+  speechSynthesis.speak(u)}
+function spkBtn(text,rate=null,key=null){const b=h("button",{class:"spk","aria-label":"듣기",title:"듣기",html:SPK_ICON});b.onclick=()=>speak(text,{btn:b,rate,key});return b}
+const splitSent=t=>(t||"").replace(/\s+/g," ").match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g)?.map(x=>x.trim()).filter(Boolean)||[];
+function rateCtl(){const r=h("select",{id:"rate_"+Math.random().toString(36).slice(2,6),onchange:e=>{tts.rate=parseFloat(e.target.value);try{localStorage.setItem("opic30_rate",tts.rate)}catch(x){}}},...[[0.7,"0.7x 느리게"],[0.85,"0.85x"],[0.95,"0.95x 자연"],[1,"1.0x"],[1.1,"1.1x"],[1.25,"1.25x 빠르게"]].map(([v,l])=>h("option",{value:v,selected:Math.abs(tts.rate-v)<.01},l)));r.style.width="auto";return r}
+
+/* ============ TIMER ============ */
+let timer={on:false,start:0,secs:0,int:null,el:null,bar:null};
+function timerStart(el,bar){timerStop();timer={on:true,start:Date.now(),secs:0,int:null,el,bar};timer.int=setInterval(()=>{timer.secs=Math.round((Date.now()-timer.start)/1000);if(el){el.textContent=fmt(timer.secs);el.classList.toggle("over",timer.secs>120)}if(bar)bar.style.width=Math.min(100,timer.secs/120*100)+"%"},250)}
+function timerStop(){if(timer.int)clearInterval(timer.int);timer.int=null;timer.on=false;return timer.secs}
+
+/* ============ VIEWS ============ */
+const VIEWS=[
+ {id:"today",ko:"오늘",ic:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'},
+ {id:"practice",ko:"연습",ic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>'},
+ {id:"chat",ko:"대화",ic:'<path d="M4 5h16v10H9l-5 4z"/><path d="M8 9h8M8 12h5"/>'},
+ {id:"mock",ko:"모의시험",ic:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>'},
+ {id:"scripts",ko:"스크립트",ic:'<path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6M9 13h6M9 17h6"/>'},
+ {id:"listen",ko:"듣기",ic:'<path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>'},
+ {id:"cards",ko:"표현카드",ic:'<rect x="3" y="6" width="14" height="12" rx="2"/><path d="M7 3h14v12"/>'},
+ {id:"settings",ko:"설정",ic:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'},
+];
+let view="today", sub=null;
+function renderNav(){const n=$("#nav");n.replaceChildren(...VIEWS.map(v=>h("button",{class:view===v.id?"on":"",onclick:()=>go(v.id),"aria-label":v.ko},h("span",{html:`<svg viewBox="0 0 24 24">${v.ic}</svg>`}),v.ko)))}
+function go(v,s=null){view=v;sub=s;timerStop();if(!player.on)ttsStop();render();window.scrollTo({top:0})}
+function render(){renderNav();ensureToday();const m=$("#main");m.replaceChildren();({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings})[view](m)}
+
+function aiNote(){if(sample)return null;return h("div",{class:"note ai"},"AI 평가·모범답안은 claude.ai 안에서 열었을 때 작동해요. 지금은 질문 연습과 카드만 사용할 수 있어요.")}
+
+/* ---- TODAY ---- */
+function vToday(m){
+  const p=S.practice;const logs=S.log.filter(l=>l.kind!=="card");
+  const recent=logs.slice(-5);const avg=recent.length?Math.round(recent.reduce((a,l)=>a+lvIdx(l.level),0)/recent.length):null;
+  const streak=calcStreak();const todayMin=S.log.filter(l=>l.date===todayStr()).reduce((a,l)=>a+(l.secs||0),0)/60;
+  const t=S.today;const done=[t.cards>=10,t.script>=1,t.practice>=3];
+  put(m,
+    h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},todayStr()+" · 목표 "+TARGET),h("h1",{},S.profile.name?`${S.profile.name}님, 오늘의 30분`:"오늘의 30분")),
+      h("span",{class:"chip "+(done.every(Boolean)?"good":"neutral")},done.filter(Boolean).length+"/3 완료")),
+    aiNote(),
+    h("div",{class:"stats"},
+      h("div",{class:"stat"},h("b",{class:"mono"},streak),h("span",{},"연속 학습일")),
+      h("div",{class:"stat"},h("b",{class:"mono"},Math.round(todayMin)),h("span",{},"오늘 말한 시간(분)")),
+      h("div",{class:"stat"},h("b",{},avg==null?"—":LEVELS[avg]),h("span",{},"최근 5회 평균 레벨"))),
+    h("section",{class:"plan"},
+      h("p",{class:"eyebrow"},"오늘의 루틴"),
+      planItem(done[0],"워밍업: 표현카드 10장",`${t.cards}/10`,"5분",()=>go("cards")),
+      planItem(done[1],"스크립트 1개 소리 내어 읽고 외우기",`${t.script}/1`,"10분",()=>go("scripts")),
+      planItem(done[2],"질문 3개 말하기 또는 AI 대화 + 피드백",`${t.practice}/3`,"15분",()=>go("practice"))),
+    h("div",{class:"card"},h("h2",{},"레벨 추이"),logs.length?chart(logs.slice(-12)):h("p",{class:"muted small"},"연습을 시작하면 평가 레벨이 여기에 쌓여요. 목표선은 IM3입니다.")),
+    h("div",{class:"card"},h("h2",{},"최근 기록"),logs.length?h("div",{class:"list"},...logs.slice(-6).reverse().map(l=>h("div",{class:"li"},h("span",{class:"d"},l.date.slice(5)),h("span",{class:"grow"},l.title),lvChip(l.level)))):h("p",{class:"muted small"},"아직 기록이 없어요."),
+      h("div",{class:"row"},h("button",{class:"btn",onclick:()=>go("mock")},"15문항 모의시험 보기"))),
+  );
+}
+function planItem(done,title,progress,min,onclick){return h("div",{class:"item"+(done?" done":""),onclick,role:"button",tabindex:"0"},h("span",{class:"box",html:done?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-11"/></svg>':""}),h("span",{class:"t grow"},title," ",h("span",{class:"muted small mono"},progress)),h("span",{class:"min"},min))}
+function calcStreak(){const days=[...new Set(S.log.map(l=>l.date))].sort().reverse();if(!days.length)return 0;let s=0;let d=new Date();if(days[0]!==todayStr()){d.setDate(d.getDate()-1);const y=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");if(days[0]!==y)return 0}
+  for(const day of days){const ds=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");if(day===ds){s++;d.setDate(d.getDate()-1)}else break}return s}
+function chart(logs){
+  const W=600,H=200,L=44,R=12,T=14,B=28;const n=logs.length;const x=i=>L+(n<2?(W-L-R)/2:i*(W-L-R)/(n-1));const y=v=>T+(8-v)*(H-T-B)/8;
+  const pts=logs.map((l,i)=>[x(i),y(lvIdx(l.level))]);
+  const grid=LEVELS.map((l,i)=>`<line x1="${L}" x2="${W-R}" y1="${y(i)}" y2="${y(i)}" stroke="var(--line)" stroke-width="1"/><text x="${L-8}" y="${y(i)+4}" text-anchor="end" font-size="11" font-family="var(--mono)" fill="var(--mute)">${l}</text>`).join("");
+  const target=`<line x1="${L}" x2="${W-R}" y1="${y(6)}" y2="${y(6)}" stroke="var(--good)" stroke-width="1.5" stroke-dasharray="4 4"/>`;
+  const area=n>1?`<path d="M${pts[0][0]},${H-B} ${pts.map(p=>`L${p[0]},${p[1]}`).join(" ")} L${pts[n-1][0]},${H-B} Z" fill="var(--accent)" opacity=".12"/>`:"";
+  const line=n>1?`<polyline points="${pts.map(p=>p.join(",")).join(" ")}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>`:"";
+  const dots=pts.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="${i===n-1?5:3.5}" fill="${i===n-1?"var(--accent)":"var(--panel)"}" stroke="var(--accent)" stroke-width="2"/>`).join("");
+  const xl=logs.map((l,i)=>(n<=6||i%2===0||i===n-1)?`<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--mute)">${l.date.slice(5)}</text>`:"").join("");
+  return h("div",{html:`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="레벨 추이">${grid}${target}${area}${line}${dots}${xl}</svg>`});
+}
+
+/* ---- PRACTICE ---- */
+function vPractice(m){
+  if(sub&&sub.q)return vAnswer(m,sub);
+  const mine=TOPICS.filter(t=>t.group==="기본"||S.profile.survey.includes(t.id));
+  const other=TOPICS.filter(t=>t.group==="서베이"&&!S.profile.survey.includes(t.id));
+  const sudden=TOPICS.filter(t=>t.group==="돌발");
+  const randomQ=()=>{const t=pick(mine.filter(t=>t.id!=="intro"),1)[0];const q=pick(t.qs,1)[0];go("practice",{topic:t,q,kind:QT[q.t]})};
+  const section=(title,list)=>[h("p",{class:"eyebrow"},title),h("div",{class:"grid2"},...list.map(t=>h("button",{class:"topic",onclick:()=>go("practice",{topic:t,q:null})},h("span",{class:"en"},t.en),h("span",{class:"ko"},t.ko+" · "+t.qs.length+"문항"))))];
+  if(sub&&sub.topic&&!sub.q){const t=sub.topic;put(m,
+    h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("practice")},"← 주제 목록"),h("p",{class:"eyebrow",style:"margin-top:10px"},t.ko),h("h1",{},t.en)),
+    h("div",{class:"list"},...t.qs.map((q,i)=>h("button",{class:"topic",onclick:()=>go("practice",{topic:t,q,kind:QT[q.t]})},h("span",{class:"chip neutral",style:"align-self:flex-start"},QT[q.t]),h("span",{},q.q)))),
+    h("div",{class:"row"},h("button",{class:"btn",onclick:()=>go("scripts",{topic:t})},"이 주제 스크립트 보기")));return}
+  put(m,
+    h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},"Question bank · "+TOPICS.reduce((a,t)=>a+t.qs.length,0)+"문항"),h("h1",{},"질문 연습")),h("button",{class:"btn primary",onclick:randomQ},"랜덤 질문 1개")),
+    aiNote(),
+    h("div",{class:"note"},"질문을 고르고 타이머를 켠 뒤 소리 내어 말하세요. 말한 내용은 키보드의 받아쓰기(마이크 키)로 입력하면 AI가 레벨을 평가하고 IM3·IH 모범답안을 만들어 줍니다."),
+    ...section("내 서베이 주제",mine),
+    h("details",{},h("summary",{},"다른 서베이 주제 ("+other.length+")"),h("div",{class:"grid2",style:"margin-top:10px"},...other.map(t=>h("button",{class:"topic",onclick:()=>go("practice",{topic:t,q:null})},h("span",{class:"en"},t.en),h("span",{class:"ko"},t.ko))))),
+    ...section("돌발 주제",sudden),
+    h("p",{class:"eyebrow"},"롤플레이 세트"),
+    h("div",{class:"grid2"},...ROLEPLAYS.map(r=>h("button",{class:"topic",onclick:()=>go("practice",{topic:{id:r.id,en:"Role-play",ko:r.ko},q:{t:"rp",q:r.q11},kind:"롤플레이 11번 · 질문하기",rp:r,step:11})},h("span",{class:"en"},r.ko),h("span",{class:"ko"},"11 질문 → 12 문제해결 → 13 경험")))),
+    h("p",{class:"eyebrow"},"14–15번 고난도"),
+    h("div",{class:"list"},...ADVANCED.map(q=>h("button",{class:"topic",onclick:()=>go("practice",{topic:{id:"adv",en:"Advanced",ko:"고난도"},q:{t:"adv",q},kind:"비교·의견"})},h("span",{},q)))),
+  );
+}
+function qKey(topic,q,s){if(s&&s.rp)return s.rp.id+"_"+s.step;if(topic.id==="adv")return "adv_"+ADVANCED.indexOf(q.q);const i=topic.qs?topic.qs.indexOf(q):-1;return i>=0?"q_"+topic.id+"_"+i:null}
+function vAnswer(m,s){
+  const {topic,q}=s;let secs=0;let fbBox=h("div",{class:"fb"});let ctl=null;
+  const tEl=h("div",{class:"timer"},"0:00");const bar=h("div",{class:"bar"},h("i"));
+  const ta=h("textarea",{id:"ans_"+topic.id,placeholder:"여기에 말한 내용을 받아쓰기로 입력하세요. (휴대폰: 키보드의 마이크 키 / Windows: Win+H / Mac: 🎤 키 또는 Fn 두 번)"});
+  const startBtn=h("button",{class:"btn primary",onclick:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작";}else{timerStart(tEl,bar.firstChild);startBtn.textContent="답변 끝";ta.focus()}}},"말하기 시작");
+  const evalBtn=h("button",{class:"btn primary",disabled:!sample,onclick:async()=>{
+    const a=ta.value.trim();if(a.length<20){toast("답변을 좀 더 입력해 주세요 (20자 이상)");return}
+    if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}
+    evalBtn.disabled=true;stopBtn.hidden=false;ctl=new AbortController();
+    fbBox.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"Claude가 평가 중… (10–40초)")));
+    try{const r=await evaluate(q.q,a,secs||Math.round(a.split(/\s+/).length/2.3),null);
+      renderFeedback(fbBox,r,q.q,a);if(r.model_im3){S.models=S.models||{};S.models[q.q]=r.model_im3}
+      S.log.push({date:todayStr(),kind:"practice",title:topic.en+" · "+(s.kind||""),level:r.level,score:r.score,secs:secs||0});S.today.practice++;save();
+      const nextRp=s.rp&&s.step<13?h("button",{class:"btn primary",onclick:()=>{const st=s.step+1;go("practice",{topic,q:{t:"rp",q:s.rp["q"+st]},kind:"롤플레이 "+st+"번 · "+(st===12?"문제 해결":"관련 경험"),rp:s.rp,step:st})}},"다음: "+(s.step+1)+"번 →"):null;
+      put(fbBox,h("div",{class:"row"},nextRp,h("button",{class:"btn",onclick:()=>{ta.value="";fbBox.replaceChildren();secs=0;tEl.textContent="0:00";bar.firstChild.style.width="0";evalBtn.disabled=false}},"같은 질문 다시"),h("button",{class:"btn",onclick:()=>go("practice")},"다른 질문")));
+    }catch(e){fbBox.replaceChildren(h("p",{class:"small",style:"color:var(--bad)"},errMsg(e)));if(e.code!=="not_granted"&&e.code!=="sampling_disabled")evalBtn.disabled=false}
+    finally{stopBtn.hidden=true}
+  }},"AI 평가 받기");
+  const stopBtn=h("button",{class:"btn",hidden:true,onclick:()=>ctl?.abort()},"중지");
+  const scr=S.scripts[topic.id];const sIdx=topic.qs?topic.qs.indexOf(q):-1;const myScript=scr&&sIdx>=0?scr.scripts?.[sIdx]?.answer:null;
+  put(m,
+    h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("practice",topic.qs?{topic,q:null}:null)},"← 뒤로"),h("p",{class:"eyebrow",style:"margin-top:10px"},topic.en+" · "+(s.kind||"")),h("div",{class:"row",style:"flex-wrap:nowrap;align-items:flex-start"},h("p",{class:"q grow"},q.q),spkBtn(q.q,null,qKey(topic,q,s)))),
+    h("div",{class:"card"},h("div",{class:"row"},tEl,h("div",{class:"grow"},bar,h("p",{class:"muted small",style:"margin-top:4px"},"권장 1:00–2:00. 질문을 되받고 → 2–3가지 디테일 → 한 줄 마무리.")),startBtn),
+      ta,h("div",{class:"row"},evalBtn,stopBtn,h("span",{class:"muted small"},sample?"":"AI 평가는 claude.ai 안에서 열었을 때 가능"))),
+    myScript?h("details",{class:"card"},h("summary",{},"내 스크립트 보기"),h("div",{class:"model"},myScript)):null,
+    fbBox);
+}
+function renderFeedback(box,r,q,a){
+  box.replaceChildren(
+    h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level||"?"),h("span",{class:"muted mono"},(r.score??"")+" / 100"),lvIdx(r.level)>=6?h("span",{class:"chip good"},"목표 달성"):h("span",{class:"chip warn"},"목표 "+TARGET+"까지 "+(6-lvIdx(r.level))+"단계")),h("p",{},r.summary||""),
+      r.strengths?.length?h("div",{},h("p",{class:"eyebrow"},"잘한 점"),h("ul",{style:"margin:4px 0 0;padding-left:18px"},...r.strengths.map(s=>h("li",{},s)))):null),
+    r.fixes?.length?h("div",{class:"card"},h("h3",{},"고칠 표현"),...r.fixes.map(f=>h("div",{class:"fix"},h("span",{class:"o"},f.original),h("span",{class:"b"},f.better),h("span",{class:"w"},f.why)))):null,
+    h("div",{class:"card"},h("h3",{},"모범답안 · IM3"),h("div",{class:"model"},r.model_im3||""),h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>copy(r.model_im3)},"복사"),h("button",{class:"btn sm",onclick:()=>go("listen",{text:r.model_im3,title:"모범답안 · IM3"})},"쉐도잉"),spkBtn(r.model_im3))),
+    r.model_ih?h("details",{class:"card"},h("summary",{},"한 단계 위 · IH 버전"),h("div",{class:"model",style:"margin-top:8px"},r.model_ih),h("div",{class:"row",style:"margin-top:8px"},h("button",{class:"btn sm",onclick:()=>go("listen",{text:r.model_ih,title:"모범답안 · IH"})},"쉐도잉"),spkBtn(r.model_ih))):null,
+    r.expressions?.length?h("div",{class:"card"},h("h3",{},"챙겨갈 표현"),h("div",{class:"kx"},...r.expressions.map(x=>h("div",{},h("span",{class:"en"},x.en),h("span",{class:"ko"},x.ko)))),h("button",{class:"btn sm",onclick:()=>{addCards(r.expressions,q);}},"표현카드에 추가")):null);
+}
+function copy(t){navigator.clipboard?.writeText(t||"").then(()=>toast("복사했어요")).catch(()=>toast("복사가 막혀 있어요. 직접 선택해 복사해 주세요"))}
+function addCards(list,src){let n=0;for(const x of list){if(!x?.en)continue;if(S.custom.some(c=>c.en===x.en))continue;S.custom.push({id:"u"+Date.now()+"_"+n,c:"custom",en:x.en,ko:x.ko||"",src:(src||"").slice(0,60)});n++}save();toast(n?n+"장 추가했어요":"이미 있는 표현이에요")}
+
+/* ---- CHAT (AI 회화) ---- */
+const SCEN=[
+ {id:"interview",ko:"오픽 인터뷰어 (Ava)",en:"OPIc interviewer",desc:"실제 시험처럼 질문하고, 답하면 꼬리 질문으로 이어가요",persona:"You are Ava, a friendly OPIc interviewer. Ask one question at a time about the learner's survey topics, following the real OPIc pattern: describe → routine → past experience → comparison, then move to the next topic. React briefly and naturally to what they said (one short sentence) before the next question. Never answer for them."},
+ {id:"free",ko:"자유 대화",en:"Small talk",desc:"일상 주제로 편하게 수다. 끊기지 않게 질문을 이어줘요",persona:"You are Sam, a warm, curious American friend making small talk. Talk about everyday topics (weekend, work, food, hobbies, travel). Share a little about yourself too, so it feels like a real two-way chat, then ask a follow-up question."},
+ {id:"gym",ko:"헬스장 직원",en:"Gym front desk",desc:"회원권 문의 → 문제 상황까지 롤플레이",persona:"You are the front-desk staff at a gym. The learner is calling to ask about membership. Answer their questions with realistic details (prices, hours, trial). After 4-5 exchanges, introduce a small problem (e.g. the class they want is full) so they must negotiate a solution."},
+ {id:"travel",ko:"여행사 직원",en:"Travel agent",desc:"패키지 문의 → 일정 변경 협상",persona:"You are a travel agent. The learner wants to book a trip. Ask what they want, suggest a package with concrete details, answer questions. After a few turns, bring up a complication (dates unavailable, price change) so they must propose alternatives."},
+ {id:"restaurant",ko:"식당 예약",en:"Restaurant host",desc:"예약 전화 → 예약 누락 문제 해결",persona:"You are the host at a popular restaurant. The learner calls to make a reservation. Ask for details (date, party size, requests). Later, tell them there is a problem (no record of the booking, or only a late slot available) and let them handle it."},
+ {id:"store",ko:"휴대폰 매장",en:"Phone store clerk",desc:"구매 상담 → 불량 교환 요청",persona:"You are a clerk at a phone store. Help the learner choose a phone, then later they call back because the screen is scratched; handle their complaint politely but make them explain and propose a solution."},
+ {id:"friend",ko:"친구와 약속",en:"Friend on the phone",desc:"파티·약속 잡기 → 취소 상황",persona:"You are Jake, the learner's friend, on the phone. You invited them to a party this weekend. Chat about the plan, then they may need to cancel or change plans; respond like a real friend would."},
+];
+let chat=null;let chatMode="text";try{chatMode=localStorage.getItem("opic30_cmode")||"text"}catch(e){}
+const saveMode=()=>{try{localStorage.setItem("opic30_cmode",chatMode)}catch(e){}};
+function chatRules(sc){return `${sc.persona}
+The learner is Korean, preparing for the OPIc speaking test, target level IM3. Their profile: ${profileText()}.
+Style: natural spoken American English, 1-3 sentences per turn, simple enough for an intermediate learner, and ALWAYS end with a question so the conversation keeps going. Stay in character; do not lecture.
+Correction: look at the learner's LAST message only. If it has a clear grammar mistake, wrong word, or an unnatural phrase, give "fix": {"original": their sentence(s) with the issue, "better": a corrected natural version keeping their meaning, "why": a one-line explanation in Korean}. If their message was fine, set "fix": null. Ignore spelling and punctuation (voice dictation). Never correct more than one thing per turn.
+Reply with ONLY a JSON object: {"reply":"your in-character reply","reply_ko":"reply의 한국어 뜻 (짧게)","fix":null}`}
+function vChat(m){
+  if(!chat){put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation practice"),h("h1",{},"AI와 대화")),aiNote(),
+    h("div",{class:"note"},"말하기 → 상대가 답하면서 틀린 표현은 그 자리에서 고쳐 주고 → 대화를 이어가는 연습이에요. '뭐라고 말하지?'에 한국어로 쓰면 영어 표현을 알려줍니다. 끝내면 레벨 추정과 표현 정리가 나와요."),
+    h("div",{class:"card"},h("h3",{},"모드"),h("div",{class:"cks"},h("label",{},h("input",{type:"radio",name:"cmode",value:"text",checked:chatMode==="text",onchange:()=>{chatMode="text";saveMode()}}),"텍스트 모드 — 입력하고 보내기"),h("label",{},h("input",{type:"radio",name:"cmode",value:"voice",checked:chatMode==="voice",onchange:()=>{chatMode="voice";saveMode()}}),"말하기 모드 — 말하면 자동 전송, 답은 음성으로")),
+      h("p",{class:"muted small"},"말하기 모드: 마이크 버튼을 누르면 키보드 받아쓰기가 열려요. 말을 멈추고 2초가 지나면 자동으로 보내고, 상대의 답은 읽어 줍니다. 이 앱은 마이크에 직접 접근할 수 없어서 받아쓰기 엔진은 iPhone 키보드(Siri 받아쓰기)를 씁니다.")),
+    h("p",{class:"eyebrow"},"상대 고르기"),
+    h("div",{class:"scen"},...SCEN.map(sc=>h("button",{class:"topic",disabled:!sample,onclick:()=>startChat(sc)},h("span",{class:"en"},sc.ko),h("span",{class:"ko"},sc.desc)))),
+    S.log.filter(l=>l.kind==="chat").length?h("div",{class:"card"},h("h3",{},"지난 대화"),h("div",{class:"list"},...S.log.filter(l=>l.kind==="chat").slice(-5).reverse().map(l=>h("div",{class:"li"},h("span",{class:"d"},l.date.slice(5)),h("span",{class:"grow"},l.title),lvChip(l.level))))):null);return}
+  if(chat.summary)return vChatSummary(m);
+  const sc=chat.sc;const bub=h("div",{class:"bubbles",id:"bubbles"});
+  const render1=(u)=>{if(u.who==="ai"){const b=h("div",{class:"bb ai"},u.text,u.ko?h("span",{class:"ko",hidden:true},u.ko):null);b.append(h("div",{class:"row",style:"margin-top:6px;gap:6px"},spkBtn(u.text),h("button",{class:"btn sm ghost",onclick:e=>{const k=b.querySelector(".ko");if(k)k.hidden=!k.hidden}},"해석")));return b}
+    if(u.who==="me")return h("div",{class:"bb me"},u.text);
+    if(u.who==="fix")return h("div",{class:"fixc"},h("span",{class:"eyebrow"},"이렇게 말하면 더 자연스러워요"),h("span",{class:"o"},u.fix.original),h("span",{class:"b"},u.fix.better),h("span",{class:"w"},u.fix.why),h("button",{class:"btn sm",style:"align-self:flex-start;margin-top:4px",onclick:()=>{addCards([{en:u.fix.better,ko:u.fix.why}],sc.ko)}},"표현카드에 추가"));
+    if(u.who==="wait")return h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")))};
+  chat.ui.forEach(u=>bub.append(render1(u)));
+  const ta=h("textarea",{id:"chat_in",style:"min-height:64px",placeholder:"받아쓰기(마이크 키)로 말하거나 입력하세요"});
+  const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ta.value="";chat.busy=true;
+    chat.ui.push({who:"me",text:t});chat.turns.push({role:"user",content:t});bub.append(render1({who:"me",text:t}));const w=render1({who:"wait"});bub.append(w);w.scrollIntoView({block:"end"});
+    try{const r=await sample.json([{role:"user",content:chatRules(sc)},...chat.turns],{cache:false,modelTier:"quick"});
+      w.remove();if(r?.fix?.better&&r.fix.original){chat.ui.push({who:"fix",fix:r.fix});bub.append(render1({who:"fix",fix:r.fix}))}
+      const reply=String(r?.reply||"").trim()||"Sorry, could you say that again?";chat.turns.push({role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});bub.append(render1({who:"ai",text:reply,ko:r?.reply_ko||""}));
+      if(chat.auto)speak(reply);bub.lastChild.scrollIntoView({block:"end"});chat.n++;const cnt=$("#chat_cnt");if(cnt)cnt.textContent=sc.en+" · "+chat.n+"턴";
+      if(chat.turns.length>24)chat.turns.splice(0,2);
+    }catch(e){w.remove();bub.append(h("div",{class:"note"},errMsg(e)));chat.turns.pop();chat.ui.pop()}
+    finally{chat.busy=false;last="";if(chatMode!=="voice")ta.focus()}};
+  const hint=async()=>{const k=prompt_ko.value.trim();if(!k)return;hintBtn.disabled=true;try{const r=await sample.json(`Korean learner wants to say this in a casual English conversation: "${k}"\nReply with ONLY JSON: {"en":"natural spoken English, 1-2 sentences, intermediate level","note":"한 줄 한국어 메모 (핵심 표현)"}`,{modelTier:"quick"});ta.value=(ta.value?ta.value+" ":"")+(r?.en||"");hintOut.textContent=r?.note||"";prompt_ko.value=""}catch(e){toast(errMsg(e))}finally{hintBtn.disabled=false}};
+  const prompt_ko=h("input",{type:"text",id:"chat_ko",placeholder:"뭐라고 말하지? 한국어로 쓰면 영어로 알려줘요",onkeydown:e=>{if(e.key==="Enter"){e.preventDefault();hint()}}});const hintBtn=h("button",{class:"btn sm",onclick:hint},"영어로");const hintOut=h("span",{class:"muted small"});
+  // voice mode: auto-send when dictated text stops changing
+  let vt=null,last="";const status=h("span",{class:"muted small mono"});
+  const armAuto=()=>{clearTimeout(vt);const now=ta.value.trim();if(now.length<3||now===last){status.textContent=now?"":"말하면 자동으로 보내요";return}
+    let left=2;status.textContent="말이 끝나면 "+left+"초 후 전송";const tick=()=>{if(ta.value.trim()!==now){armAuto();return}left--;if(left<=0){status.textContent="";last=ta.value.trim();send()}else{status.textContent="말이 끝나면 "+left+"초 후 전송";vt=setTimeout(tick,1000)}};vt=setTimeout(tick,1000)};
+  if(chatMode==="voice"){ta.addEventListener("input",armAuto);ta.placeholder="키보드의 마이크 키를 누르고 말하세요"}
+  const micBtn=h("button",{class:"btn primary",style:"min-width:140px;justify-content:center",onclick:()=>{ta.focus();toast("키보드의 🎤 키를 눌러 말하세요")}},"🎤 말하기");
+  const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn,h("button",{class:"btn",onclick:()=>{clearTimeout(vt);send()}},"지금 보내기"),status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
+  put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow",id:"chat_cnt"},sc.en+" · "+chat.n+"턴"+(chatMode==="voice"?" · 말하기 모드":"")),h("h2",{},sc.ko)),h("div",{class:"row"},h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_auto",checked:chat.auto,onchange:e=>chat.auto=e.target.checked}),"자동 읽기"),chatMode==="voice"?h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_hide",checked:chat.hide,onchange:e=>{chat.hide=e.target.checked;bub.classList.toggle("hidetext",chat.hide)}}),"상대 말 숨기기"):null,h("button",{class:"btn sm",onclick:()=>endChat()},"대화 끝내기"))),
+    bub,
+    h("div",{class:"chatin"},h("div",{class:"card",style:"gap:8px"},ta,inputRow,h("div",{class:"row"},h("div",{class:"grow"},prompt_ko),hintBtn),hintOut)));
+  if(chat.hide)bub.classList.add("hidetext");
+  setTimeout(()=>{bub.lastElementChild?.scrollIntoView({block:"end"})},50);
+}
+async function startChat(sc){chat={sc,turns:[],ui:[],n:0,busy:false,auto:true,hide:false,summary:null};render();
+  const bub=$("#bubbles");const w=h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")));bub.append(w);
+  try{const r=await sample.json([{role:"user",content:chatRules(sc)+"\n\nStart the conversation now with a natural greeting and your first question. Reply with ONLY the JSON object (fix: null)."}],{cache:false,modelTier:"quick"});
+    w.remove();const reply=String(r?.reply||"Hi! How's it going?");chat.turns.push({role:"user",content:"(start)"},{role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});render();if(chat.auto)speak(reply)}
+  catch(e){w.remove();bub.append(h("div",{class:"note"},errMsg(e)))}}
+async function endChat(){if(!chat)return;const mine=chat.ui.filter(u=>u.who==="me");if(mine.length<2){chat=null;render();return}
+  chat.summary="pending";render()}
+async function vChatSummary(m){
+  if(chat.summary==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"대화 평가 중…")));put(m,h("h1",{},"대화 정리"),box);
+    const tr=chat.ui.filter(u=>u.who==="ai"||u.who==="me").map(u=>(u.who==="ai"?"Partner: ":"Learner: ")+u.text).join("\n");
+    try{const r=await sample.json(`${RUBRIC}\n\nThis is a transcript of a practice conversation (${chat.sc.en}). Rate ONLY the learner's turns.\n\n${tr}\n\nReply with ONLY JSON: {"level":"IM2","score":60,"summary":"한국어 총평 2-3문장","fixes":[{"original":"...","better":"...","why":"한국어"}],"expressions":[{"en":"useful natural expression the learner could have used","ko":"뜻"}],"next":"다음 대화에서 시도할 한 가지 (한국어)"}\nGive 3-5 fixes and 4-6 expressions.`,{cache:false});
+      chat.summary=r;S.log.push({date:todayStr(),kind:"chat",title:"대화 · "+chat.sc.ko+" · "+chat.n+"턴",level:r.level,score:r.score,secs:chat.n*45});S.today.practice++;save();render()}
+    catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("button",{class:"btn",onclick:()=>{chat=null;render()}},"닫기"))}return}
+  const r=chat.summary;
+  put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation review · "+chat.sc.ko),h("h1",{},"대화 정리")),
+    h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level||"?"),h("span",{class:"muted mono"},(r.score??"")+" / 100")),h("p",{},r.summary||""),r.next?h("p",{class:"small"},h("b",{},"다음엔: "),r.next):null),
+    r.fixes?.length?h("div",{class:"card"},h("h3",{},"고칠 표현"),...r.fixes.map(f=>h("div",{class:"fix"},h("span",{class:"o"},f.original),h("span",{class:"b"},f.better),h("span",{class:"w"},f.why)))):null,
+    r.expressions?.length?h("div",{class:"card"},h("h3",{},"이렇게 말할 수 있었어요"),h("div",{class:"kx"},...r.expressions.map(x=>h("div",{},h("span",{class:"en"},x.en),h("span",{class:"ko"},x.ko)))),h("button",{class:"btn sm",onclick:()=>addCards(r.expressions,chat.sc.ko)},"표현카드에 추가")):null,
+    h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{const sc=chat.sc;chat=null;startChat(sc)}},"같은 상대와 다시"),h("button",{class:"btn",onclick:()=>{chat=null;render()}},"닫기")));
+}
+
+/* ---- MOCK ---- */
+let mock=null;
+function buildMock(){const mine=TOPICS.filter(t=>t.group==="서베이"&&S.profile.survey.includes(t.id));const sudden=TOPICS.filter(t=>t.group==="돌발");
+  const combos=[...pick(mine,2),...pick(sudden,1)];const items=[{kind:"자기소개",q:TOPICS[0].qs[0].q,key:"q_intro_0"}];
+  for(const t of combos){const order=["desc","routine","exp","compare"];const qs=order.map(o=>t.qs.find(q=>q.t===o)).filter(Boolean).slice(0,3);while(qs.length<3)qs.push(pick(t.qs,1)[0]);qs.forEach(q=>items.push({kind:t.en+" · "+QT[q.t],q:q.q,key:"q_"+t.id+"_"+t.qs.indexOf(q)}))}
+  const rp=pick(ROLEPLAYS,1)[0];items.push({kind:"롤플레이 11 · 질문하기",q:rp.q11,key:rp.id+"_11"},{kind:"롤플레이 12 · 문제 해결",q:rp.q12,key:rp.id+"_12"},{kind:"롤플레이 13 · 경험",q:rp.q13,key:rp.id+"_13"});
+  pick(ADVANCED,2).forEach(q=>items.push({kind:"14–15 · 고난도",q,key:"adv_"+ADVANCED.indexOf(q)}));
+  return items.slice(0,15).map(it=>({...it,a:"",secs:0}))}
+function vMock(m){
+  if(!mock){put(m,h("div",{},h("p",{class:"eyebrow"},"Mock test · 15 questions"),h("h1",{},"모의시험")),aiNote(),
+    h("div",{class:"card"},h("p",{},"실제 시험과 같은 구성으로 15문항을 연속으로 풉니다: 자기소개 1 → 콤보 3세트(9) → 롤플레이 3 → 고난도 2. 문항당 최대 2분, 전체 약 30분."),h("p",{class:"muted small"},"끝나면 Claude가 전체를 한 번에 채점해 종합 레벨과 문항별 피드백을 줍니다. 중간에 나가면 진행 내용은 사라져요."),
+      h("label",{class:"row",style:"cursor:pointer"},h("input",{type:"checkbox",id:"mock_listen",checked:tts.ok}),"실전 듣기 모드 — 질문을 음성으로만 듣고 답하기 (텍스트 숨김, 2회 재생)"),h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{mock={items:buildMock(),i:0,result:null,listen:$("#mock_listen").checked&&tts.ok};render()}},"시험 시작"))),
+    S.log.filter(l=>l.kind==="mock").length?h("div",{class:"card"},h("h3",{},"지난 모의시험"),h("div",{class:"list"},...S.log.filter(l=>l.kind==="mock").slice(-5).reverse().map(l=>h("div",{class:"li"},h("span",{class:"d"},l.date),h("span",{class:"grow"},l.title),lvChip(l.level))))):null);return}
+  if(mock.result)return vMockResult(m);
+  const it=mock.items[mock.i];const n=mock.items.length;
+  const tEl=h("div",{class:"timer"},"0:00");const bar=h("div",{class:"bar"},h("i"));
+  const ta=h("textarea",{id:"mock_"+mock.i,placeholder:"받아쓰기로 답변 입력"});ta.value=it.a;
+  const nav=h("div",{class:"mocknav"},...mock.items.map((x,i)=>h("i",{class:i<mock.i?"done":i===mock.i?"cur":""})));
+  const next=async()=>{it.a=ta.value.trim();it.secs=timerStop()||it.secs;if(mock.i<n-1){mock.i++;render()}else{mock.result="pending";render()}};
+  let plays=0;const qText=h("p",{class:"q grow",style:"margin-top:10px"},it.q);const hid=h("div",{class:"hidden-q",style:"margin-top:10px"},"질문을 듣고 답하세요. 실제 시험처럼 재생은 2번까지 가능해요.");
+  const reveal=h("button",{class:"btn sm ghost",onclick:()=>{hid.hidden=true;qText.hidden=false;reveal.hidden=true}},"질문 텍스트 보기");
+  const replay=h("button",{class:"btn sm",onclick:()=>{if(plays>=2){toast("실제 시험에서는 2번까지만 들을 수 있어요");return}plays++;speak(it.q,{key:it.key});replay.textContent="다시 듣기 ("+(2-plays)+"회 남음)"}},"질문 듣기 (2회)");
+  if(mock.listen){qText.hidden=true;setTimeout(()=>{plays=1;speak(it.q,{key:it.key});replay.textContent="다시 듣기 (1회 남음)"},300)}else{hid.hidden=true;reveal.hidden=true}
+  put(m,h("div",{},h("p",{class:"eyebrow"},"Question "+(mock.i+1)+" / "+n+" · "+it.kind),nav,qText,hid,h("div",{class:"row",style:"margin-top:8px"},replay,reveal)),
+    h("div",{class:"card"},h("div",{class:"row"},tEl,h("div",{class:"grow"},bar),h("button",{class:"btn primary",onclick:e=>{if(timer.on){it.secs=timerStop();e.target.textContent="다시 시작"}else{timerStart(tEl,bar.firstChild);e.target.textContent="답변 끝";ta.focus()}}},"말하기 시작")),ta,
+      h("div",{class:"row"},h("button",{class:"btn primary",onclick:next},mock.i<n-1?"다음 문항 →":"제출하고 채점"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"시험 중단"))));
+}
+async function vMockResult(m){
+  if(mock.result==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"15문항 채점 중… (30–90초)")));
+    put(m,h("h1",{},"채점 중"),box);
+    if(!sample){box.replaceChildren(h("p",{},ERR.not_granted),h("button",{class:"btn",onclick:()=>{mock=null;render()}},"닫기"));return}
+    try{const r=await evalMock(mock.items,null);mock.result=r;S.log.push({date:todayStr(),kind:"mock",title:"모의시험 15문항",level:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0)});save();render()}
+    catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{render()}},"다시 시도"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"닫기")))}
+    return}
+  const r=mock.result;
+  put(m,h("div",{},h("p",{class:"eyebrow"},"Mock result"),h("h1",{},"모의시험 결과")),
+    h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level),h("span",{class:"muted mono"},(r.score??"")+" / 100"),lvIdx(r.level)>=6?h("span",{class:"chip good"},"목표 달성"):h("span",{class:"chip warn"},"목표 "+TARGET)),h("p",{},r.summary||""),
+      r.top_fixes?.length?h("div",{},h("p",{class:"eyebrow"},"가장 먼저 고칠 것"),h("ol",{style:"margin:4px 0 0;padding-left:18px"},...r.top_fixes.map(s=>h("li",{},s)))):null),
+    h("div",{class:"card"},h("h3",{},"문항별"),h("div",{class:"list"},...(r.per_question||[]).map(p=>{const it=mock.items[(p.n||1)-1]||{};return h("div",{class:"li",style:"flex-direction:column;align-items:stretch;gap:4px"},h("div",{class:"row"},h("span",{class:"mono small muted"},"Q"+p.n),h("span",{class:"grow small"},it.kind||""),lvChip(p.level)),h("span",{class:"small"},p.comment),p.better?h("span",{class:"small",style:"color:var(--accent)"},"→ "+p.better):null)}))),
+    h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{mock=null;render()}},"닫기")));
+}
+
+/* ---- SCRIPTS ---- */
+function vScripts(m){
+  if(sub&&sub.topic)return vScriptTopic(m,sub.topic);
+  const mine=TOPICS.filter(t=>t.id!=="intro"&&(S.profile.survey.includes(t.id)||t.group==="돌발"));
+  put(m,h("div",{},h("p",{class:"eyebrow"},"My scripts"),h("h1",{},"주제별 스크립트")),aiNote(),
+    h("div",{class:"note"},"내 프로필(직업·거주지)을 바탕으로 주제당 질문별 110–150단어 스크립트를 만들어요. 하루 1개씩 소리 내어 3번 읽고, 키워드만 보고 말해 보는 게 목표입니다."),
+    h("p",{class:"eyebrow"},"자기소개"),h("div",{class:"grid2"},scriptTile(TOPICS[0])),
+    h("p",{class:"eyebrow"},"내 서베이 주제"),h("div",{class:"grid2"},...mine.filter(t=>t.group==="서베이").map(scriptTile)),
+    h("p",{class:"eyebrow"},"돌발 주제"),h("div",{class:"grid2"},...mine.filter(t=>t.group==="돌발").map(scriptTile)));
+}
+function scriptTile(t){const has=!!S.scripts[t.id];return h("button",{class:"topic",onclick:()=>go("scripts",{topic:t})},h("span",{class:"row"},h("span",{class:"en grow"},t.en),has?h("span",{class:"chip good"},"저장됨"):null),h("span",{class:"ko"},t.ko))}
+function vScriptTopic(m,t){
+  const box=h("div",{style:"display:flex;flex-direction:column;gap:14px"});let ctl=null;
+  const gen=async(btn)=>{if(!sample){toast(ERR.not_granted);return}btn.disabled=true;ctl=new AbortController();const stop=h("button",{class:"btn sm",onclick:()=>ctl.abort()},"중지");
+    box.replaceChildren(h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"스크립트 작성 중… (20–60초)")),stop));
+    try{const r=await genScript(t,null);S.scripts[t.id]={...r,date:todayStr()};save();show()}catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)))}finally{btn.disabled=false}};
+  const show=()=>{const sc=S.scripts[t.id];if(!sc){box.replaceChildren(h("div",{class:"card"},h("p",{class:"muted"},"아직 스크립트가 없어요. 프로필을 설정에서 채운 뒤 생성하면 더 나다운 답변이 나옵니다."),h("div",{class:"row"},h("button",{class:"btn primary",onclick:e=>gen(e.target)},"AI로 스크립트 만들기"))));return}
+    box.replaceChildren(h("div",{class:"row"},h("span",{class:"chip neutral"},sc.date+" 생성"),h("button",{class:"btn sm",onclick:()=>{S.today.script++;save();toast("오늘 스크립트 학습 체크!")}},"오늘 학습 완료 체크"),h("button",{class:"btn sm ghost",onclick:e=>gen(e.target)},"다시 생성")),
+      ...t.qs.map((q,i)=>{const s=sc.scripts?.[i];return h("div",{class:"card"},h("span",{class:"chip neutral",style:"align-self:flex-start"},QT[q.t]),h("p",{class:"q",style:"font-size:16px"},q.q),h("div",{class:"model"},s?.answer||"—"),h("div",{class:"row"},spkBtn(s?.answer||""),h("button",{class:"btn sm",onclick:()=>go("listen",{text:s?.answer,title:t.en+" · "+QT[q.t]})},"쉐도잉"),h("button",{class:"btn sm",onclick:()=>copy(s?.answer)},"복사"),h("button",{class:"btn sm",onclick:()=>go("practice",{topic:t,q,kind:QT[q.t]})},"말하기 연습")))}),
+      sc.expressions?.length?h("div",{class:"card"},h("h3",{},"핵심 표현"),h("div",{class:"kx"},...sc.expressions.map(x=>h("div",{},h("span",{class:"en"},x.en),h("span",{class:"ko"},x.ko)))),h("button",{class:"btn sm",onclick:()=>addCards(sc.expressions,t.en)},"표현카드에 추가")):null)};
+  show();
+  put(m,h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("scripts")},"← 스크립트 목록"),h("p",{class:"eyebrow",style:"margin-top:10px"},t.ko),h("h1",{},t.en)),box);
+}
+
+/* ============ TRANSLATION ============ */
+function needTrans(text){return splitSent(text).filter(x=>!S.trans[x])}
+async function translateSents(sents,onProgress){if(!sample)throw{code:"not_granted"};const todo=[...new Set(sents.filter(x=>!S.trans[x]))];let done=0;
+  for(let i=0;i<todo.length;i+=40){const chunk=todo.slice(i,i+40);
+    const r=await sample.json(`Translate each English sentence into natural, concise Korean (존댓말 아닌 평서체 해석, OPIc 학습자용). Keep the same order and count.\nReply with ONLY a JSON array of strings, one per input sentence.\n\n`+JSON.stringify(chunk),{modelTier:"quick",cache:false});
+    if(Array.isArray(r))chunk.forEach((en,k)=>{if(typeof r[k]==="string"&&r[k].trim())S.trans[en]=r[k].trim()});done+=chunk.length;onProgress&&onProgress(done,todo.length);save()}}
+function transOf(sent){return S.trans[sent]||""}
+
+/* ============ BACKGROUND AUDIO SESSION ============ */
+const KEEP_URI="data:audio/wav;base64,UklGRiR9AABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQB9AAAHABIA8f8SAAoA8v8HAPj/DAD0//7/+P/+/wYAAgAMAAAA8f/8/wsA8f8PAAkA9v8DAO3/EADv//j/DAAOABMABgACAAkA8//+/wEADQACAAYA7v////r/7/8PAPn/EQABAO3/DAAHAPz/7f/8/wMAAAAQAAwAEQACAO7/9P8PAAwA+//+//X/DAD6//P/7v8FAPv/DAATAO//9f/5/wkACAALAAYA+f8NABIAAwD7/+//EgATAPP/CgANAAgA7/8FAAUA7f/+//z/9v8SAPL/DAACABMAEADv//j/DAD7//v//P8IAAAACADt//f/7v8IAPP/EQD4/wYA/f/u/wQACwDv//T/EgDx//b/+f8AAPL/9f/5//T/BgDy/wMA9f/v/wYACwD7/+//+//v/wYACQD4/wAAEQDv//L/AwDz/wUA8v/2//j/AwAEAAMAEwAQAO3/7/8FAPD/9//8//H/BAAOAPD////t//X//v/3////BgDy//X/7f/x/+7/AAAEAPD/7/8RAAQABAADAPP/9P/5/wcA7//0//7/+/8HAPX/AQDz/+7/EgD8/xIA9f/8/xEA/v8SAPj/7f/t/wUAAgDz/xMA+P/2/xAACgDu//7/AAABAO//9v/z//b/7v/6//H/DQD1//f/CAAJAA8A+f8KAO7/8v////L/7/8PAPP/AAARAO3/7v/t////8v8MAP3/AAANAAgA9P/x//f/DQDw/wAAAwD2/w0A7f8IAPz/+P/9//7///8DAAQA7v8DAAgADwAAAAEA///w/woAEQD3/wkA9P/y/wYAEwDz//z/EAADAPv/8f8TAPf/CwANAAAAAQAHAA0ACwAQAAQABQARAAcA9//6/wUA9/8AAA0A7//w/wsAAAAIAPP/CgD+/wIADwDy//X/EQD0/wcACgAFAAMAEwAKAPL/BADx/+7/AgDx/wUA7f8CAA4AEAAOAO//7/8QAAYADAATAPX/9/8EAAUABAAJAPv/8P8GAA0AEQAJAAwAAAAAAAsAAAAAAA4A+/8TAA8A7f8AAP7/DQAMAP//AgACAPr/9P/z/wwAAwDt/xMABwANAPv/9P8MAO//8P/6//T/8v8RABIABwAEAA0A9//z/wYACAAEAAAAEwAJAAMA8f8OAAQAEwAMAAUABQADAPf/BAALAPf/AgARAPv/DADz/+//+P8DAAAA+f8KAPv/CgARAPj/+f/0/wkADQD7/xAADwD2//f/CAAQAPH//P8MAP//EAAPAPf/9P8MAP3/7/8GAPX/8v8FAAUA8f////z/BQANAAkADAD8//v/AAAPAPv/CgDw/wIADQD5/wYA8v8OAP//8P8RAAEA+P/z/wUADgD6//3/BgASAPT/CQD+/xMA8f8QAAkADQAQAAwACwAEAPD//f/2//P/7v/5/wAA+P8GAPn/EAASAAUA//8MAPX/EAD8/xMABADt//j//f8RAPD/AAAEAAEADQANAPX/EgACAAwA+/8EAPD/+v/6////DwANAAwA8//4//H/CwD//+//CgAHAPr/9f8CAPf/8v8PAPP/AgAOABIABwD3/wIACwABABMACwASAAMA+//0//D/9/8DAPb//v8PAPv/+v/2/wQADAD2//n/7v/8/w0ACQD1/wEA9v8SABIA8P/7/wkADQAJAAAA+f/x/+7/+v8JABIA9v/v/wcACQASAA4A8f8LAAYABwDt//P/BgAIAO7/DgD///b/DwDu/woABgAOAPH/AQD6/xMA+/8QAAwAAwD8//j/DgAMAAkA8/8RAAwAEgDw/+//CwDx/wsA7/8GAP7/CwARAPb/AQALAP7//f/+/+3/BwDy/wkAAAAGAAoADwARAO//8v/y/+//CwANABIA8v8EAPL/+f/1//P/CgDx//b/7v/8//P//P8NAPH//P/x/wkA9v8JAP//8P8IAPH//v/4/woAAAAKABAAAAD5/wUA9f8EAPj/9P8LAPL/AwD9//z/EAAOAAgAEAD4////CgD5//7/EwD4/woADwD9//f/CgAPAP7/DwAGAAsAEAAOAAsAAAASABIAAwD9/w0A7f/1/wQADwADAPD/AgAGAAIA9f/1/wYADgDw/wAAAwAHAPb/9f/t/xAAEgD9/xAADAAQAAsABgATAAsAAQD2/xMA+f////D/9P8GAPP/8v8TAAUA9f/+/w8A7v8QAO///P8OAO//EADv//3/7f/8//T////v//z/9//9/w0A9P8GAPT/+v8KAPj/9v/w//P/BgARAA8ABgD0/wAAEgALAAwACgD3//v/9f8NAA0ADgANAPn/8/8FAPb/AADz//v/+f8GAAAADAD+//X/CwANAA4A8f/u//P/9P/5/wYADgD3//X/9v/x/+3/BQDt//T/DAAJABIAEgANAA4A+P8MAPD/8f/1/wIA8//9/wgAAQAFAAkACAD5//b/8v/x/wsA7//y/wMADwD2//H//P/3//D/CQATAPj////3//D/AAADAPP/BAAJAAgAAgACAO7/+f/9////BwD9/xMADwAQAPL//P8LAO//9P8IAAAABAAPAPz/AwAIAPX/9f8QAP3/DwDz/wUAAAAOAAIAEgATAAgA7f8AAAEA+/8PAPn/AQAFAPn/7f/z/wUABgD+//D//v8TAAQA9P8IAAgABgAPAAAACQD///b/+f8TAPT/8//1//P/7/8QAAgA8P/+//7/EQAIAAAA/f/3/xMABgATABIA//8HAAcA///2//r/8P///xEACgDx/wAA+P///wgA+f8AABIACwAMAPb///8BAPf/+P8JAPP/9//9/xAA+v8JAAkACAARABMADgDv//b//f8NAAwA8f/0/wAA9v8GAA0AAQARABIA8v/6//z/BQASAAcA///+/xAA8v/y//f/9/8RAA8ACAARABIA+f8TAPD/AwD1//r/8P8LAAIAAADz/wgA7f8JAPX/9f/1//n/DAAAAAQAEAABAPb/9v8RAAAA+v/z/+3/7f8EAAcACgABAPf/AwABAAIA7v/8/wIAAgD9/xMACgAGAPL/AwAGAAUA8f8LAO3/EwD4/wAABAAQAO//9//y/wsACQADAPz/BAD+//j////7/wAABwAEABIAAgDy/+3/8//z//X/+P8AAAgA/v/w//3/CgABAAsADQDz/w4AEAAKABAADAASAAAA+v/x/wUA+v/9/xEAEwAAABIA8//z/+//AAD9/+7/CQAOABAA+//0/wwAAwAEAO3/DQADAAAAEQDw/wUAEgDw//D/9v/1//D/BQAAAAAA8//2//H/9P8LAAkA+/8DAP3/AAAAAPP/9v/8//n/9P8AAA0A+v/t/woACAD3//P/EAATABIAAQD5//r/AwD+////DgAAAAgA/v/7/+7/8f/8/w4AAwAPAPn/EQDt/wsA7/8GAO//7f8BAP3/DwAPABEAAQAQAAkA7f8JAAsAAwANAAQAAADw/wUA//8PAAcABAAHAA0A/f/5/wgA9/8KAO3//v/5/w0A+f8AAPf/EgDw/w4A+v/t/wQA/f/y/woABgD9/wEA9f8MAPv/AAD8/wQADgD8//T/DAD8//v/9P8OABAADgDy//X/8v/z/wAAAAAFAPn/AwAMAPz/DQAHAAUA+P///wYA/P8CAPn/DQASAAcABAAAAAgAEgAAAO7/EgDx//T/CgATAPv/+//2/wAA//8DAA4AAQABAAwA7f8PAA8A+f/2//b/CgAKAO//BgAFAPb/DwDz//j/9v/6/+7/8f8QAAoA/f/x/wYADwDw/wsAEAABABMA7/8KAAgAEAD8//P/9f8FAPz/EAADABEA7v8BAAEAEgDx//j/BgAAAO7///8JAPP///8KAAQA+f/7/wcAEwD7/xMA9f8AAAkA/v8AAA0ABwARAPP/9v8QAA0A8v8AAAEA/v/u/+7/8v8IAPn//f8TAP//CAAJAAIADQD7//D/+//v//v//v/8//3/EQD///7//P/+/+7/7/8QAAwA+v8IAP7/EwALAAAABAALAAMAEAAAAAAA//8CABIA8//8//H//v8FAAAA+/8TAO7/DADx//n/CgD1/wQA9/8IAO3/AgANAPn/AgAKAAwA/v8NAAQA8v8HAAwACgAAAAgACAAAAP3/9f/x/w8A+P8CAPT/CwD4//r/BQDx/wAABQD0/w0AAgAOAAoACQD4/xMA8f8HAA0AEAACAAEABwAQAAsABADt////EgD6/wUAEAD5/xIA/f8MAPH/AQAAAO7/DgACAA8ACQANAAsABQD//woAEwAIAAEACQALAPL/+v/1/xEAAQAIAPD/9//6////EgAIAAUAEgAHAP//7/8AAO7//f/6/woA/f/y/+3/+v8FAO//EwD4//3/8/8MABEA7f/u/wkA9/8FABEA8f/t/w0ADgAAAAUA///w/xIABADy/wAADgAKAAEA9/8AAAQAEgD8//z/DwDx//z/EAD2//D/CQDv/xIAEAAAABEA+v8SABMACQAEABAACgD1/wwADwAEAO7/7v8IAPr//f8BAPj/9P8RAPv/+v8AAPT//v8GAAkA8v8AAPf/EgANAAAADQDw/+//AADv/wAA+/8FAAcA/v8AAAsA+v/+//D/DAAJAA0A9v/3//D/BADy/wAACQAKAAkAEwALAPP///8PAAgAEQADAPD/DAD3/+7/AAD6//D/AgAJAO7/BgAPAPD/+/8IAPr/+P/z/wsA7v8CAP3/8P8JAA8A9P/0/wIA7//1//H/EAAPAAMADgD+/wcA+f8DAAQA/v8IAAAAEAAQAPn/DgD0/woA8//u//7/+//y//b/BgD1/wAADwD+//v/CwDw//7/CQD6/xAAAwD0/wgA+//y/xAAAwDx//L/DgADAAQAAwARAAkAEQAPAPL/BwAAABIAAwD8/wAA/P/y/w4ADQD5//3/AwD7/xMA+/8TAPP/AAAPAPf/CgD+////CwD4/wkAAwD2//r/8P8JAPj/+f/0//b/8v8CABMAAgDv/wIA+v8HAPX/EQAHAPb/7v8RAO7/+//0//T/BwD2//T/CgDt//7///8FAAEAEQAAAPT/AwAFAPL/AQACAO3/7/8NAPf/BAANAO//CQDu//r/EQAIABIA9f/+////BQDv/wAABAAJABMA8f/y/wkACAACAPD/8f8TAAUA//8OAA0ACQD7//3/BgDw//j/8f/t//v/DQAHAAIADwD6//X/CgAOAPn/AQARAPj/CwALAO3/7/8FABAA8f8GAAwAAwDt//3/BwD6//X//P8OAPX/7/8OAAUADgD3//r/CQASAAEACwD7/wsAAADw//j/EAALAPL/DQANAP7/+v/u//X/BQD6/wIA+v8MAAQAAwD6//z/DwD+/xAA8/8FAAcA///8/wAACwD9/w4ADgD+/wQABAAOAO3/AwD3//f//f8DAAcA+f8BAAQABQAAAPD/9//t//v/AwATAA4AAwD7//T/9P/t//f/DAD6//z/DQD1//D/DQD0/wYA7v8NABIAAwASAO7/+v8HAPr/+v/v//L/DgD0//f/9f8EAPv////+/wcABgDv/wIA+P/4//H/7v8JAPr/EgADAAQAAgALAAcAEQAQAAkAAwAOAPf/DAD4/w4ABwD4/xMABgDx//P/EgAFAAgA/v8FAPn/+P/4//z/DwANABIA7v8IAPX//f/8//b/BQAEAPz/EQD3//3/8v/6/w0A7v/y//3/8/8TABIA7f8LAO3//f8SAO//DgD2//z/7//7/+7/EwDx/wAACgAGAPX/+P8HAA8AAAD9/xAAAgACAAEA/P/v/xEA9f8PAA8ABAAKAAIA9P8BAPT/7v/+//7/EwD4//r/9P8PAAkA7//3/xMADQD+//z/8f8EAP//AAD9//j/EgD3//n/AgDv//P/8P8GAAsA7//7/wkA//8AAAgA8//8/+7/9f8GAPr/BAD5//z/+f8BAPf/AwD3//D/EgAGAO//8f8CAPX/AwD5/xEAEADv//L//v/5/wsAEADz/wkA8f/y//7///8IAAsAEgD4//D/DgASAPT/+//4/+//CAAOAA8AAwAIAAoA7v8RAPb/+P/3//r/CQAGAA8ADwAOAP7/8P8PAA4A7f8DAPr/8/8OAPv/BQD1//z/DgAFAAkABAAGAAYADQATABMA8/8QAPT/BwDz/+7/BQD4/xAACwD+//z/AAD//+3/AAD5/wwADQAOAAEAAgASAO7/+P/9//X/CQDt//n/DgATAAUA//8NAAEAAwD/////DgASAO7/9/8DAPv/EQASAAMA+P8RAO///f8JAAAAAAAGAPL/7v8GAAUA+/8NAPT/AAAAAPv/BAARAPv/BAASAA4ADQALABIACQAGAP7/7//4//f/7/8DAA0A7f8TAAQA9v8CAP7/CQACAAMAEAAFABEA8P/y//3/DAD8/wAA8//x/+7/9P/4//P/7v8GAP//BgATAPz/+P8RAP//AADw/xEA/v///wkA7v8MAAMACQAKAPT/DAD2/w8A/v8CAPf//v/8//H/DAAMAAwA7v8AAAwADAAKAPr/DQATAAUA8v/t/wwA9v/3////+f/8/wYA9/8KAAUADQAJAAMA8P/x/wIA+f/v/+//AQALAAkA8f8DAAkAAQD//+//+f/+//3//f/y/wYACAD+/wYAAADu/woA9/8LAA4A9P/y//T/8/8GAPv/AAD3////AQD//wYAAAD+/xIAAgD1/wAAEAAKAAcA///7/wMACwACABAA8f/1/wwACgDx/+3/8f/+/wcA8P/y//f/EgD4/+//7//w//n/8f/z//T//v/9/xIA8f/0//v/EgD2/wAA9//8//j//v8IAPz/+/8GABIA7f/x////DwD6/wUA/v/w/+//9v8CAAUA/P8IAO7/EgDt//7/8P8OAAwA7/8EAPL/9f8SAO//9P8PAAgAAQAIABEA9P8JAPz/AwD6/wQA7f8NAA0ADwAOAAAA/f8PAPD/7v8FAO3/8P/7////CgACAAwA/v/+////AQDw////AgD//w8AEQAEAPj/7v8HAAgA/v/5/xAA9v8MAA0ABgABAP7/9v8QAA0A9P/3//r/EQAPAPX/+v8DAPH/+f/4//7//v8CAA8A/f8FABEAEADx/+7/8/8DAAMA9v8BAP7/9v8SAAIA7/8RAAUAAAARAAAA7/8GAA8ADQD0/+7//P8RABIA+P8SAAwAEgABAA0ADwD3//f/EAASAAYA9f/8/+7/CwAKABIACwDy/wwA+v8MABMA7v/v//v/+f/6/+7/AwALAPz/DQADAAwA8v8AABMA+P8TAP7//v8LAAoAEADz/w0AEQD+/wkAAAD3/wcA8f/9/woABgD8//j/CAATAPj/DgABAO//BQARAAwAAQABAPj///8IAAsAEAD6//j/8P/0////7v/w/xAA/v/+//7/9P/7/w4A+P/5/wkA7v8JAO//8P8OABAAAgACAP//AAD1//3/7v/5/wQA/v8MAO//DAABAPv/7v/8//b/+//z/wUADAD0/wUABAALAPb/+P8PAA4ADwDu/wwA7f/8//P/DAAFABIADQAAAAUAEAD3/wkA+f8QABIA7f/u//v/7/8HAPz/7v/5//f/9v8GAAUA+v8AAP//EwDv//r/DAARAAgABgALAPf/8v/2/xEAEQD1////EQATAPn/DQAHABEACwAOAAIAAADy//L/+f/t//z/BwD+////9f8BAAcACADu/w4AEgD+//n/AwD//wMA+P/u//z/8P8IAO7/AwAMAAAA7v/6//P/BADw//7/8f////b/BQALAAgA/P8JAPT/CwDw//v/7f/u//3/AwD0/w0ACQDv/wkA7f/y/w0ADAD3//L/BwAPAPH/AAARAAkACAAHAPL/8//3//z/DAD6//z/+P/y/xEAEAD+//P/9v8FAAAA9v8GAAIAEQD2/xMABgAPAAwACADy//7/8f8OAAwAAAAAAAUABQD0//r/9P8AAPn/+P8EAAEACgD+/+//EAATAPr/8P/4//v/9//4/+//DAAJAP7/9v8PAAwA8v/+/wEABwAMAPT/8f8FAPn/AgACAAoA9P8EAAgA+v/+/+7/BAD3//T/CwACAPv/CADu//v/+f8QAAEA8f8RAAoAEgDt/wMABgAFAAwABAD+//H//v/1/////v8AAPD/DwAPAAAAAQDu//D/+P/8/w4ADgDu/wgAAgDt//n/DAAPAPn/EwAGAAEACwDv/wcABgD8/xMA8f8AAAYA9/8MAPb/8v/4//L/9v8HAAsA/P8LAPr/9/8IABMADQABAPT//P8QAA0ADQAOAPP/AgACAPH/7//5/wEA8P/z/wAAAQD0/xAA9v8FABMACwD6/wMA9/8AAPL/AAD6//v/9f/+/xAAEgDy/wYA/f8BAPT/DwAGAPj/9P////b/7f/t/wUA9v8CAPL/BgANAA0A/P8JAAUAAQDz//7//f/2//T/8P/x////CAD9//H/DAD+//b/+P/w/woAEgARAA4A8P8JAPT/+P8PAO//9/8OAA0AAQD1//b/EAAPAAMACgAFAPr//f8FAA0AAwAOAO3/CADx/+3/8//4//r/CQAMAAUA+//2/xEA/f/x/+7/BgD3//b/CgDv//v/BwAHAAIABgD3/woACAAJAA8A8P8OAPn/9P/t/w4A9P8KAAkAAgD3//L/EAD0/wwACQD1/xIABwARAPb/DADt/+3/CAATAPT/9//z//X/7//7/wAABAD2/wgABQD+/wgAAADz/xMA/f/z//7/8f8MAPz/BgADAPz/CgD5//D/9/8OAPr/8/8AAAQAAQD1/+///v8CAAMA/v8KABAA8//9/xMACgAHABIAAgD2//v//v8JAPz/CwAQAO7/9P8CABIADQD1/+7/BQANABAADgAEAO3/DAD2/wsA7v/7/+7/8f8HAPj/CAD9//X/DgATAAcAAADz/wMAEwAMAAYA9P/v/woADAASAPf/7/8DAPT/8P8BAAUA/v8OAPz/9f/1/wYA+/8TAPH/AQDu/+///v8MAPj/CwAHAA4A9//8//z/AAD+//T//v8QAO3/AADy//3/8//u/woA9/8QAO//8v8MAP//AQAKAAIA//8SAAIA9//1/wEAAwD1//b//P/5/wwAEQAKAAUA9f/8/wsA/f8HAAkA7f8IAAoAAADv/wsAAwACAAQAAAALAO3/7v8GAAkABwAAAPX/8P/u/wIA8f8BAAwABADz//b/BQD6//L/EADz/xAA+f/v/wkA/v/3/wEA9/8RAAMA9v8MAAYAAgD3/w4AEgDx/+//9/8SAPj/9v8QAA8AAwADABEACwDv//D/EQAHAP//AQD1/+//7v/y//T/EgAAAPn//P8DAPz//f8AAPf/+//v/wEA9v8MABIABgALAAIA//8CAP3/CgAEAP///f/0/woA/v8AAPz/9f8OAA4ADAAGAA4AEgANAPT/AQD5//r/CAACAPD/CgD7//f/8P8MAPX/CgAAAA4A8P8RAA4ADgAQAAoA8f///xIAEwATAPj/9f/+/wAA+//w//v/8/8LAAAA/f8AAO3/DwAMAPH/9f/v/wgABgD5//H/AgD//wQA7v8EAAAADAARAAUADgADAAwADAAFAAgA/f/t/wgA+//1/xIA7f8CAAcA9f8GAAgA9P/y/xEA+//8/wgADADy/xEA7v/w//b/EgANAP7/AQD//+7/EQDt/w8A+P/y//n//P/7/xMA8f8DAAYA/P8CAAIA+P/1//T////x//X/CQATAA0A/P/x/wUA/v/5//3/DwAPAAgA/v/2//z/CgD5//f/DgAQAAEABQATAAUA9v8PAPD//P/y/wAA7//z/+//+//x/+3/+v8OAP//CwD5//v/7v/8//f/CAAHAAUA9v8RAO3/BgDx/wYAAwABAPj//P8SABIA7//+//f/AAALABEABAD1/w8AAAAHAPn//v/6/woA7f8HAPH/CQAMAP7//v/+/wEA/P8JAAYA+v/1/w8A9f/8/wYA+/8NAAUA/f/7/xEA9P/6/xEAAgAPAO3/CADv//D/DgAAAPn/BgDz//H/CQARAA8A/v8JABIA7f8DAAkACgAPAAAA9v/w//X/+v8CAAUA+f/4/w8A+P8KAPL/BwAIAAoA9P8CAO3/AwAJAAIA///1/wgAAAAGAAUA7/8TAPz/9/8GAPv/DAANAPP/8/8PAPX/7f/v/woA7f8BAAwA8v///wgA/P/+/wwADgAHAAYAAAAPAPz/DAAKAAAAEAAQAO7/BQALAAsA7/8BAAMAEwADAAEA+/8DAAYACgDw/wkADgANAAEAAwAPAPb/9f8BAAAA/f/6/xAA8/8GAA0ABwAIAPf/EAAFAPb////4/wMAEwAQAAgA//8RAO//AAD5/wEADgAAAAsA7v8MAPr/EAD9//7/EQAPAPj/7f8GAPL/BAD6/wAA/P/x/wAAEQABAA8A/f/5/xIA+P/8//v/CAD6//D/+P8QAAcA+f/4/xEA8f/x/wEADwAQAPH/CQDv/wYABADv/+7/7v8FABIA+/8LAPD/AwDv/xMAAAD5/w0AAgDz/woA9P8CAAYAEwASAAwADwDt/wEA/f/z//r/CgANAPj/+f8TAAQA+v/v/+7/8v8TAAwADgD8//X/BgDu/wEABQANAAsA8v/0/wsA7f/v//H/EQD2/w0AAwD8//j/9P/z//r/EAAAAPX/CQAMAPL/DQD+/xEA9//+//b//v/+/wkA9f/u/xEA+f/y//r/9v8OAAQAAgACAPf//f/0/wIA9f8LAAIABQD9/wIA8v/5//f//P/3/wUA+v/y/wkABQD4/wcABQD5/wIA+/8PAO3/AgAFAA0A8v/0//L/BQD0//n/9//y/wcAEQAKAAAA/v8TAPX/DQDu//v/AQAPAPb/DwD0//f/CAAIAPD/DQDw//L/AAADAAsA//////T/BwARAAEA/P/7/xIAEAAKAAkAAwAEAAYA8f8OAPb/EAAMAAQA/f/y/+7/BQASAPD/8f/3/wgA7v8QAAsA+f/v//z/7v8MAAgACAAAABAA8v/w//D///8BAPv/AQAFAPn/CQD2//7/BwD7/xMA+/8BAAwA9P/4//v/7v/5/wwA8////w4A8v/v/xEAAAAJAAQA8v/1/+///v8GAPr/DwAAAAkADwAEABIA9f8FAO3/9f8NAPL/CwAPAAoA9P8DAPn/BAD1////+v/z//z/+P/5//j/AAD0//v/9/8OAPj/DAD9//v/8P/1/wsA8v8MAAEADwDt/wEA+//u/wAA+//t/+///v8PABAADQAJAAEA/f/9//r/8f8TABMACgD4/wwA+f8TAPj/CgALAAAADwAMABEADwD+/wIA+/8LAAEAEgAAAAAACAD+/wkA7v8PAPj/DwDy/xIA/v/0//P/+v8OABMA+P8JAO3/7v8AAPT/BQARAAYA+f/v//v/CgD0/wEADwAAAPb/+P/9/wAA+P/+/wYA7f8OAAkACQATAPH/+v8JABIA8P/5/xIA8/8NAA0A+/8RAAoA+P8LAAYABwAAAAAA//8NAAMAAgD2/w0ADgD6/xMAEwAJAAEABQD1//b/9P/t//7/+v/8/+7/7f8SAPn/BwD9//T/DwAIAA0ACQDx//D/BwDu/w8A8//6//f/DAD//+7/BwD+//j/8v/5/+//DQATAPf/BQDt//b/BAACAPL/8//9//b/8//3/xEA8f/7//j//f8TAAwA8//+/wUAAwD8/wsAEwD5/+//CAD6/wYAEAATABAAEQD6/+7//P8SAP//EwD+/wsA8v8GAP3/CgD4/+//EwDv/w8ABgAJAAAACgAGAP7////0/woAEQAIABAA7v/7/xMACwALAAAA+P/w/wYA///1//H//v/4//j/EQAJAPP/DgACAPP//P8SAAcADAAEAAAACwD5//j/9f/w//z/9//4//r/DgD1//P/AAD9/wkAAwADAP7/DwAAAAwACQAHAAYACQDx//z/AwACAAkAEgAGAPj/BADv/wcADQAMAAYABgD3//r/AAAAAAEABwD5/+///v/0//b/+f8TAO3/CQDu/wsAAADy//H/8/8LAPr/AAD/////7//y//X/AADy//L/EQDx//H/7/8QAPX/9v/8/w8A+//4/wAA+P/4/wAAAQAKAAcAEAD5/wgACwD8//b//f8AAAgA8//2/wIAEQD9//z/BAD2//r/8f/y/woA9f8BAAIACgAGAAAACQD5/xAA8v/t//X/+v8EAPb/EQD0//v//f8CAPH/+/8BAPL/7//z////8f/7//P/7f/x//7/7f8BAPj/CADx//b/CADz/wwA8v8MAAQA9//z/wQA8P8KAP7/AwDv/wEAAQDw/wwAAAANAAwAAAD5//7/8P8BAAkA9v/8/woAAQD//+//AQD5//z/9////wsA7//y//3/AQAGAO//CwATAAEAAwAAAO7/7f8AAO//BAAMAAgAEgD6/xMADgD4//b/7f/+/xIA///y//3/+/8JAPj/EAAKAAoA9v/u//P/DAABABIADgDz/+7/DwD8//r/9//v/xAA8//1/xMABwAMAAUA8P/4/wUA8v/+/wwA+v/y/wUAEQAPAAMA8f/z//j/DAAJAAYA+v/u/woA9//z/xEACAD1//P/+f8MAPj/+//+/////f/1/xIA+/8OAPv/AAATAPH/7f8EAAQA9P8CABEA7v/+/wMABwDy/woA/f/z/xEA+P8PAO//EQD1/w4ABQADAPL/7v8BAPf/CwAGABIADAAOAPH/DAAPAPH/CgARAPb/EwALAA4ACwDz/wYA7v/z/wYAAAAMAA0ACQAHAAYA+//5//7/BwAAAAQAAwDt/wAA8/8QAPj/CAACAP//BQDw//X/9P8TAAEA9v/9/wkACwDv/woAEADy//v/AgAJAAoAEwALAO3/7v/1/wUA//8NAAEA8/8HAPH/AADt//j/+v8FAAAACAACAA8AAwAPABMADgDu/wYA8f8IAAcACwDw/wMAAwATAO//9P/2/xAAAgDt/wYA8f/2/+3/BQAAAAgA+/8BABMACwD///H/+P8FAAwA8v/z//r/EQD///n/+f8RAAAA9//3/xEA8P/t/xEA+f//////DgDt/+3/+//4/wIADgASABIAEAAJAPL//v8JAP///v/v/xIA9v8NAPn/CQDy/wQAAAAPAP7/9/////j/DgD7////DAD9/wwABADw/wgA8//3//z//v/7//T/7v/t/wsA7v8TAAIA+v/7/wgA+f/t/xEA+/8AAAcAEQD//+3/EAD4/wkA8f8GAAkA9P/+/+3/AwD4//H/8P/7/xAAAAAPAAwA/f8KABAA9v/t/wsA+f8DAPb/+v/z/woA8v/9/wYA/v/2/////v8TABMABgD//wwAAQAPAO3/7f/+//7/8P/x/wUAAgAJAAoA+v8QAA4A8f/y/xIA7/8BAAAA+P8RAAoAAAAQAAYA+//+/wUAEwAKAAQA+v/x//3//f///+7//P/x/wgAEAAAAAIA+//x//D/CAADAAAA9//z/wYAEgDw//X/+//4/wsA+//0//j//v/v/+3/+v/5////EgD8//f/9v8QAA0ACgAMAAEA8//1//X/7v8NAAgA/v/x/wcAAgAOAAQA/f/w/w4A+P/6/+7/9P/1/+7/8v8LABAA7v///xEAEwD8//j/+P/9//D/8//z/wIAEQANAPD/8//6//z/7//6//D/DwDw/+3/CQABAA4ADgAPAAEA9f8AAPz/9f/7/wEABQARAAsA+P/w//X/BQAAABAACAAPAAAADADz/+7/DwALAAkA9f8NAP//9/8QAPb/9v/6//n/BgADABAA+v/1//j/+f/7//D/EAACABIAAgDv//v/8v8LAAIA+P8TAPr/DgDx/wwAAADt/wEABgABAAYABAAAAAwACQDu//H/9P8KAAsAAAAQAAwA+//3//z//f8TABMA+v/6//z/+P8QAAIA/v8GAPb/EwASAPX/9v/u/w4A8f/v/wQABwD9//H/DgAMAAUACAADAO//DADy/wAA9v8NAPz/+v8TABMABQD7/wAA7/////r/CwAJAPT/EQACAPv/CAACAAAA//8HAA8ABwDu//7/EAD4//P/AQD0//P/BgAHAAkA8P8AAPH/DAD//wsACwD6//f/CgACAP7/9f8PABAABwASAP//DgAJAAgA///x/wcADgD+/+3/9v8OAAcADwDt//7/EQALAAAABADv//n/+/8PAPv/AAD4//v//f8BAO//7f/0//b/7f8IAO7/AAATAA8A/v8BAPP/DgAJAAMA+//7/wgA+P8IAAsAAwDw/wAABAAAAAwA+P8GAA8AEwANAPP/EAD6/wUAEAD1//H//f/y/xMA/P/+////9f8QAAQABQANAAAA/v8IAAUA9/8AAPP/DAAFAPH//v/t//b/CwD+//H/EwAGABIAEAAHAAIAEAD9/xMA8v8OABIAEwAFAPz////x//P/BAAEAP//EAAPAPH/AwAQABMAEgAAAA4ABwAIAAoABwDx////EgASAPb/DAAOAPz/8f8GAPz/AAAIAAUAAgD5//7/DwDv/wEA+f/3//3///8JAPX/8//3/xMABwDy/wwA+//t/wMA8P8AAPT/EAD//wUADwAPAAAABwALAPr/8f8IAAYA+v8DAAoAAQAAAAYADwD7//X/9v/u/xMA7/////T/9v8EAPX/BADz//n/8f/w/xAADQD9/w0ADAAJAPr/AwARAAkADwD+//3/BAD6/xEA/f/y//z/CAABAAEA8/8DAAMA8//z//3/+v8SAPz/CAD9//b/BwD3/w0ACQD///T/AAD3//D//f8KAAkAEwAEAPL//v/8/wYA8P8CAA0A//8RAO//EAD4/wQABwD4/w4ABgAFAA4A8/8QAPT/AAD1/w8ABwALAAQABQAFAPj/AwAAAPT/BwD1/wwACQD8/wEA8P8HAAAAEAADABMA9v/4/wQA8P/+/xAA/f8BAPz/EgAPAPX/9v///wMACADu//f/CAD+/w0AEQAAAPX/BwAJAAQA9P8FAAQA9v///wIA8P8HAO7/EQD+/woA8v/y/wsACAD2/wIACQAFAPT/+P/0/wIACQD7/wwABwATAPD/BgAMAAYAEgAMAO//+/8IAPX/DAAIAPn/+//u/wsA+/8LABIADwARAPj////1//b//f8GABIA8P8TAPX//P8SAO//8v/y//r/+/8FAAsADQD2//P/DgADAPr/CgAQAAwAAgAGAAwA+v8IAP3/EQD9////7v/2//n/AQAAAAAADgAGAPL/AgD///z/BAAQAPz//f8PAAIACwAHAPH/EQACABEA/f/+/wgA/v8GAPP/BAD8//D/DAAIAPr/AAD7/wwACwDz//v/CAATAA0ABAD5/xIAAQDz//n/EADv//X/7v/3/wEA9//x//7/+v/+/wYA9f/w/+3//v8MAAMACQAGAAcA7//z/wMA+v/2//7/AAATAO7//v/2/wYABQAMAAsACgDu/wQA7v8MAPj/8/8BABMADAABAPn/AAATAAUA+/8AAAEAEwAHAP//AAAEAPn/AgDz/w8A9f8PAPv/DgAEAPr/AAADABEA9P/0/xMA/v8LAAIA8v8NAO//7v/3////CQD+//v/+P8SAAAA//8CABIA+P8PAAIABwARAAUA+f/5/wkA/P8MAA8A+f8TAPH/AQADAPr/AQAAAAEADQD7/w8A//8TAAgABAD5//n/9v////3/AADx/w4ADwD9//D/CAADAPj/EAAAAAIA///1/wgADQD9/wwA/v8SAAAA///4/xAACwALAPL/7v/5/wIABwACAAAA/P8GAAEADwAAAAcA+f8IAO//7/8JAAAA7/8PAO3/CgD5/wkA8f8SAPD/BwD7/+3/9v/8//D/CgAFAAcA7v8LAPn/8f/4/wAACQAIAPL/BAAJAPH/BADu////7f/8/wEA9f8TAAoA9P/y/wYAAAAPAAMADwD8/wIA7f/w/xIAAQD4//L/CwAEAPH/9v8IAO7/CQAPAPD/9f8LAPz/AAAKAPb/DADt/+3/+v/1//X/EQD0/+7/DAABAAcACgALAPX/7v8BAAkA/v/9/wkA+/8CAA0A9f/y/+7/BAAFAAgA8f8HAAcAAAAIAPX/AAALABMACAADAPz/CwAIAPD//v8BAAMAAAAPAP7/AwASAPj/BQDw/wUAAgD9//v/EwARAAcA7v8RAAUA7//u/wAAEAD+/xEA8P/6/wEA//8PAA8AAgD4/xEACgABAP//CQABAAMA+v/v//f/+/8GABEADADz/wsA9P8FAPD/7f/y/xIADAD3/+//AgAFAPv/9P/w/wAA8v/y/+7/AAAQAAAA/v/t/wYA/f8QAP3/EwAQAO3/9//y/w4A7//4//b/BgAMAAYABADt/wQA9f/1/w0A///z//7/CQD2//7/9P8GAPz/CwDx//T/CQD+/wYACgD3/woA9v/y////+f8DAO3/9f////j/BgASAAwAAgAOAAMABwARAP3/BwD6//L//v/8/wEA9//1/wUA9P/y//r/8//t//H/CAADABMA7//y/xMAEQDx/wEA8v/0//f/CAD5//X/7v8DAPX/BAAAAAsABAAKAPv////u//j/BgANAAcADwD2/w0A8P/2/wQAAgD4//7///8RABMABQAAAPL/EgABAAMAEwAOAAMADQATAAAABgD6//H/AADy/+//9f/v/xEA7f8JABEABADx//f////6/w8A/P8AAPr/CADy//T/+v/6/+///f/5/xEA9/8TAAYA8v8KAPj/8/8OAA4ACAD7/woA9f/v/xIA+f8QAAoACwARABIA+//y/w8AAAD2//H/9P/6//X/7v8GAAwABQALAAwADAD7/xEA9f8TAA0A+//3/wcA7v8FAAUA9f8OABMABgD7/woA/v///xAAEwDw/xEAEAD0//b/BQDy/wsADQDy/+3//f/x/w4AAAAHAPf/BgATAO//AAACAPv/CgAAAAgAAwAFAA4A9//x//j/9/8PAAgABQALAAQA8//v////+P8SAAMA/P8BAAkA8f8CABEA+v8NAAMAAAD4/wUAAAAFAAEABwASAPv/EgAAAAgA9v8SAAsA9v/y//P/8v8FAO//CwD7//z///8LAA0ABADw/wkA8f/w/xIA8/8QAAsA//8CAA8A7f/3/w8A/v/x//D/8v/u/+3/+//9/wEAAgD+/////v8OAPD/CwAOAAAA/P/2/+//9f8FAPD/DQASAPf/EwD6/xMA+f/x/wUA+/8PAAwACgAPAAIA7/8EAAMA+//2/wQACgD9/wYA7f8JAAQADQAEAAcAEgAHAP3/EwDz/xEA//8CAAYAEQACAAgA///z/wUA8v/5//7/DAD8/xIA+f8KAAUA+v/2/wkA8//3/wAA/v/1/wQA8v/8/wYAEQDy/wEA9P/9/wkAEAATABIADAAEAAoA///w/wgA9P8PAPP/7/8DAPH/7/8IABMADQANAAUA9f8CABEADgDv//T/BQDv/woA9f8CAO7/BAAGAP///f/w/wcA/P8NAAAA9/8BABAA9P/u//D/7/8TAP//AgAAAA0A8P8HABAADQADAPT/8v////j/+f/v/+3/7f8EAPn/BQDz/woADgAFABEAAAARAPL/DgALAO3/BQATAPX/CgAAAPP/8v/0//f/BwACAP7/7/8SAPb/AwAKAAIA+v/+//T/DgANAPj/AQD//wcA/P/9//j/CgDv/wcAEgD8/wkA8/8AAAsABQDw/wAABQAJAO7/BQARAAEAEADz/wcA/f8SAA4ACwACAP7/AAD4////CQD1//D/AADy//j/8f8JAPX/EwAFAA8ABQDt//z/8f8GABEACgD7/wsACgD1//j/9f/u/xEADQDz/wEABAAPAPn//P8FAPP/EAD0/wEA8/8HAAkA7f/1/xIABwDw//v/8/8FAPb/AwD///r/DQAJAAUA8/8JAPb/AADv//f/BAD0//f/8/8SAAoADwD1//H/CAALAPD/DgDt/wEABwAQABMA9f8DABAA9v/u/w8A8//3/+3/7/8EAPP/8f/z//r/CwDx/wEADAD7//f/EwANAAAACgAIAA8ADADx////7f/w//L/BgAEAAAAAAATAO//DQAFAA4A9P8BAA8A+/8AAPD/BQAFAAsADwAKAAMAAQAHAO//CAD8/wMADgADAO3/8/8AAPD/7/8OAPv/9P/u/wEADQD8/wwA9P8TAAsABwALAAEA7//t/xEAEQAHAAIA7v8AAAcA7/8EAPj/9P8KAAcA/P/2//j/EQD7//L/7//4/wsA9f8FAAMA8P/0/w8ADQDv/wYA/v8KAO//9v/y/wwA//8PAAwA9v8LAAQA/v8PAP3/+v/9/wAACQD3/wAADAANAPb/7v8IAA8AEwDw/w8A//8BAPf//f8BAPT/DQAOABAA7v/u/wUACQD8////+f8JAPv/+/8AAAwABwABAAwA9f8DAAUAEADv/wsADwAJAAwABQAEABEABwAHAPr/9v8RAPP/BQATAA8AAAD7/wwADQDz//H/8v/1/xEA7f8HAAwACQD5//T/AgAOAA4AAADw/+//9f8IAAAA9P/5/wQADQAIAPL/AgAKAAAAAwAOAPP/DwDw/w8AAAABAPf/8//t/wAAAQD8/xAA+f8NAPP/DgABAAIACgAOAAcADgAJAAgAAAAAAP7/7//t//v/DAACAAUA/f/7//f/AgAOAAMAAwD/////BgDy/xIABgD3//r///8PABIA/f8SAPz/AADw//v/DAATAP7//f8CAAAAEwD1/xAA7v/1/wMAAwAFAO3/7f/5/wMA8P8PAPf/9P/x//v/CAANABEA+f8DABMA/v8FAAQAEwATABIA9v8RABMA7v/4/wkA7v/4/xIAAgABAPz/8f8QAAcA8v/3/wwAEQDt/wMAAQALAAMADwACAAgA8v8NAPn/9f/y/wkA9P8LAPP/9P/4//H/AwD5/wgAAwADAPP/BAAPABAACAASAA8A7f8TAPf/AAAJAA0ADwABAPr/8f/w/wwAEAAJAPH/BAAAAAQAEQD//woA9v8KAPf/AQD5/wMADADv/wAA9v////P/DwD0//f/AADu/wYADgACAAUACgAOAP3/7f8TAAsAEgATAAMA/f/8/wYA8P/u/w0ADQDt//r/CQDy/+7/+v8HAAIABwAPAAAADwACAA0A+f/7//7/EwD5/wQAAADx/+//8v8EAAkAAAALAPX/+v8AAAMA7//8/wgAAAACAAYA8P/t//T/DQD7/+7/CwDy/+7/BQAPAAsADwAGAPr/EAD4//T/BQDv//n/+P///xIA+P8AAP7/AQD0/w0A8P8CAPz/BgD3/wwAAQDz/wgADQAPAPH/CgD8//P/7f///w8ADAD///z/9P////r/CgDt/wsA7v8QAAsADgADAAUA/f8SAA4A9f/6//D//P/2//7/8P8SAAkACgACAO3/BQDt//T/BwD1/wEAAAAGAAEA8f8CAPv/DAAEAO//9P/9/wgAEAACAPb/AAACAAcAAAAFAP3/+f/3/wQACQAJABMA+P8RAAMADwAFAAUA8f/v/xEACwAOAAoA8v8FAAwACwAJABIA+v/y//j/AQAAAAsAAgAJAPT//P/w/wkAEwD4/wwADQDu/xIACAAHAAgA8/8MAA8ACQD8/xMAAgDt/wgA9//6/wMABADt/wsABwDt/xEAEQD7/wkABAD5/w0A9v8AAAgA8f/2/w4ADQD7/wgA8P/x//b/9P8NAAMAEgAJAP7/7f/1//b/8P/7/wgA7/8CAO3//P8JAPf/+f/u/wkADgD7//7/+P8AAPT//f/t//z/9f8NAAUACwD0/wkACQABAAIAEwAKAAIA9f/9//z/7v8EAPP/9v/y/xAA/v/5//v/BAANAAkABQDz//H/AgAIAAcAEwD2//n/8v8OAAgA9P8GAP3/AwD//w4A9f8SAAkAAAAKAO3/+v8AAAMAEAD7/wAA9P/t/xAA///6/xEADwD0//v/BgD7/wAAEAAFAPv/9//w//r/BAATAA4AAAD//+3/DAARAAcA/P/8/wkAAwD3/wUAAQADAAMA//8EAAUACAANAAAAAAD+//3/BwD//+7/9//0/w0A/f8TAPz/EAAHAA8A8f/4/wYAAwAQAPL/+f/y/xAA+v8RAPP/EgD6/w8A/v/w/wIAAAABAAYA+v/0/wEADQAFAO7/7//u//j/7v8CAPP/9/8CAPj///8DAAYAEQD4//P/7//v/xAAEAAPAPv/8v8RAP7/CQAQAAcA8//8//7/7f/3//r/EwADAA0ACwASAPf/9/8IAPn/8f8HAAYA/v8TAAYABQD0////9v/2/w4ACwD9/wEA/f/y//T/EADy/wEABwD5/wsADQD4/wMA8v/t//f/9f/2//P/CwAMAA4A9P8CAPb/AAAAAPv//f8HAPH/AQDz//D/+v8TAAwAEAAGAAEA/v8PAO//CgASAA0A8v/x/+7/DwDu/+3/DAD4/woA9P8SABAAAwAEAAMA+f8NAPH/BwD//wYAAAAEAAEA/P8PAPz/8v/1//L/8v/w/wcAAAD2/wUA+f8IAPj///8EAPr/CQALAPb/AAARAP//9f/4//P//P/x//n/CQD5/wMA8P/1/w0AAQD3//j/8v8IAAwACgAFAPL/BgARABMAAAD6/////f/z/w4ABgDz//L/+/8BAO3/+v/5/xEABQAAAAIA9P/u//v/CgACAPn/8f8SAPj/AQD5/w4A+v8OABEACgANAP3/DwAKAAAA/f8MAPX///8LAPf//f/y/xEADgD8/wUA/P8LAAgADQANAA0A7v8HAO//BgAJAP3/9f/9//n/8v////r/7v8RAPH/7/8AAAQA+//7/woA7//4//b/+P/1//v/EgD0//7/AAD8//7/DwD///7///8FAO7/DAATAO//+f/6/wQA8/8RAAoAAAACAAUABQD9/wsA7v8AABIACgD9/wMACQDy//L/EQATAPj/BwAPAPT/EAD5//X/CgALAPT/DgD7//z/EQAGAO7/AQATAPr/CAD8//n/DQATAPf/8v8HAPD/+f8EAA8ABQDx//n/CAD0/wIACQAAAO3//v///+3/CgD7//r/CQD9/w4ACwAOABEA+P8AAPn/+f/6/xMA8/8FAAUABAAQAPn/+f/z/wkAAwAAAAIABgAPAAYACgD0/+//EgD4//H/CQDw/+7/AAD///3/CgARAO3/AQAKAPH/BAAAABIADwAKAPL/DADz//X/7f/2/w0A8f8BAO7/+P/5//X/+f/5//n////0/+//AQACAPL/AQD5/w8A+//t//b/EgAMABAA+v/4/xEADwAPAP//7//v//r/+v8GAPj/DQAFAPT/9P8BAAkA//8HAPX/EQD2/wwA7v/w/xMABwAKAP//9//0//7/AAD5//P/DAD9//v/EgAAABIA7//z/wsAEwDx//r/AwD6//L/CQDz/w4ADAD7/wIAEwACAAcA9P8QAAQA9//v/wEA8P8HAAwA8f/9//H/9f8AAPr/DwD//wgACQDw/wUAAQARAO//CwAAAPn/AAD//wcA+P/z/w0A9/8MAA4A/P8HAPH///8JAPz/AAD///f/9v/4//f/AwATAPj/CQATAP//BAAGAAIADAAOAPz/9v8OAAIABQD4//z/EAAAABAA/v8MAAgA9v/5/w8AEwD7//X/8P/u/wQABgDy////9//w/wcA/P/x/xMA9f8TAPP/8v8RAPv/AAAHAAMACAALABMAAwDu/wwAAADx//z/9f/z//3/9P/+////CQD5/xMA8P8FAO3/CQAAAAoAEgAIAO3/9/8EAPP/7v8OAAMAAQAHAAwAAgAMAAIAEAARAPr/AQAEAAkACgAFAPL/EAD4//j/8P8KAA0A+P/7/+7/7//u//P/8v/v/+3/7f8LAAoACQAIABMA9P8IAAMA/v/u//P/BAARAPD/CAALAAoA+P8QAPX/BwD8////AAAEAPj//v/x/w8A7f8GABEAAwD+/wEABQASAPP/BwAAAPD/8P/2//z/EgAQAO3/CQDw//r/AgARABIA/P/t/+//CgAAAAwADgD8//H/AAAQAAgA8f8HAA4A7v8QAPz/AADy//n/DAD1/wYACgD2/wUAAAASAAMAAAAQAPv/BwD3//r/9P/x/wUADgDw//////8AAA8A9f8HABMABAAEAPH/CAATAPb/+v8HAO//8/8DAP3/AAAFAPD/7//4/wAACADt/wMA7v/z//P/7/8OAPb/8f8MAPH//v8JAAIA8f///wAAAAD9/+3/8//t/+//AQDy/xAA+//u//7/CwAGAO3/7f8PAAwACAD1//D////8//T/9P8HAA0ADwD4//L/EwAPAPD/8f8RAO//AQAEAO//CQDv/w4A//8LAA8A/v8AAAgAAAD5/w0A8/8PAO7/7v8AAPf////u////BQALAPT/DgAFAA0A7f8CAO3/DQARAAsADgACAAAA7v////7/CQAMAA4A/P/7/wgAAwASAAAA//8NAAIAEAD2/wwABAANAAgA+P8MAA0ADwD0//3////2/wAACAAAAPf////t/wcA/P/v//X/8//8/wwA///+/xAADAAAABEACwAAAAoA7f8BAAUAAAABAAIAAwD1//n/7f/+/wwAAAADAPj/BgD4//f/DAD1/wQA+P/z/+//+P8IAAcA8//y/+//AgD4//D/EAAHABMACQALAAAABwD2/wAA+//8//b/BgDt//T/CQATAO//AAANAPn/CwAFAPv//f8MAAIA/P/y/xMAEgAMAPH/9v8FAAMADQAAAPL/+f8OAO3/AAAAAA8A+/8TAPH/CQAJAPX//v8LAAQA/f8QAAcACQAPABEAAAACAP//DQARAAUABwADAAoACAD7//3/EwAJAPr/BQDw//v/DgAOAAQAEwD//wcABgAJAPb/9//z/xEA8/8FAP//AAAIABIA7//9//P/EwABAAYABAD1//f/BAATABAADgAKAAAA/v8BAA0AAQAAAAYAAQAAAPr/BQDv//P/EgD1/wUACgD8/w4ABgARAPX/7f8PAP3/EQD+//T/CQAJAPf//P/y/woA8/8MAP//CgAPAAoADQDt//f/+P8DABIA9/8RAPb//P8TAAoA9f/2/w8AAAARAPj///8BAP3/7/8HABIAAQD0//r/9P////r/7/8KAAcADQAAAO//9v8JAPX/BwANAPr/+f8MAPj/7//t//j/DAAHAAcA/v/9/xIAAQADAPr/BADy/wEACQAOAAMA/f8EAAAA+f8KAPP/+v8JAPn/EAD+/xMA+v/7/wYA9/8KAPb/8/8MAO//AwAGAPn/CAAAAO//8v8BAPn/+f/0//P/8P8RABEAEQAHAAYA7f/0//b////x//v/9P8RAAQA7v////H/7v8LAAoABwAHAAwAEwAFAPv/AwAFAPX/8P8FAPf/DwD4//P/9v/u//n/CwAEAAoA/P/9//P/BgABAAIA7f8EABEA9/8LAAkA9v/t/wMA8/8PAPj/CgARAO//AQD6//j/BwDy/xAABwAQAAwA9f8BAAAA+v/9//z/DQAHAAgA+f8IAPn/8/8FAPz/BAD9/wAA9/8CAPT/+v8AABIACgADAPf/DAD4/wAACgDu//X/EgAAAO7/EwD3/wgADgARAPv/9f8MAP7/7v/7//D/EAASAAQA//8AAPb/7v/u/wkAAwAPAA8ACQD+//P/8//4//H/+v/v/wUAAQABAP7/EQAMAPr/DgD1/wAACgAIAAMA9////xMA+v/3//T/AQAKAPL/AgD4////8v8CAAMA/P/2/w4A9f8KAAsADwDx/wwAAgDt/w0A9P8BAAgADAACAA4ACQAAAO////8GAA0ADgDu//P/AwAFAPj/BAARAAEADADv//r////+/wgA8v8RAPP/AQAIAPr/CQD3/woA+P8MAP3/9//z//D/AwAHAPH/BAD6/w0A+f/9/wYAEQDw/wAAAQD9/wsACwAQABIADQADAPb/CwASAAsA8f/8/w4A9/8IABEA8P/0//D/CQDz/xIA+f/w/w4ADQD1/wwA8P/w/w4ABQDv//X/AgAMAO//CAAPAO3/9f8AAO//EAD9/xEADgD1/wIACwD4//b/AQARAPH/EwAOAPL/EQD//wIA9v8KAO7/+P8LAAAA/P8SAAIA7f8SAO7/EQD///3/DwD+/xEA+f8AAAEA9P8NAPH/+f8PAAMA/f/+/wAADQAHAAgAAgD2/xMACwD6//b/AAD5/w4AAAD5/xMA/P/5/w4A9f/3/wAA7f/z/wcADAAPAO//+//1//X/AQAFAPn/+//7//X/+f/z/xAA+f/6/wcABAAKABAAEQAEAPL/EQAPAPr/AAADAPr/+//2/wAABAALAA0A+f8RAPP//f/z//P/EwABAP///v/+/w8A7v/9/wIABwAOAP///f/v/wwA7f8FABAAAgDt//D/DwASAA8A7/8KAPT/CgANAAQA8v8PAPL/CQAJAAEA8//t/w0ACwD6/wcAEgD8//v/8//8//v/9f/z//f/AAD3/wwA8v/6/wcAEQANAAsADgANAAYAAwAAAO7/8v8CAPH/7f8CAAgA9P8BAPr/8/8FABAADQD2//v/DwDz/+3/9v/6/xAA8v/9//j/DQD8//n/AADx/w0ACAAIAA8A9P/3/w8ACADw//b/+v/4/wkAAAD4/+7/EQD1/wUA+//+/w0A8//t/w8A/P/8/wsA9P/7//b/BQADAAkA///z/wgA+f8EAPX/8v8RAPX/9f8RAA8A///3/xAA+P8DABEAEwAQAPP/CQD9/xMA/f/v/wkA9v8QAAwAEQD9//n/EQDx/w0ACwAPAAUAEgAGAAsACwARABIABAALAAcADQASAA0A+//y/wkADQD8/woA+f/9/wQACQD9/+3/9f/9/wkA+f/6/wAA8v8IAAEADgD1//f/AgD6/+3/+P/y/wQA+/8AAP3/AgDu//3////3//f/9f/3/xIAAQALABEABQAIAPz/BwAKAO3/8//0/wEA9P/6/w8AAAARAAsA8v/0//T/EgD4/+3/DwABAPf/CADx//z/+P8PABMAEAALAO//+f8DAPT/EgD8//n/8/8HAPT/+P8CAAgA7/8HABAA+/8CABAABADv//T/CgAKABMA9//v/wkADAATAAAADwAEAAEA+f/6//T//P8FAPL/+P/+/wIA8//4/+//CgAKAPL/CADx/wEAAADx/wUADgAGAPv/7//6/xAADQD2/xIACwABAAAAEgD9//7/8//7/wYAAwAGAAAAAwD2/xEA8f8SAPX/8f8AAP3/9f8AAPr/CQAGAAAA+P/2//H/EgDw/wAAAwABAP7/8v8HAO3//f8RAAkABgAIAAgA8//9/wcAEgALAAAABgD9/xAABwAHAO7/8/////X//f/w/+3/BgAPAAIABgABAAMA///5/xEA//8KAPf/EAD6/xEA+//z/xMABwD9/wsA8//6/+//9f8DAPr//f8EABEA9f/6/+7/EQADAO3/7f/1/wgAEgAGAPn//P8RAO7/EwD+/+3//P8BABEABQD6//L/AAACAAUA8v/0//b/BgD1/w4A9f/3/w8A7v8KAPr/CQD0/xAA8P8JAA0ADAAAAP//AwD9/xIADwD3/wIA+//4/+7/9P8GABAA7v/+/+7/9P8RAPv/9P8GAAQAAgADAAoACAAMAAgABgDw/xIA+P8OAAAA7//t/+7/AADv/w4ABAD2/wEADgANAA4A+/8TAPf/+f/v//f//P/0//r/AAANABIADwAGAAMA8v8IAPT/7f8JAO7/9/8AAAQA///x/wIA8//7//H//P8MAAMADwD8//P/AAAEAPz/7v8RAAcA9f/0/+7/7//y/wIAEAAQAO//8f/v/+7/BQDx//7/CgD8//z/BAD3/wAA+/8OAPX/9v/z/xAADwD7/w0A/v8RABIA7//z/wQAAAAQAPD/EwADABIA9/8TAPn/EQD//wAAEQDt//3/CQADAO3/EgAMAA0AEAASAPX/8//v//7/9f8DAAwABQAFAPH/CwARAPj/BwD0/wUACgD4////8/8DAPn/BAAFAPX/CwANABMAEwAPAAAACAASAPL/+v8BAAgA//8MAAYA8//2//b/CQDx/xIADgDv/woA9P/z/wQAEQD0//P/BgDx////DQDt//D/+v/t/xIAEgD8/wUADQAIAAkABwD2/wMA8f8MABAA7//4//j/8v/x/xAAAAAIAA4A7//v//f/BADv//n/+P/8/woABgAAAP3/DgALABAA/f8NAPT/DwAFAP//DwARAPb/CQANAAcA/v8IAPv/BwAGAPD//P8PAAEADAAJAP3/CgADAAMABQDx//j/BAD6/xEABwD9//z/+//w/wgA/f8AAPn/DQDv/+7/CQDz////+P/5//n/8v8DAAkABwDt/wAA9f8DAAEAAwADAA0ABAD9//D//f8TABIA/P/v//z/CgAQAPr/DgD0/woA+//y//j/8f/5/wQA9/8RAAEABgADAAMAEgATAAAA8f8CAPj/EAANAPL/DwABAAYA9f/w//D/BwAIAPT/EwAKAAAACgARAA4AEgAJAPv/BQAJAA0ABwDx////EQAKAAkAAgAAAA4ADgD/////8P8JAPD/BAAFAPz/DQDx/xAA+v/y/wMAAAABAPD/8/8JAP//AgD9/wAABQD8/wAADAAQAPX/EwAFAAAAEgD4/wYA/P8SAAIA8f/4/wAA/P8JAO7/BAD9//P/DwD7/woA8P/+/xEAEwAJAP7/EgD5/wEABQADABEADQD5/woAEwD0/wAAEQAGAO3/AQD8/wAA/P8RAPb/+/8MAAwAAQD+/+3/CQD5/xAA+//7/wYABQAGAAUAEgD//w4A/P/9/wEAAgD4/wUABAANAO7/EAAEAAAABgAJAAAADwAAAP//AAAAAAQA9/8NAPb/8v/4/wYADQD+//D/9v///wAA8P8AAAUA+/8GAAAABwDt//L/8f/1/xMAAwAMAAsA9v8LAPH/CQD1/wgADAAMAAoA7f/5/wsAAgD3/xAABAAJAAoAEwAHAPb/7/8OAPz/EwABAA0ABAAFAPz/AAAOAAUA+//z/wIA9f/9/+//AgALAAsA7f8NAPH/CwALAPP/BAAQAPD/CQALAP3/9v8HAAYACwACAAsA/P///wgA7//4//D/+f8AABIACAAJAP//DQAFABIA9//0/wUADgD7/wsAEwD0/wIADgDu/wEACAAAABMA9P8HAA4ADwDu/////v8RAPP/CQATAP//AADt/wAACQD1/xEABAD9//v/CQDy/wwA8/8AAAAAAAD5//r/CgAJAAYABAD3////9P8TAO//BgDv//L/EgANAPr/AgABAPr/CADu/wkACwAFAP7//v8QAPr/9P8AAO//+P8JAAoADAD+/w0ADQAQAAYAEQACAP7//v8SAAEABQAKAPX////u////DAAMAO//CQD6/+3/AQAAAAwABAANAPT/+P8EAP3/EwADAAMA8P/v//7/DQD7/w0AAAARAAgAEwACAPz/7/////n/CQALAPb/7v/t//H/EADt/woA//8JAA8ABwAAAAMACQAGAAkAEgATAPj/EgAFAAEAEwD0/wQA9f/1/wkA/P/2/woAEQDt/wMA+f8NAP3/+//z/wgABQD1/xEA+P8MABEACQDu//3/AQDz/+//9/8FAAUACwAMAO7/DQDv//b/8/8AAAkA8P/u/wUADQACAP3/CwDz//P/9v8DAAIA+v/w/+3/EgD9/xAADQAHAAEA7v/w/wAABADu//3/CwARAPn/7/8SAAgADAAFAAQA///w/xIABwAAAA8A9/8EAP7/9f8AAAQACgDw//T/9P/w/wQABQARAPb/+f8KAA0ABAD///D/EQD9//3/AADv/wEA+f////7/AAD7//D/EwD8//z/8f/y/wAA8//t//7/8f8RAPv/EAAHAPj/7f8KAPf/DwD4//X/CwAOAAwACwD4/xIABQD6/xMA+P/u/wAA7v8HAO3/8P8AAPP/CQARABAAAQAIAA4AAAD5/wwA//8NAPP/DAACAPr/DwANAAYACwAGAO//EQD8//v/EAD8/xMAAAACAPz/DAANAA0A8v8SAAQA9//4/wQADQAEAA8ACQD9/wIA9P////j/AAATAAAADgAOAAAABgD9//r/7v/6/woAEgADAAAA+/8SAPn/CwAIAP/////t//X//f/y/+//CAAPAP7/9/8IAPv/+f/8//b//v8TABAA8v8BAPf/BAAMABIADwAJAAAACgATABAACAAFAA0ACwAHAPj/EQDv/wUAAQACAA4ADQABAAcACQDv/xMACAAGAAAADwASAA8A9v8PAPX/EAAKAO7/EAAJAAMA///7/wAAAAD///3/EAADAAUADAANABEACAADAPP/EADx/w8ADQDx/w0A7//6/w8AAQAAAAEA+/8EAPL/8f////P/AAD5//j/7f8IABIACwD4/wwA/P8AAPr/8//7/w4ABgAAAPz/8f/x//f/+v/x/wMADgAIAPj/+f/1/wUA8f/0/wYACwAQAAQABQASAA4AEQANAAkA+f8IAAMADQAJAPn/DwD7//b/AwDv/+7/+//t//j/CwAAAAkACgDu/+//+/8DAAAADwDz/xMACAD9//z/7f/6//D/9P/9/wYABAASAP7/9/8HAAwAAAD1//r/AwAMAA0A/v/+//z/DgANAAYAAAABABMABAD4/wEAEQANAA0AAwAHAPb/CwATAAwA/f8JAO7/DwD3//7/+/8OAP///P/+/wYA7v8FAPL/AAD0/xIABgACAO7/8P/1/wsAAgDy/xEA9P8PAAQACAD///H/EQD+//f/7v8LAA0A7//7/wYABgAIAAAAAwAQAAsACAD1//n/AAD1//X/8f8BAAIABQAEAO3/+P8LAA4ADAAKAPz/DgD7/w8A7f/7/wgA+P/v////8P/3/w0AAwAKAP3/AgAFAAAA/v/9//r/AwADAAkACQAIAPT//f8CAPT/8//0/wwA/v8RAA4A/v8TAAMACAD+/wQAAwDu//D/8v8BAPz/8//u/wIA/P8IAPD/+/8HAP3/AwADAPD/CQACAAwABADy/xAACgAEAA4A8f/4/woA+P8NAAUA/f8FABAA9/8TABIAEAD7//7/8P/5/wwAAAATAO//CQDz/wAA9P8OABEA7f8FAAAAAAAAAAgA8f8BAAEA/f/6/+7/+f8MAPH/9//u/+7/EQD0/wYA9f8GABMADgDt//f/8v/1/woA7f8SAAoA+f8PAA8AAAABAP7//v8GAAIA+f8BAPT/DgD9/wgADgD+//f/8P/y/wMA9/8KAP7/AAD2/xIA/v8NAAkA8/8AAP7/CgANAAMAEwD7//f/9/8SAAQABQAGAAQA/P/6/w4A///t//b/EAAHAO7/DgAQAPP/9P8RAAAA9/8CAPb/+f8IAP//BwD8//T/EQAMABEACAD7//j//P8OAAoAAADw//T/BAANAAcAAgD2//P/7v/x/xIACgD5//P/7/8GAAIACQATAAcACQD8/w0ACADv/w8A+f8FAPb/BwD0/xEA8/8BAPf//f/9/+////8SAPr/EQD5//z/9f/9/xAABAD6//j/DAAOAAkADAD8//v/+P/6/w4AEAACAAMABwAIAO//8f8NAPL/DAARAPn/CQANABMA8f/6/xEA+v/2//7/+f8CAAkACwACAAoA7f/9/wUAAgDx/wsACQAAAPT/8/8DAPX//f/8/wsABAADAA0ADQAGAAQAEAALABIADAABAP//8P8TAP7/+/8MAAMADQAFAPP/+f8BAA0A/v/5/xEADwAMAAcA/v8PAPn/AAAPAPT/9P8PAAAA+//7//T/DgADAAYA9//v/wgAEwDv//3/9/8AAPb/EgDt//r//f/0//f/8v8EABAACAAFAPP/DAD+/xIAEQDy/wEAAwDv////7v/6/wcADgALAPv/7//8/wQADQAKAAQA9//t/wAA7f8SAPD/BgAAAAkAAwAFAAEABwANAPn/BgD4/xEA8v/w/wEACgASAA8ABwAMAP//DQANAA8AEgD+/xMA+v8MAAQAAwANABIAEADz/wIAAgAJAPf/BAACAAQADgD2/w4ACwD8//H/AwARAP7//f/8//P/AQD1//X/EgDy/+7/CwDv/wkADAAMAAAA9//8/wsA7v/y//L/AAATAPP///8AAAkADQDv//b/DAD2//b/8/8HAA8AAgAGAP7/AAAJAO7/+//+//j/EgAKAAIA7v8MAO3/8f8OAPz/8v8HAPr//v/y/w4AAQD9/wAACQAMAAAABgD5////CAD6/w4ABQD7/wwA9v/2/w4ABAAKAPL/DgAAAAoA+v8GAPf/EQAFAPL/9f8FAAMADwADAAcA8/8OAPL/EwARAAYA+/8SAA4ACgAFAPL/+P8BAPP/8v/w/xAAAgD8/wAA/v8HAO3//v/w//v/+f/t/woA+//8/wcA///3/xAA/v8SAAQACgAAAAcABQD//wIAEAD0/wsABgD2/wIABwD0////+v8CAPf/DQD9/xEA8P8DAPn/7/8PAPH/EgAMAAIADwDw//D/AAAHAAAA/f/1//r/7f8CAO3/9v/y/w4A/v8PAAQADAAKAAIADgABAPj/+P8IAAgA7f/x/wkA8f/6//L/CwDt//v/8f/u/wYADwABAPH/BwASAAAA/f8CAPj/8f/t/w0A/P8QABAAAAD4//X/AgAOABAA+P/x//n/CQAMAAAA+f/v/wgA9//9//n/CgD//wIA/f8LAO3/9f/9/wAA8f8AAPT/BwDx/+//DgAEAAMAAgDw/xAA8f8MAO//9f8GAPz/8v8OAP3/7f/5/wQA8v8IAAAA7v8EAAAACgAAAO//+/8QAA4AEgARAO//AAATABAA8P/x//n/EwD4//L/AwD2/xIACAAPAAwAEQAJAAAACQDv/+3/DwD9/wwA/v/0//L/+v8LAAAA+f8KABEA///u//v/8/8FAPb/BgATAO//AAAPAO//BQD0//X/DgDz/+3/9P8LAAwABgD0////CgAHAAwA+v8EAP7/+/8FABEA9v/t/wwAEAD4//3/AgDt/wEA7/8LAAgAAAD1//v/EwDt/wgA7v8AABIA9//4/xEACgAJABEA9v/z/xIAEwD8//7/+v/5/xAAAwAAAAYA8P/7/w4ABAD0//T/+//0/wYA+P8JAA8ABQD1//n/AAADAAkADgASAAQA+v/1//P/AQACABEAAQD1//r/7/8EAAwA8P/2/xIADAACAAIA+f8CAO7/8P8HAPT/BAD3/wEA/P/z/wYA+f8AAAsA9f8KAAcABgAPAPX/EQAAAPD/AwDz/wQAAQD8/wAAEgAEAAQA9P/y/wEACgARAAEA7v8FAAAAAgASAP//DAD9//n/EQDt/+//BQACAAUA7/8OAA4ACAAHAPz/AwAAAPr/9/8SAPT/EgAKAAsA9/8GAPP//f8JAPD//f/1/+//AQANAPv/AgAEAAwA//8AAAMAAgACAAoACQAAAP3/7v/w/wMA/v8FAO3/EwAHAA0AAQD3//X/DAD4//P/CgAJAAUA/P/0//v/8f/x/+7/+f/5/wUAAQDt/wwAAAAFAAkA8v8RAPP/9P8AAAkAAgDx//T/EgANAAwAEAD0/w0AEgD8//7/EwD9//j/EgACAPj/EAAPAPH/CgDw/wwA/f8BABMABQDt//b/7v8CAAsACAATAPj/AQASAPT/BwAGAP7/BwD7//7/AQDz/wEA9v/0/wsA8f8NAPb/+P8IAAkACAANAAAA9//u//v/BwD9/wQADAAOABMA9/8GAAUADwAPAAUA7//z/wsADwD1//P/BwDu////7f////3/AwDx/wQA+f/t/wIAAwALAO3/+/8LAAgA8P8MABMACQASAPT/8f/5/wkA/f/3//j/7v/3/xAA/f8CAAwAAwAGAAAA+v8OAPP/9v/x/xIACwAOAAQADQAAAAgAEAD8/wMAAADu//7////u/woABwALAAgACQDv/wsA/v/0/wwA7/8AAA8AAgAKAAUA+v8KAPn/CwACAAQAEAAMAAUA8f/7//L/AQACAAIABAAMAAkACgAEAAIACQD0//b/EgAOAAgA/v///wUACAACAPr/9/8DAAMAAADy/xIA9f8FABMA//8QAPH/+P8SAAEA+v8FAAgAEQD9/wIA8f/w//T/7f/z/wUABAAEAPf/7v8AAPX/+v/t/wAA/P/3/wsAEgDy/wQA8f8IAAAA7f8AABIA+/8FAAgA7/8JAPP/CwADAPP/DQD6/wwABAD2/wwA7//v/wMADgAHAPv/AwD7/wEA9/8BAAAA+f8JAO7/CQDy/+//CAAPAAYA9f/t//n/DAAHAAAADAATAAwA/v/2//z/DQASAAoAAQD+/wIAAAD9/wkAEgDt/+3/BQD5/w0A7f/z//D/DwABABAAAwDv/xMA8/8PAAoA7v///wEAEwAQAAsA+v/1/w8A/f8JABMAEQAKAO///P/z/+3/+v8IAAcA8f/7/wAA9v8EAPv/BAAIAO7/BwAMAA8AEQAKABEA9P8AAAwA7f/6/wQAEgAEAPf/+v8AAPL/AgANAPP//P/7//n/AAAFABAAAgAAAAQA+P8KABIA+//9/wsAAgD+/wYAAgD0/w8ADQD1/wkADwAIAPP/DQANAO3/AAASAP3/+P/x//j//f8NAAEA7v8GAAQA7/8BAPP/+/8AAA4AEQASAA0A+f8JABAA+f8AAAsA/f8OAPf/BAD//wAA9v/v/wYA9v8FAPf/DgACAAEA+P8DAPb/EgAEAP//EAD1/wwA7f/2/+//7f/1//T/EQAOAO//AwDv//H/BQAKAAIA7f8NAPj/7f/z//r/CQD0/wIAEwAJAAEAAwAMAP7/AAAGAAUAEQAPAPf/CAAQAO7///8FAAkA+f/w/wAAEwAQAAUABADt/wsACwAPAAAA//8GAP3/8v8KAPb/DwD3/w0A8f/y/wsA7//5//T/7v8AAPf//P8HAPr/EwD+//X/CwD3/xEABAAEAO7/+P/8/wEABAANAA8A8P8PAPP/9v8FAAEA/f8EAAIAAgAOAP7/+/8TAPX/DwADAAgA7f8SAPn/DAATABEADAANAPj//f8PAAgAAAAHAPz//f/u//f/8v/9//7/8P8EAAQADQABAO7/9f8CAP//DAD1//r/EQAKAPj/+/8AAPD//f/8/wAADwAJAO7//P8FAAwADgAOAP3//v8GAAIA9v8FAPP/8P8FAAEAAAD7/w0ACAD3//b/EgD9/wQADAD1/woA8v8FAPr/DwD7//3/DwARAPT/9f8HAPH/8f8CAPr/7v8AAAwA8v8AAA8AEQD2/wIAAwD7/xIA7/8GAPb/7/8EAPn/+//6/w0A9//y/xEACgD3//b/8P8JAP7////v/w0ABQDw/wgABwD+//X/DgAEAAwA9v/y//P/AQAHABEADQALAAUA7//3/wYA7v8EAO3/AgDy/wQA/P8EABIA/P/7/wgADQAJAAcADQDy/+3/AAD5/wAAAwAMAAYA+v8HAPf/BQAFAPT/7v/0/xEABwD5/wMACQD0//T/7v8NAA4A8v8HAO//9f/5/wgAAAD1/wwA+//y/wMABAAFAAEABgD7//r/CgD1/////f/w/woA+f/z/w0AAwACAAAAAwD3/wIADgAHAAgAAAAMAA8AAQAHAAAA7v8RAO7//v8LAAcAEwAMAPv/9v/2/wYA7/8GAAQAEAD5//D/EgAIAAQA9P/y/wYA+v/1/wsA8//t/xAACAARAAMA/P/6//z/EgD9/w4A9v/3/wgA9f/t/w0A8/8MAAIAEwDu/wEACQADAO7/DwAHAA8A+P8LAPT/AADz//D/8f8QAP7//v8EAPX///8KAA8ADAAOAA0A/f/1/xAABQAJAAEACQANAPH/EQAQAPL/AgANAPj/+v8QAAkAEwAQAA0AAADz/wMA8f8EABMAEgD3/wMA9P/z//H/EQALAAwA8/8OAPf/CAARAPT/EgANAAkABAASAPv/+P/5//r/DAAKAPf//P/3//b/DgABABEADQDy/wIA/f/8//7/AAD3//T/DQD1//r//f/t//n/9/8CAA0ADgAJABAAEwARAAEA/P/0/w0A+v/3/xAA8P8DAPr/+P/u/woADQAMAPD/BAAAAPn/AwD+/wAABQDy/wsA9f/u//z/BADw/xMAEgAAAPD//P/t//f//v8QAP3/EAADAO//BwABAAoADQABAPf/DgAFAAsA7f////n/9//6//v/DQDv//L/AwABAPn/+f8MABIADAAEAPj/BAAGAPn/CAAJAO3/AwDy/wcA8/8SAAoACgAGAPb/+v8OAP//CwD4/w8AAAABAP//DQAQAAkA9P/8/w8A7f/4//H/CgAHAA4ADAD8/wsA7/8IAPn/CQADAPL/EgAOAO7/+//t/+7/CwDy/wAA7f/x/xMADwDv//7/EQALAPD/9//5/+//8P8RAAAA9v8OAO//+//6/wEA9/8AAPT/9P/2//f/9P/0//L/8f/4/wQA/v/u//j/7f8QAPX/DgAMAPf////5/wUAEwAHAAgADQD3/xEA7f/y/xIA7f8MAPH/EQDw/wcA8f/y/wwABgD5//v/AAALAAsA7v/1//T//P/2/xIAEQD8/wsA/v/+/wkA8P8BAPn/8f/1/w8AEAATAPP/AAAFAAgACAABABAACwADAAUAEgDy/woA+v/9//P/DQASAAMADAACAAsA7v/6/woAEwDz//T/+f8KAAMABgAOAPf/7/8MAPT/CgDz/wIAAQASAAYA+P8IAAYA///0/wYABAAHAO3//v/8/+7/9P8DAO//9f/+/wYA//8JAPP/AgDz/////f/x/w0ACwD3/wwA7/8AAAMABwDt//r/+P8KAAcABQDw/xAA9f/0//b/CwAHAPX//f8SAAwACwD3//P/EAD5//r//P/0/+//9v8KAPr/9v8TAAEAEgADAPH/EwAMABEA7v8LAP//8P/5//z/+f8OAPf/+f/1//n/DgD6////CgD3/+//9/8TAPn/+v/3/wQA8v/z//T/7/8SAAwAAAAFAA8AEwDw/wwA9P8TAAkADwAOAO//DQD6/+7/+P8TAAYAEQACAAUA+/8PABAACwD9//T/EgAJAO7/7v/3/wAACAAEAP//9v/5/wwA+f8RAAcA9f/5/wgA7v8QAPj/DAD5//j///8PAPX/+/8IAP//DQALAAAAEQD3/wgADQAHAAQA7v/v/wcA9/8AAAQA9f/v/w8A+//1//T/CgAKAPT/EwAKAA0AEwD//wAAAwDw/w0A9//8/wYA/f8QABMAAAAIAPH/7/8PAPT/DQDy/wQAEAAAAPz/AADz/wIAAQD8//L/7f8HAPz/BgAHAAUA+P/+//v/DgDt/wMA+f8AAO3///8OAAAA+P8FAO3/AgDu/+3/7/8CAAAA8P8SAA0A/P/8/xIADwD4/xMAAwDt//r/BwD7/wcAAAAJAP//7v8QAAIAAgD1/xEABQDy//7/8P8GAPL/DQAQAPb/EQACAAIAEwD1//f/EwAQABMA/P/4//3/8f8GAPP/EAD+/w4ABQAMAAkA/v8MAAcABQAPAAAA7/8CAAwAEwABAAkADQDu//T/BAAJAO3/DwD5/xAA7v/9/wAACgD5//r/+f/z/xEA7/8BAAkA8/8QAAsA+P8LAPv/CQD9//L/9f/6/wcA7f/+//f/AAAHAPT/AgD//wEA9P8LAAQA+v8GAA4AEwD//wkAAAASAP3/9f8RAA8A/f/x/wAA7f8DAPr/EgAQAA8AAwDw/wsA+P/u/wUACwAIAPH/EAD7/wMA/f/2//L/7//3/wMA9P8MAPT/8/8GAAoAAgAKAPz/AwATAPr/EwAPAP7/9v/v/wcA/v/z/xIAAgD5/wkAEAD8/w4ABQD0/wkABgAQAAQA7v/v/xAA+//7////9f/2//X/AQD///T/DAD0/wAABAACAA4AEAAAAAwA9f8AAPT//P/4/wsACAD+/w4A7f/7/wsAAQALAAYA7f/7/+7/8f8AAAgACwDu/xAA/f/z////9/8QAAAA+/8HAPn/EQDy/wMACgDw/wEA8//z/wcA/P8AAP//+v/y//b/7f8QAO7/7f/w/w8ADwD+//3/9f/v/wwADQDw//X/DwAAAAsA7/8OAPf/8//4/xIACgDv/+//+v/0//b//v8MAPz//P/7/wEA+P/v/+//9/8QAAAABAARAPr/+v8CAPT/CgADAAkADAAOAPX/7//2//j/CgD8/wsACADu////+f/y/+3/CgAAAO7/7f8JABEACAD4//7/CwACAAwA8//u/w4AAQAMAAcA7f8JAPH/+f8CAA4ABAAAAAwA7v8IAAsA7v8NAAAAEgAHAPL/BADv/wAAAwDu////AAD9/wMABgAFAO3/8f/8////EgD0/+7/EQDt//H/DwAIAAsABQD0/wQADgAQAAsA7f/8/wQA7f/+/w4ADQD+/wUACQACAP///P8TAPz/DwAJAP//DgAAAPf//f8AAPP///8EAPz/EAAAABMAAgAAAAcABwATAP//AAAOAAgADgDz////8v/7//3/+//2/wkACQD0/wIA8P/9//L//v8EAPj/EgDu//P/EwD/////BAAAAA0A7f8KAPD/CAAAAAYAAQD8/wQA8P8LAA0A/f8IAAAA9f8TAO//DAAEAAYA+f8SAPL/7v8CAAkAAQD+/wIA+//0/woAEgAAAPb/+v8HABAA9P8FABMA+P8IAPv/EgDx//f//v8FABIADwD4/wMABwDt//v/9v8QAPf/9P/1//j/8v8LABIAEgD1//b//v8IAP7/DgD4/wkAEgDy/+7/+////+7/CwAAAAcA+v8OAAEA+v8GAAwABgADAA8AAwAPAPT/CAAPAPb/BgD3/wAA7//y//T/EwASAAwACAADAAQA+f/4/wsAAAARABAA//8GAPH/+/8QAAEAEAD+/xAA7f/1//P/+P8BAPr/8f/0/xAA9/8OAAEA//8OAA0A9P/y//X/BgDz/wEAEQDy////9f8FABMA8v8DAPD/+f8MAA8A7/8AAPz/BQANABEADADu/wgACwAFAPr/AAAEAAMA8P/z/+7/AwDx//H//v/v/wAAAgDw//L//v/7/xMA///8/xAA7f8OAAwABAATAAkA8v////v/+v/0////9P8IAPX/8v/6/woA8//x//T/BwAPAAIAAwARAAEA+f/v/woA7v8QAPn/CgD+//f/9v8TAPn/+f8QAAgA//8BAPH/9/8FAPP/CQAQAO//DgADAAcABgAIAPn/9v8RAP7/8P/2//3/BgD4/wQA9f/5/woA/v/x/+//+/8AAAsAAgD8/xMABAD///P//P/9/wQA//8KAA8ACAD0/wUAEQALAPz/BADy/wcA8/8KABIA9P8CAA4ADQD0/wQA8//v/wEA9v8BAPT/AQD6/wMABADx/w8A/P8GABMA8f8IAAkA+v/3/xEA8f/5//7/CgD5/wcA+f/+/wIAEQDw/wcADwAAAPv/DwAMAO//+v8FAPX/AAAAAO//EgD0/wEAAADw/+//9P8TAAUA9P/u/xAACgD6/xIAAAD0/wgADgAKAPr//P8DAAoAEgAJAAYA9//w/wAAAgDz//j///8GAPj/8f8MAP//9f8FAPj/AAAMAAwA/f/x/w4A8P/8//H/7v/6/woACwDw/w0A+f/6/wAA+v/5//b/DgAFAPL/8P8RAO7/7//+/wcA+f8KAAkA9//1//f/CgDx//v/7//3/xIA7v/x////DAACAAUAEgAQAAkAEgD7//j/9P/z/wYA8P8OAAAADAAEABEA9v/z/+//+P/v/wEA///u/w8AEQAEAA0A/f8SABMA+//+/wAACQDx//D/BwD4//f/8f8FAO7/CQAOABMAEwASAAgA///v//X//P/z//H/EgD9//z/7v/8/wMAAAACAPv/BgD2//P/7/8OAO3/7f8AABEA+//1/wUAEQD7//n/9//2/wIA9f/7/w0A7f8FAO3/DQATAPP/+/8DAAwAAgDy/wMA+P8LAAsAEQAOAAIA+P/x//j/AQDy/xIA8f8HAPX/+//6/wsABQD+/wAACwAEAPX/CADv/+3//P8FAAMA//8HAAUADwAEAPP/+v8GABMA+v/9//f/EwD5/wAADAANAO//AAD4/wEA9//9/wcACwAKAAAACQD8//H/9v/1/wsACwARABIA9/8QAO3/EAD6/xMABADu//b/8/8MAPT/AgABAAoA8P8LAP7/CgDy//n/DQASAPr/8f/3/xEABQD5////DQD3/+////8MAAEA8//8//P/8f8IAA8A///y//D/CgD6/xMA8v/u/+3/9v8OAAUAEQDz//T/9P/t/wkA+//9//T/EQD7/wEA+v8CAAoAAQALAPb/BwAQAPj///8IAPf/BwATAAQABAD7/xAACgD6/wAA8v/9//X/CgD6/xAA8v8HAPf/AQAEAPT/7f/t/wQA7//w//b/+P8QAAAA/v/0/wQAAQD6/woACQAEAO3/EQAAAAcA+v8DAAgADAAAAAYA7//v/wEAAAD2/wsA8P/x//7/CwD5//3/AAAIAAYAAAANAPz/8f/2/wwA/P/x//v/EwD5//7/BwDx/xMADwDx/+3/DAAJAPP/8f8BAAAAAQAIAAcABgD6/wAA8P8GAP//EAD+//f/DgAAAO7/+P/z//3/8f8JAAAAAgDv/xEA7////wkACQANAP//AgD8//b//f/z//L/9f/0//v/AQD8//L/AwAHAPr/8v////D/7v8MAAQACgDz//n/AAABAAcACwASAAIA///t//L/EQAAAPP/EwD8/wMA/f8OAA4AEwAEAAUAEwAPAPP/+P/y/xIAAgAAAAoABQAEAA8ADgDt/xIA+f/7//P/BwD5/+//9f/w//b/DQDu////CwADAAoA9//8/xIACgAMAAAA8//0//T/EgD1/wcA///4/wMAEwAMAAAA7v8CABEAAQAAAA0A/v/2//P/EwDv/w4ADAASAPT/9f8HAPf/BQAOAAkA/f/6//D/DAAJAPj/EAAPAP3/DQAGAAgAAQD0/+7/EQDu//z/CAD8/woABAAHAAwA8P8RAAgACgANAAcA/v8LAAcA7v8LAAIABgD0/w4A9P8BAAwA9v8MAPH/7f8OAPj/CwD0/wEA8//w/w8A7/8IAPf/8f/v/wcA+v/6//v/7f/7/+7/AAARAO//8v///woA/f/t//3/AwD3/w4A8v/z//f/9v8SAPX//v/0//b/+v/0/wUA//8QABMA7v/u/woABgD9/+3/CQAGAAYA7//5/wgA8//0//D//f/v////DAANAO3/9v8HAPP/DAD4/wEA/P8AAAMA9P/5/wIADQD1/+3/AAD///j/AAABAPr/CwATAAEA+v8NAPP/BgASAAgA+/8JAA0A9P8NAPn/9//x/wYAAwD7//T/DgAPAAUACQAHAP//BgAOABEAAQD4/w4A+v/2/wkA+f8MAPb/9v8CAAwAAgD9//b/CQD8/wAAEwD6/wIA7//9/wMACAD8//r/BwASAPP/CgARAAgA9////wIAEwAJAPv/9f/y//j/7v8GAAAA/f8BAPD/9//5/wAABgAJAAcADAANAAAACQAKAPr/CAD0/w4ACgABAAAA8P8OAAkA/P8GAPz/9v8IAPD/+P/x//L/9f8BAAoA/P/9/xIADQATAAsABgAMAO//+P/z/+//CwDv/xIACwD9/wAA//8KABMA9P8TABIADQADAO3/+f8LAPn/8f/6//z/AwDx//b/AADv/wAA/P8TAPz/9/8KAAQAEQARAAMABAD0/woA8f8NABIACgAFAPv//f/v/+//+P/t/w0A9v8GABMA+P/2//H/8v8CAPL/+//v/wsA9f/2/+3/AgD2/wcAEAD3//T/9////wkA+v/4//b/EwD4/wUA8/8BAAEAEwDt//3/AQD3//b/DgAFAO//EAD8//X/EwDw/wIAEwDz//3/BQAIAO7/EAADABAA9v8OAPD/EgAFABMA9/8SAPj/DgAIAPH/8v/0/wAAAgDv//3/AAD8//D//v8OAPL/8v/3//b/BQAGAPX/DAAKAA4ABgASAA0AAAANAP3/EQAGAA8A+f8IABIADwALAPH/9P8PAPf/AQDw/xEA+f8DAAkAAAAHAP//EgAOABEABQD//wAADgD1/wkA9P8QAPD/AgD6//D/AQDv//b/AQAMAAwA+//3//3/DgAJAPP/7v/t//D/BgDw/wYADQANAPn/8P/v//L/9/8QAP7/+P8JAP//+f/u/wMA/v/v/xAA8v8TAA8A8v8EAO3//f/9//n/CAAAABMAEwAEAP3/9f8KAAIADAAHAAUAEwDz//3/AAAMAPX/DwAHAAsAAwACAPX/AgAAAPj/BAD9/w4A8//y//f/CAAJAP//+f8LAP7/DQDw/w4ACQAFAAQA8f/+/wgA8/8AAAYA9f8QAPb/+P////P/8v/4/xMAAwAQAPv/7v8AAPn/AgDu/wkADAALAPv/8/8PABAA/P/4/wQACgAHAPP/+P8MAAMAAQAQAP3/EgAIAPj/8f8CAAcADwALAPL/BQDx/wMACQAPAPf/9P/y/xMA//8EAPv/CQD6/xEACgD0//7/AAD2/woABgAHAO///v/y/xMA7f8RAA4A+//7/wMAEQDw//f//P/x//H/7v8FABAA7v8DAPb/EQD4//b/CwARAAAA9f/6/xMADwADAAAABQDz/wAABgAFABEA9P/u/wYAEgDx/wMAEwAKAAoADQADAAAA8//z//D/+P/v/wMABgDu/w4A/P8LAP7//f/8/xAA/P8AAPb/7v8FAPv/7v8JAAgA7f/5/w0AEgDz/wkA7v8PAPT/BgABAAwA8P/2//D/9v/x/wQAEgDw/wQA/v8LAAkAEgAGAPr/EwAJAAMA7/8HABIA7f/u/wIA///t//z//v/3//D/+v8AAPz//P/1//T/+/8MAPP/+P8OAAUABwAAAAYAEwD4/wAA7v8GAAMABAD0//j/7f8DAAkAAQANAPn/DwAAAAAACQDx//f/9//7////8//2//r/EAALAAQA7v8LAAoABAAOAPz/DwAQAP7/9v8BAAgA+f/1/+//EwABAAQACwDx/wMABgAGAPz/BgDz/wQAEgDv/wIAAAAJAPj/AQAOAO3/AwDx/xEA9/8IABEADQD9/wkABgAAAPP/CAD//wgACwD6//b/+P/9//r/8f/x//v/CgABAPf//v/3//P//v///wIAAAARAAUAAAD3//D/CwDy//j/DAABAPv/9/8NABIA7f/v/wAACQAAAA8A/P/7//n/EQANAAIACAARAA4ACwAFABIABQATAAEAAAAEAO3//f/7/+//7/8PAAcACwD0/wIAAQAEAP3/8v/9//f/9v/8/wEAAgANAPf/7f/u/+3/CgAHAAgA9f/y//j/AAD+/wsACQDx//L/8v8FAPD/8/8AAAcA7f8LABEADAAIAPz/DwARAPj/+P8SAAkA+f8BAA0AAwAAAAAA9v8DABMA9v8AAPL/CgD//xEA7f/5/wYA+//t/wIABgAJAAoADgDu/////P8PAA4ADwD2/wgABAAOAP7//f/x/wEA9f8HAA4A8v/9/wAACAD5//z/CAALAA0AAQDz/xAAAQD/////DgAPAPv/BgAPAAMA9f8PAA0AEAD4/wAAEwAOAAAABgADAPH/CwAHAPv/AwD6/wMAEQAAAPD/CwASAP3/9f8OAPP/AAABAP3/7v8SAO//8f8MAPL/AAALAP7/9f8RAAsA+v8JAAQA8/8BAAMA8v/2//P/CAD//wgAAAAAABIAEwDv/xIA9f/5//z/AQALAPD/AAD1/+3/CwAAAPH/AgAAAPL/8P8GAAEAEgADAPj/7/8RAA8A9P/y//f/CwANAPb////4//X/DwAFAAcA8v8CAP3/8v/x//7//P8BAA8ADgALAAQA9f8NAAAA8P/z/xEADAAMAAEAEQAAAA8A9/8GAAIA/v8SAPX/DgATAAUA+//2//r/+P/1/w0ACwADAPD/9f//////DAD5/xEA9P/1//P/8f8SABEA7f/v//b/7v/x/xIA/P8JAP7/CwD9/xEACwAFAP7/7//z//f/EQAPAO//CwDx//n/AADy/woADwAMAP7/BwABAPr/9v/v/wYA/P8QAA0AEwD5/wAACQALAAMA+v/9/xEADADx//v/8/8FABIA9P8SAO7//P8JAAAACAD+/wwA8v/x/wQAAAALAP3//P/6//7/CAASAAEAAQD1//L/AQD7/xIA7/8NAAUA/P/v/wIADwAPABEABQAEABMACgABABIABAASAA0AAgD///T/DgDv//f/DQD4/xMA8P/5/w8A/P/9/wQABgD0/w0A8P/3/+7/+v8SAAAACgD+////+v8TAA8A+v8SAPz/AQDv//f/CwDw/xMA///0/wMA7f8HAPT/CQAAABIA9f8HAPP/AAANAO3///8KAPn/DgAKAPn/CQD4/wYA7f8HAAwA+v8OAAIA/f8DAPb/9v8AAA==";
+let keep=null;
+function keepAlive(on){try{if(!keep){keep=new Audio(KEEP_URI);keep.loop=true;keep.volume=0.01;keep.preload="auto"}
+  if(on){keep.play().catch(()=>{})}else{keep.pause()}}catch(e){}}
+function mediaSession(){if(!("mediaSession" in navigator))return;try{const it=player.items[player.i]||{};
+  navigator.mediaSession.metadata=new MediaMetadata({title:(it.en||"OPIc 30").slice(0,80),artist:it.label||"OPIc 30 무한 재생",album:"OPIc 30"});
+  navigator.mediaSession.playbackState=player.paused?"paused":"playing";
+  const H={play:()=>{if(player.paused)playerPause()},pause:()=>{if(!player.paused)playerPause()},nexttrack:playerNext,previoustrack:()=>{player.segs=[];player.si=0;clearTimeout(player.t);player.t=null;audStop();if(tts.ok)speechSynthesis.cancel();playerStep()},stop:playerStop};
+  for(const k in H){try{navigator.mediaSession.setActionHandler(k,H[k])}catch(e){}}}catch(e){}}
+
+/* ============ INFINITE PLAYER ============ */
+const player={on:false,paused:false,items:[],i:0,s:0,sents:[],t:null,lock:null,opts:{q:true,scripts:true,cards:true,texts:true,shuffle:true,think:5,gap:1.5,ko:"sent",repeat:1}};
+try{Object.assign(player.opts,JSON.parse(localStorage.getItem("opic30_player")||"{}"))}catch(e){}
+function buildPlaylist(){const o=player.opts;const items=[];const ts=TOPICS.filter(t=>t.id!=="intro"&&(S.profile.survey.includes(t.id)||t.group==="돌발"));
+  for(const t of ts)for(const q of t.qs){const model=S.scripts[t.id]?.scripts?.[t.qs.indexOf(q)]?.answer||S.models?.[q.q];
+    if(o.q)items.push({kind:"Q",key:"q_"+t.id+"_"+t.qs.indexOf(q),label:t.en+" · "+QT[q.t],en:q.q,ko:q.k||"",think:o.think});
+    if(o.scripts&&model)items.push({kind:"A",label:t.en+" · 모범답안/스크립트",en:model,ko:""})}
+  if(o.q)for(const r of ROLEPLAYS)items.push({kind:"Q",key:r.id+"_11",label:"Role-play · "+r.ko,en:r.q11,ko:r.k11||"",think:o.think});
+  if(o.q)ADVANCED.forEach((q,i)=>items.push({kind:"Q",key:"adv_"+i,label:"Advanced",en:q,ko:ADVANCED_KO[i]||"",think:o.think}));
+  if(o.cards)for(const c of [...CARDS,...S.custom])items.push({kind:"C",key:c.c==="custom"?null:c.id,label:CAT[c.c]||"내 표현",en:c.en.replace(/___/g,"something"),ko:c.ko});
+  if(o.texts)for(const t of S.texts)items.push({kind:"T",label:t.title,en:t.text,ko:""});
+  return o.shuffle?pick(items,items.length):items}
+function playerStart(){if(!tts.ok&&!Object.keys(AUD.man).length){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
+  player.items=buildPlaylist();if(!player.items.length){toast("재생할 항목이 없어요. 아래에서 내용을 선택하세요");return}
+  player.on=true;player.paused=false;player.i=0;player.segs=[];player.si=0;ttsStop();wakeLock(true);keepAlive(true);playerStep();mediaSession();renderMini();if(view==="listen")render()}
+function playerStop(){player.on=false;player.paused=false;clearTimeout(player.t);player.t=null;ttsStop();wakeLock(false);keepAlive(false);try{navigator.mediaSession.playbackState="none"}catch(e){}renderMini();if(view==="listen")render()}
+function playerPause(){if(!player.on)return;player.paused=!player.paused;clearTimeout(player.t);player.t=null;if(player.paused){audStop();if(tts.ok)speechSynthesis.cancel();keepAlive(false)}else{keepAlive(true);playerStep()}mediaSession();renderMini();if(view==="listen")render()}
+function playerNext(){if(!player.on)return;clearTimeout(player.t);player.t=null;audStop();if(tts.ok)speechSynthesis.cancel();player.i=(player.i+1)%player.items.length;player.segs=[];player.si=0;player.paused=false;playerStep()}
+function silenceSegs(sec){const out=[];let left=Math.round(sec);for(const d of [20,10,5,3,2,1]){while(left>=d){out.push({t:"file",src:"audio/silence_"+d+".mp3",rate:1});left-=d}}return out}
+function buildSegs(it){const o=player.opts;const segs=[];const src=audSrc(it.key);const sents=splitSent(it.en);const ko=o.ko!=="off";const n=Math.max(1,o.repeat|0);
+  const koSeg=(text,key)=>{const f=koSrc(key);return f?{t:"file",src:f,rate:1,text:"",ko:text}:{t:"ko",text}};
+  const enSegs=()=>src?[{t:"file",src,rate:tts.rate,text:it.en,ko:it.ko||sents.map(transOf).filter(Boolean).join(" ")}]:(sents.length?sents:[it.en]).map(sn=>({t:"en",text:sn,ko:(it.kind==="Q"||it.kind==="C")?"":transOf(sn)}));
+  // pattern: EN → 해석 → EN × (n-1)
+  if(src||it.kind==="Q"||it.kind==="C"){segs.push(...enSegs());if(ko&&it.ko)segs.push(koSeg(it.ko,it.key));for(let r=1;r<n;r++){segs.push(...silenceSegs(1),...enSegs())}}
+  else{// sentence-level fallback for scripts/texts: each sentence EN → KO, whole item repeated n times
+    for(let r=0;r<n;r++){for(const sn of (sents.length?sents:[it.en])){segs.push({t:"en",text:sn,ko:transOf(sn)});const k=transOf(sn);if(ko&&k&&r===0)segs.push({t:"ko",text:k})}if(r<n-1)segs.push(...silenceSegs(1))}}
+  const wait=(it.kind==="Q"?(it.think||0):0)+o.gap;if(wait>=1)segs.push(...silenceSegs(wait));
+  return segs}
+function playerStep(){if(!player.on||player.paused)return;const it=player.items[player.i];if(!it){playerStop();return}
+  if(!player.segs.length){player.segs=buildSegs(it);player.si=0;renderMini();mediaSession();if(view==="listen")updateNow()}
+  if(player.si>=player.segs.length){player.i=(player.i+1)%player.items.length;player.segs=[];player.si=0;if(player.i===0)player.items=buildPlaylist();playerStep();return}
+  const seg=player.segs[player.si];const tok=player.tok=(player.tok||0)+1;
+  const after=()=>{if(!player.on||player.paused||tok!==player.tok)return;player.tok++;player.si++;if(view==="listen")updateNow();playerStep()};
+  player.cur=seg;if(view==="listen")updateNow();
+  if(seg.t==="file"){audPlay(seg.src,{rate:seg.rate,onend:after});return}
+  // speech synthesis segments (fallback / Korean): cannot run while the page is in the background on iPhone → skip
+  if(!tts.ok||document.hidden){after();return}
+  const u=new SpeechSynthesisUtterance(seg.t==="ko"?seg.text:ttsText(seg.text));
+  if(seg.t==="ko"){const kv=koVoice();u.lang="ko-KR";if(kv)u.voice=kv;u.rate=Math.min(1.1,tts.rate+0.1)}else{u.lang=tts.voice?.lang||"en-US";if(tts.voice)u.voice=tts.voice;u.rate=tts.rate}u.pitch=1;
+  u.onend=()=>{player.t=setTimeout(()=>{player.t=null;after()},300)};u.onerror=e=>{if(e.error==="interrupted"||e.error==="canceled")return;after()};
+  speechSynthesis.cancel();speechSynthesis.speak(u);
+  clearInterval(player.ka);player.ka=setInterval(()=>{if(player.on&&!player.paused&&speechSynthesis.speaking)speechSynthesis.resume()},10000)}
+async function wakeLock(on){try{if(on){player.lock=await navigator.wakeLock?.request("screen")}else{await player.lock?.release();player.lock=null}}catch(e){}}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState!=="visible"||!player.on||player.paused)return;if(player.lock===null)wakeLock(true);setTimeout(()=>{const a=AUD.el;const filePlaying=a&&!a.paused&&!a.ended&&a.src;if(player.on&&!player.paused&&!filePlaying&&!(tts.ok&&speechSynthesis.speaking)){clearTimeout(player.t);player.t=null;playerStep()}},800)});
+// watchdog: if speech silently died (common after screen lock), restart the current sentence
+setInterval(()=>{if(!player.on||player.paused||player.t)return;const a=AUD.el;const filePlaying=a&&!a.paused&&!a.ended&&a.src;const ttsBusy=tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending);if(!filePlaying&&!ttsBusy){playerStep()}},4000);
+function renderMini(){const m=$("#mini");if(!player.on){m.hidden=true;return}m.hidden=false;const it=player.items[player.i]||{};
+  m.replaceChildren(h("span",{class:"now"},(player.paused?"⏸ ":"▶ ")+(it.label||"")+" — "+(it.en||"")),h("button",{onclick:playerPause},player.paused?"재생":"일시정지"),h("button",{onclick:playerNext},"다음"),h("button",{onclick:playerStop},"끄기"))}
+function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[player.i]||{};const seg=player.cur||{};
+  const en=(seg.t==="file"&&seg.text)||seg.t==="en"?(seg.text||it.en):it.en;const ko=seg.t==="ko"?seg.text:(seg.ko||"");
+  b.replaceChildren(h("span",{class:"eyebrow"},({Q:"질문",A:"답변",C:"표현",T:"내 자료"}[it.kind]||"")+" · "+(it.label||"")+" · "+(player.i+1)+"/"+player.items.length+(audSrc(it.key)?" · 🎧":"")),h("span",{class:"en"},en||it.en||""),ko?h("span",{class:"muted small"},ko):h("span",{class:"muted small"},"(해석 없음)"))}
+function transBtn(){const missing=[];for(const sc of Object.values(S.scripts))for(const x of (sc.scripts||[]))missing.push(...needTrans(x.answer));for(const m of Object.values(S.models||{}))missing.push(...needTrans(m));for(const t of S.texts)missing.push(...needTrans(t.text));
+  const n=new Set(missing).size;if(!n)return h("span",{class:"chip good"},"해석 준비됨");
+  const b=h("button",{class:"btn sm",disabled:!sample,onclick:async()=>{b.disabled=true;try{await translateSents([...new Set(missing)],(d,t)=>b.textContent=`해석 중 ${d}/${t}`);toast("해석을 만들었어요");render()}catch(e){toast(errMsg(e));b.disabled=false}}},"AI 해석 만들기 ("+n+"문장)");return b}
+function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem("opic30_player",JSON.stringify(o))}catch(e){}};
+  const ck=(k,l)=>h("label",{},h("input",{type:"checkbox",id:"pl_"+k,checked:o[k],onchange:e=>{o[k]=e.target.checked;saveO()}}),l);
+  const nModels=Object.values(S.scripts).reduce((a,sc)=>a+(sc.scripts||[]).length,0)+Object.keys(S.models||{}).length;
+  const now=h("div",{class:"nowbox",id:"nowbox"},h("span",{class:"muted small"},"재생을 누르면 여기에 지금 나오는 문장이 표시돼요."));
+  const box=h("div",{class:"card"},h("div",{class:"hdr"},h("div",{},h("h3",{},"무한 재생"),h("p",{class:"muted small"},"업무 중 배경으로 계속 듣기. 끝나면 처음부터 다시 섞어서 반복합니다.")),rateCtl()),
+    now,
+    h("div",{class:"row"},player.on?h("button",{class:"btn primary",onclick:playerPause},player.paused?"▶ 이어서":"⏸ 일시정지"):h("button",{class:"btn primary",onclick:playerStart},"▶ 무한 재생 시작"),player.on?h("button",{class:"btn",onclick:playerNext},"다음 ▶▶"):null,player.on?h("button",{class:"btn ghost",onclick:playerStop},"■ 끄기"):null),
+    h("p",{class:"eyebrow"},"재생 내용"),
+    h("div",{class:"cks"},ck("q","시험 질문 (80+)"),ck("scripts","모범답안·내 스크립트 ("+nModels+")"),ck("cards","표현카드 ("+(CARDS.length+S.custom.length)+")"),ck("texts","내 자료 ("+S.texts.length+")"),ck("shuffle","섞기")),
+    h("div",{class:"row"},h("label",{class:"f"},"한국어 해석",h("select",{id:"pl_ko",onchange:e=>{o.ko=e.target.value;saveO()}},...[["sent","영어 뒤에 한국어로 듣기"],["off","영어만"]].map(([v,l])=>h("option",{value:v,selected:o.ko===v},l)))),transBtn()),
+    h("div",{class:"row"},h("label",{class:"f"},"질문 뒤 생각할 시간",h("select",{id:"pl_think",onchange:e=>{o.think=+e.target.value;saveO()}},...[0,3,5,10,20].map(v=>h("option",{value:v,selected:o.think===v},v?v+"초 (속으로 답해보기)":"없음")))),
+      h("label",{class:"f"},"반복 횟수",h("select",{id:"pl_rep",onchange:e=>{o.repeat=+e.target.value;saveO()}},...[1,2,3,4,5].map(v=>h("option",{value:v,selected:o.repeat===v},v===1?"1회":v+"회 (영어 → 해석 → 영어 ×"+(v-1)+")")))),
+      h("label",{class:"f"},"항목 사이 간격",h("select",{id:"pl_gap",onchange:e=>{o.gap=+e.target.value;saveO()}},...[0.5,1.5,3].map(v=>h("option",{value:v,selected:o.gap===v},v+"초"))))),
+    h("div",{class:"note"},"백그라운드 재생: 🎧 표시가 있는 항목(시험 질문·표현카드)은 영어·한국어 해석 모두 녹음 파일이라 화면을 꺼도, 다른 앱을 써도 이어지고 잠금화면·이어폰 버튼으로 조작돼요. 모범답안·내 자료(녹음 없음)는 기기 음성이라 iPhone에서는 화면이 켜져 있을 때만 나오고, 꺼져 있으면 건너뜁니다."));
+  if(player.on)setTimeout(updateNow,0);return box}
+
+/* ---- MY TEXTS ---- */
+function vTexts(){const title=h("input",{type:"text",id:"tx_title",placeholder:"제목 (예: TED-Ed · Why do we dream?)"});const body=h("textarea",{id:"tx_body",style:"min-height:110px",placeholder:"영어 스크립트를 붙여넣으세요. TED-Ed 영상 페이지의 'Transcript' 탭이나 YouTube '스크립트 표시'에서 복사하면 됩니다."});
+  const add=()=>{const t=body.value.trim();if(t.length<30){toast("스크립트를 붙여넣어 주세요");return}S.texts.push({id:"t"+Date.now(),title:title.value.trim()||"내 자료 "+(S.texts.length+1),text:t.replace(/\s+/g," "),date:todayStr()});save();title.value="";body.value="";toast("추가했어요");render()};
+  return h("div",{class:"card"},h("h3",{},"내 듣기 자료 (TED-Ed 등)"),h("p",{class:"muted small"},"좋아하는 TED-Ed·팟캐스트 스크립트를 붙여넣으면 무한 재생 목록과 쉐도잉에 들어가요. 'AI 해석 만들기'를 누르면 문장마다 한국어 해석이 붙습니다."),
+    title,body,h("div",{class:"row"},h("button",{class:"btn primary",onclick:add},"추가")),
+    S.texts.length?h("div",{class:"list"},...S.texts.map(t=>{const miss=needTrans(t.text).length;return h("div",{class:"li",style:"flex-wrap:wrap"},h("span",{class:"grow"},h("b",{},t.title),h("span",{class:"muted small"}," · "+splitSent(t.text).length+"문장"+(miss?" · 해석 "+miss+"문장 없음":" · 해석 완료")),h("br"),h("span",{class:"muted small"},t.text.slice(0,90)+"…")),h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>go("listen",{text:t.text,title:t.title})},"쉐도잉"),h("button",{class:"btn sm ghost",onclick:()=>{S.texts=S.texts.filter(x=>x.id!==t.id);save();render()}},"삭제")))})):null)}
+
+/* ---- LISTEN ---- */
+let ld={mode:"quiz",q:null,revealed:false,plays:0};
+function vListen(m){
+  if(sub&&sub.text)return vShadow(m,sub.text,sub.title||"쉐도잉");
+  if(!tts.ok){put(m,h("h1",{},"듣기"),h("div",{class:"note"},"이 브라우저는 음성 재생(speechSynthesis)을 지원하지 않아요. Chrome, Safari, Edge에서 열어 주세요."));return}
+  const pool=[];TOPICS.filter(t=>t.id!=="intro"&&(S.profile.survey.includes(t.id)||t.group==="돌발")).forEach(t=>t.qs.forEach(q=>pool.push({topic:t,q,kind:QT[q.t]})));
+  ROLEPLAYS.forEach(r=>pool.push({topic:{id:r.id,en:"Role-play",ko:r.ko},q:{t:"rp",q:r.q11},kind:"롤플레이",rp:r,step:11}));
+  ADVANCED.forEach(q=>pool.push({topic:{id:"adv",en:"Advanced",ko:"고난도"},q:{t:"adv",q},kind:"고난도"}));
+  if(!ld.q){ld.q=pick(pool,1)[0];ld.revealed=false;ld.plays=0}
+  const it=ld.q;const guess=h("textarea",{id:"ld_guess",style:"min-height:80px",placeholder:"들은 질문을 영어로 받아 적거나, 핵심(주제·시제·무엇을 묻는지)을 한국어로 메모하세요"});
+  const ans=h("div",{},h("p",{class:"q"},it.q),h("p",{class:"muted small",style:"margin-top:6px"},it.topic.en+" · "+it.kind+" — "+({"묘사":"현재시제로 장소·사물·사람을 그리듯 설명","습관·루틴":"현재시제 + 빈도 표현(usually, every weekend)","경험":"과거시제로 이야기: when/where/who/what happened/how I felt","비교·변화":"과거 vs 현재 대조: back then / these days","롤플레이":"질문 3-4개 또는 해결책 2-3개를 제안","고난도":"의견 + 이유 2개 + 예시"}[it.kind]||"")));ans.hidden=!ld.revealed;
+  const playBtn=h("button",{class:"btn primary",onclick:()=>{ld.plays++;speak(it.q.q,{key:qKey(it.topic,it.q,it)});cnt.textContent=ld.plays+"회 들음"}},"▶ 질문 듣기");const cnt=h("span",{class:"muted small mono"},ld.plays?ld.plays+"회 들음":"");
+  put(m,h("div",{},h("p",{class:"eyebrow"},"Listening"),h("h1",{},"듣기")),
+    vPlayer(),
+    voiceCard(),
+    vTexts(),
+    h("div",{class:"note"},"실제 OPIc은 질문이 음성으로만 나옵니다. 텍스트 없이 먼저 듣고, 무엇을 묻는지(주제·시제·유형) 파악한 뒤 확인하세요. 영어 음성은 기기 내장 음성을 사용해요."),
+    h("div",{class:"card"},h("p",{class:"eyebrow"},"질문 듣기 · "+it.topic.ko),h("div",{class:"row"},playBtn,cnt),guess,ans,
+      h("div",{class:"row"},ld.revealed?null:h("button",{class:"btn",onclick:()=>{ld.revealed=true;render()}},"정답 확인"),ld.revealed?h("button",{class:"btn primary",onclick:()=>go("practice",{topic:it.topic,q:it.q,kind:it.kind,rp:it.rp,step:it.step})},"이 질문에 답하기 →"):null,h("button",{class:"btn ghost",onclick:()=>{ld.q=null;render()}},"다음 질문"))),
+    h("div",{class:"card"},h("h3",{},"쉐도잉"),h("p",{class:"muted small"},"모범답안이나 내 스크립트를 문장 단위로 듣고 바로 따라 말하기. 스크립트 탭과 AI 피드백에서 '쉐도잉' 버튼으로 바로 올 수 있어요."),
+      h("div",{class:"list"},...Object.entries(S.scripts).map(([id,sc])=>{const t=topicById(id);if(!t)return null;return h("button",{class:"topic",onclick:()=>go("listen",{text:(sc.scripts||[]).map(x=>x.answer).join(" "),title:t.en+" 스크립트"})},h("span",{class:"en"},t.en),h("span",{class:"ko"},t.ko+" · "+(sc.scripts||[]).length+"개 답변"))}),
+        Object.keys(S.scripts).length?null:h("p",{class:"muted small"},"저장된 스크립트가 아직 없어요. 스크립트 탭에서 먼저 만들어 보세요."),
+        h("button",{class:"topic",onclick:()=>go("listen",{text:CARDS.map(c=>c.en.replace(/___/g,"something")).join(" "),title:"표현카드 42장"})},h("span",{class:"en"},"Expression cards"),h("span",{class:"ko"},"기본 표현 42개 연속 듣기")))));
+}
+function vShadow(m,text,title){
+  const sents=splitSent(text);let i=0;let loop=false;let auto=false;
+  const rows=sents.map((s,k)=>h("div",{class:"sent",onclick:()=>{i=k;playCur()}},s,transOf(s)?h("div",{class:"muted small"},transOf(s)):null));
+  const mark=()=>{rows.forEach((r,k)=>r.classList.toggle("cur",k===i));rows[i]?.scrollIntoView({block:"nearest"})};
+  const playCur=()=>{mark();speak(sents[i],{onend:()=>{if(loop){setTimeout(playCur,700)}else if(auto&&i<sents.length-1){i++;setTimeout(playCur,900)}}})};
+  const btn=(l,f,c="btn")=>h("button",{class:c,onclick:f},l);
+  put(m,h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("listen")},"← 듣기"),h("p",{class:"eyebrow",style:"margin-top:10px"},"Shadowing · "+sents.length+"문장"),h("h1",{},title)),
+    h("div",{class:"card"},h("div",{class:"row"},btn("▶ 이 문장",playCur,"btn primary"),btn("◀",()=>{i=Math.max(0,i-1);playCur()}),btn("▶▶",()=>{i=Math.min(sents.length-1,i+1);playCur()}),rateCtl()),
+      h("div",{class:"row"},h("label",{class:"row small",style:"cursor:pointer;gap:6px"},h("input",{type:"checkbox",id:"sh_auto",onchange:e=>auto=e.target.checked}),"자동으로 다음 문장"),h("label",{class:"row small",style:"cursor:pointer;gap:6px"},h("input",{type:"checkbox",id:"sh_loop",onchange:e=>loop=e.target.checked}),"한 문장 반복"),btn("■ 정지",ttsStop,"btn sm ghost")),
+      h("p",{class:"muted small"},"듣고 → 0.5초 뒤 똑같은 리듬으로 따라 말하기. 막히는 문장은 '한 문장 반복'을 켜고 3번 이상.")),
+    h("div",{class:"card"},...rows));
+  mark();
+}
+
+/* ---- CARDS ---- */
+let deck={cat:"all",order:[],i:0,flip:false};
+function vCards(m){
+  const all=[...CARDS,...S.custom];const cats=["all",...Object.keys(CAT),...(S.custom.length?["custom"]:[])];
+  const filtered=all.filter(c=>deck.cat==="all"?true:c.c===deck.cat);
+  if(!deck.order.length||deck.order.some(id=>!filtered.find(c=>c.id===id))){deck.order=pick(filtered.map(c=>c.id),filtered.length);deck.i=0;deck.flip=false}
+  const card=filtered.find(c=>c.id===deck.order[deck.i]);const known=Object.keys(S.cards).filter(k=>S.cards[k]==="known").length;
+  const sel=h("select",{id:"cardcat",onchange:e=>{deck.cat=e.target.value;deck.order=[];render()}},...cats.map(c=>h("option",{value:c,selected:deck.cat===c},c==="all"?"전체 ("+all.length+")":c==="custom"?"내가 추가한 표현 ("+S.custom.length+")":CAT[c]+" ("+CARDS.filter(x=>x.c===c).length+")")));
+  const fl=h("div",{class:"flash"+(deck.flip?" flip":""),onclick:()=>{deck.flip=!deck.flip;fl.classList.toggle("flip",deck.flip)}},h("div",{class:"in"},
+    h("div",{class:"face"},h("span",{class:"eyebrow"},CAT[card?.c]||"추가 표현"),h("span",{class:"big"},card?.en||"—"),h("span",{class:"muted small"},"탭해서 뜻 보기")),
+    h("div",{class:"face back"},h("span",{class:"big"},card?.ko||"—"),card?.src?h("span",{class:"muted small"},"출처: "+card.src):null,h("span",{class:"muted small"},"소리 내어 3번 말해 보세요"))));
+  const mark=v=>{if(!card)return;S.cards[card.id]=v;S.today.cards++;save();deck.i=(deck.i+1)%deck.order.length;deck.flip=false;render()};
+  put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},"Expression cards · 외운 표현 "+known),h("h1",{},"표현카드")),h("div",{style:"min-width:170px"},sel)),
+    h("p",{class:"muted small mono"},(deck.i+1)+" / "+deck.order.length+(card&&S.cards[card.id]==="known"?" · 외움":card&&S.cards[card.id]==="again"?" · 다시":"")),
+    fl,
+    h("div",{class:"row"},spkBtn(card?.en||"",null,card?.id),h("button",{class:"btn grow",onclick:()=>mark("again")},"다시 볼래요"),h("button",{class:"btn primary grow",onclick:()=>mark("known")},"외웠어요")),
+    h("div",{class:"note"},"카드 앞면을 보고 먼저 입으로 말한 다음 뒤집어 확인하세요. AI 피드백에서 '표현카드에 추가'를 누르면 내 표현이 여기 쌓입니다."),
+    S.custom.length?h("details",{class:"card"},h("summary",{},"내가 추가한 표현 ("+S.custom.length+")"),h("div",{class:"kx",style:"margin-top:8px"},...S.custom.map(c=>h("div",{},h("span",{class:"en"},c.en),h("span",{class:"ko"},c.ko),h("button",{class:"btn sm ghost",onclick:()=>{S.custom=S.custom.filter(x=>x.id!==c.id);deck.order=[];save();render()}},"삭제"))))):null);
+}
+
+/* ---- SETTINGS ---- */
+function vSettings(m){
+  const p=S.profile;const survey=TOPICS.filter(t=>t.group==="서베이");
+  const name=h("input",{type:"text",id:"p_name",value:p.name,placeholder:"영어 이름 또는 이름 (예: Minsu)"});
+  const job=h("select",{id:"p_job"},...["회사원 (직장인)","학생","사업가·자영업","일 경험 없음"].map(v=>h("option",{value:v,selected:p.job===v},v)));
+  const home=h("select",{id:"p_home"},...["아파트에서 가족과 거주","아파트에서 혼자 거주","개인 주택에서 가족과 거주","원룸·오피스텔에서 혼자 거주"].map(v=>h("option",{value:v,selected:p.home===v},v)));
+  const extra=h("textarea",{id:"p_extra",style:"min-height:80px",placeholder:"스크립트에 녹여 넣을 나의 디테일. 예: 용인 수지 거주, 주말마다 탄천 조깅, 좋아하는 영화는 인터스텔라, 반려견 이름 코코"},p.extra);
+  const cks=h("div",{class:"cks"},...survey.map(t=>h("label",{},h("input",{type:"checkbox",id:"sv_"+t.id,checked:p.survey.includes(t.id)}),t.ko)));
+  put(m,h("div",{},h("p",{class:"eyebrow"},"Profile & survey"),h("h1",{},"설정")),
+    h("div",{class:"card"},h("h3",{},"내 프로필"),h("p",{class:"muted small"},"AI 평가와 스크립트에 쓰입니다. 실제 시험 서베이와 같은 선택으로 맞춰 두세요."),
+      h("label",{class:"f"},"이름",name),h("label",{class:"f"},"직업",job),h("label",{class:"f"},"거주 형태",home),h("label",{class:"f"},"나만의 디테일 (선택)",extra)),
+    h("div",{class:"card"},h("h3",{},"서베이 선택 주제"),h("p",{class:"muted small"},"IM3 전략: 겹치는 스크립트를 재활용할 수 있는 주제로 5–6개를 고르세요. (예: 공원·조깅·걷기는 같은 장소 이야기로 묶기)"),cks),
+    h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{p.name=name.value.trim();p.job=job.value;p.home=home.value;p.extra=extra.value.trim();p.survey=survey.filter(t=>cks.querySelector("#sv_"+t.id).checked).map(t=>t.id);save();toast("저장했어요")}},"저장")),
+    tts.ok?voiceCard():null,
+    h("div",{class:"card"},h("h3",{},"데이터"),h("p",{class:"muted small"},uid?"학습 기록은 내 Claude 계정에 저장되어 다른 기기에서도 이어집니다.":"지금은 이 브라우저에만 저장돼요. claude.ai 안에서 열면 계정에 저장됩니다."),
+      h("div",{class:"row",id:"resetrow"},h("button",{class:"btn sm ghost",onclick:e=>{if(e.currentTarget.nextSibling)return;e.currentTarget.after(h("button",{class:"btn sm",style:"color:var(--bad)",onclick:()=>{S=structuredClone(DEF);save();deck.order=[];render();toast("초기화했어요")}},"정말 초기화할게요"))}},"기록 전체 초기화…"))));
+}
+
+/* ============ BOOT ============ */
+loadLocal();render();loadManifests().then(()=>{if(view==="listen"||view==="settings")render()});
+(async()=>{
+  if(!window.claude?.use)return;
+  const [u,d,s]=await Promise.all([claude.use("user"),claude.use("db"),claude.use("sample")]);
+  sample=s;
+  if(u&&d){try{uid=await u.id();db=d;docRef=db.doc("data/users/"+uid+"/state/main");const snap=await docRef.get();
+    if(snap.exists){const remote=snap.data();if((remote.updatedAt||0)>(S.updatedAt||0)){S=Object.assign(structuredClone(DEF),remote);try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}
+    else if(S.updatedAt){docRef.set(structuredClone(S)).catch(()=>{})}}catch(e){docRef=null}}
+  render();
+})();
+</script>
+
+</body>
+</html>

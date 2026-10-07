@@ -1,0 +1,4 @@
+__pycache__/
+*.wav
+.DS_Store
+tools/tts/models/
