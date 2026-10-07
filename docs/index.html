@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261007-225934-db3287">
+<html lang="ko" data-build="20261007-230852-2d02b4">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -378,14 +378,14 @@ function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;const key=l=>
   for(const [k,v] of Object.entries(o.scripts||{}))if(!S.scripts[k]||(v.date||"")>(S.scripts[k].date||""))S.scripts[k]=v;
   Object.assign(S.models=S.models||{},o.models||{});Object.assign(S.trans=S.trans||{},o.trans||{});Object.assign(S.cards,o.cards||{});
   for(const c of (o.custom||[]))if(!S.custom.some(x=>x.en===c.en))S.custom.push(c);for(const t of (o.texts||[]))if(!S.texts.some(x=>x.id===t.id||x.text===t.text))S.texts.push(t);
-  if((o.updatedAt||0)>(S.updatedAt||0)&&o.profile)S.profile=Object.assign(S.profile,o.profile);if(o.today&&o.today.date===todayStr()){for(const k of ["cards","script","practice"])S.today[k]=Math.max(S.today[k]||0,o.today[k]||0)}if((o.updatedAt||0)>(S.updatedAt||0))S.updatedAt=o.updatedAt;if(!fromCloud)save();else{try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}
+  if((o.updatedAt||0)>(S.updatedAt||0)&&o.profile)S.profile=Object.assign(S.profile,o.profile);if(o.analysis&&(o.analysis.ts||0)>(S.analysis?.ts||0))S.analysis=o.analysis;if(o.today&&o.today.date===todayStr()){for(const k of ["cards","script","practice"])S.today[k]=Math.max(S.today[k]||0,o.today[k]||0)}if((o.updatedAt||0)>(S.updatedAt||0))S.updatedAt=o.updatedAt;if(!fromCloud)save();else{try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}
 function ensureToday(){if(S.today.date!==todayStr()){S.today={date:todayStr(),cards:0,script:0,practice:0}}}
 
 /* ============ CLAUDE → WEB SYNC (state carried in the web URL hash) ============ */
 const WEB_URL="https://zzonos.github.io/Opic_self_study/";
 const b64u=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 const unb64u=t=>{t=t.replace(/-/g,"+").replace(/_/g,"/");t+="=".repeat((4-t.length%4)%4);const bin=atob(t);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u};
-async function packState(){const json=JSON.stringify({log:S.log,scripts:S.scripts,models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,updatedAt:S.updatedAt});
+async function packState(){const json=JSON.stringify({log:S.log,scripts:S.scripts,models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,updatedAt:S.updatedAt});
   const bytes=new TextEncoder().encode(json);
   if("CompressionStream" in window){const cs=new CompressionStream("deflate-raw");const w=cs.writable.getWriter();w.write(bytes);w.close();const buf=await new Response(cs.readable).arrayBuffer();return "z"+b64u(buf)}
   return "r"+b64u(bytes.buffer)}
@@ -617,7 +617,7 @@ const ART_URL="https://claude.ai/artifact/HuASd2nEpXENsSugPoScyp";
 function aiNote(){if(sample)return null;return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"AI 평가·대화·스크립트는 Claude 앱에서 열었을 때 작동해요. 여기서는 듣기·카드·질문 연습을 쓸 수 있어요."),h("a",{class:"btn sm",href:ART_URL,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap"},"Claude에서 열기"))}
 
 /* ---- TODAY ---- */
-function vToday(m){
+function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);
   const p=S.practice;const logs=S.log.filter(l=>l.kind!=="card");
   const recent=logs.slice(-5);const avg=recent.length?Math.round(recent.reduce((a,l)=>a+lvIdx(l.level),0)/recent.length):null;
   const streak=calcStreak();const todayMin=S.log.filter(l=>l.date===todayStr()).reduce((a,l)=>a+(l.secs||0),0)/60;
@@ -636,7 +636,7 @@ function vToday(m){
       planItem(done[1],"스크립트 1개 소리 내어 읽고 외우기",`${t.script}/1`,"10분",()=>go("scripts")),
       planItem(done[2],"질문 3개 말하기 또는 AI 대화 + 피드백",`${t.practice}/3`,"15분",()=>go("practice"))),
     (window.claude?.use&&unsyncedCount()>=3)?h("div",{class:"note",style:"align-items:center"},h("span",{class:"grow"},"웹 계정으로 안 보낸 기록이 "+unsyncedCount()+"건 있어요."),h("button",{class:"btn sm",onclick:syncToWeb},"웹으로 보내기")):null,
-    h("div",{class:"card"},h("h2",{},"레벨 추이"),logs.length?chart(logs.slice(-12)):h("p",{class:"muted small"},"연습을 시작하면 평가 레벨이 여기에 쌓여요. 목표선은 IM3입니다.")),
+    h("div",{class:"card"},h("div",{class:"hdr"},h("h2",{},"레벨 추이"),h("button",{class:"btn sm",onclick:()=>go("today",{analysis:true})},"상세 분석 →")),logs.length?chart(logs.slice(-12)):h("p",{class:"muted small"},"연습을 시작하면 평가 레벨이 여기에 쌓여요. 목표선은 IM3입니다.")),
     h("div",{class:"card"},h("h2",{},"최근 기록"),logs.length?h("div",{class:"list"},...logs.slice(-6).reverse().map(l=>h("div",{class:"li"},h("span",{class:"d"},l.date.slice(5)),h("span",{class:"grow"},l.title),lvChip(l.level)))):h("p",{class:"muted small"},"아직 기록이 없어요."),
       h("div",{class:"row"},h("button",{class:"btn",onclick:()=>go("mock")},"15문항 모의시험 보기"))),
   );
@@ -694,7 +694,7 @@ function vAnswer(m,s){
     fbBox.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"Claude가 평가 중… (10–40초)")));
     try{const r=await evaluate(q.q,a,secs||Math.round(a.split(/\s+/).length/2.3),null);
       renderFeedback(fbBox,r,q.q,a);if(r.model_im3){S.models=S.models||{};S.models[q.q]=r.model_im3}
-      S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",title:topic.en+" · "+(s.kind||""),level:r.level,score:r.score,secs:secs||0});S.today.practice++;save();
+      S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",qt:q.t,title:topic.en+" · "+(s.kind||""),level:r.level,score:r.score,secs:secs||0,fixes:(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}))});S.today.practice++;save();
       const nextRp=s.rp&&s.step<13?h("button",{class:"btn primary",onclick:()=>{const st=s.step+1;go("practice",{topic,q:{t:"rp",q:s.rp["q"+st]},kind:"롤플레이 "+st+"번 · "+(st===12?"문제 해결":"관련 경험"),rp:s.rp,step:st})}},"다음: "+(s.step+1)+"번 →"):null;
       put(fbBox,h("div",{class:"row"},nextRp,h("button",{class:"btn",onclick:()=>{ta.value="";fbBox.replaceChildren();secs=0;tEl.textContent="0:00";bar.firstChild.style.width="0";evalBtn.disabled=false}},"같은 질문 다시"),h("button",{class:"btn",onclick:()=>go("practice")},"다른 질문")));
     }catch(e){fbBox.replaceChildren(h("p",{class:"small",style:"color:var(--bad)"},errMsg(e)));if(e.code!=="not_granted"&&e.code!=="sampling_disabled")evalBtn.disabled=false}
@@ -720,6 +720,60 @@ function renderFeedback(box,r,q,a){
 }
 function copy(t){navigator.clipboard?.writeText(t||"").then(()=>toast("복사했어요")).catch(()=>toast("복사가 막혀 있어요. 직접 선택해 복사해 주세요"))}
 function addCards(list,src){let n=0;for(const x of list){if(!x?.en)continue;if(S.custom.some(c=>c.en===x.en))continue;S.custom.push({id:"u"+Date.now()+"_"+n,c:"custom",en:x.en,ko:x.ko||"",src:(src||"").slice(0,60)});n++}save();toast(n?n+"장 추가했어요":"이미 있는 표현이에요")}
+
+/* ---- ANALYSIS (예상 등급·추세) ---- */
+const QTN={desc:"묘사",routine:"습관·루틴",exp:"경험",compare:"비교·변화",rp:"롤플레이",adv:"고난도",intro:"자기소개",chat:"AI 대화",mock:"모의시험"};
+function analyze(){const es=S.log.filter(l=>l.level&&l.kind!=="card").map(l=>({...l,i:lvIdx(l.level),t:l.ts||Date.parse(l.date+"T12:00:00")}));es.sort((a,b)=>a.t-b.t);
+  const n=es.length;if(n<5)return {n};
+  const now=Date.now();const w=e=>Math.pow(0.5,(now-e.t)/(7*864e5))*(e.kind==="mock"?2:1);
+  const recent=es.slice(-20);const W=recent.reduce((a,e)=>a+w(e),0);const mean=recent.reduce((a,e)=>a+w(e)*e.i,0)/W;
+  const sd=Math.sqrt(recent.reduce((a,e)=>a+w(e)*(e.i-mean)**2,0)/W);
+  const lo=Math.max(0,Math.round(mean-sd)),hi=Math.min(8,Math.round(mean+sd));
+  const last10=es.slice(-10);const pIM3=last10.filter(e=>e.i>=6).length/last10.length;
+  const mocks=es.filter(e=>e.kind==="mock");const mockHit=mocks.slice(-5).filter(e=>e.i>=6).length;
+  // trend: slope over last 20 entries (levels per entry)
+  const xs=recent.map((e,k)=>k),ys=recent.map(e=>e.i);const mx=xs.reduce((a,b)=>a+b,0)/xs.length,my=ys.reduce((a,b)=>a+b,0)/ys.length;
+  const slope=xs.reduce((a,x,k)=>a+(x-mx)*(ys[k]-my),0)/Math.max(1,xs.reduce((a,x)=>a+(x-mx)**2,0));
+  const trend=recent.length<6?"데이터 부족":slope>0.04?"상승":slope<-0.04?"하락":"정체";
+  // weekly
+  const wk=e=>{const d=new Date(e.t);const day=(d.getDay()+6)%7;d.setDate(d.getDate()-day);return d.toISOString().slice(0,10)};
+  const weeks={};for(const e of es){const k=wk(e);(weeks[k]=weeks[k]||{k,sum:0,n:0,min:0}).sum+=e.i;weeks[k].n++;weeks[k].min+=(e.secs||0)/60}
+  const weekly=Object.values(weeks).sort((a,b)=>a.k<b.k?-1:1).slice(-8).map(x=>({...x,avg:x.sum/x.n}));
+  // by type
+  const by={};for(const e of es){const k=e.qt||e.kind;(by[k]=by[k]||{k,sum:0,n:0}).sum+=e.i;by[k].n++}
+  const byType=Object.values(by).map(x=>({...x,avg:x.sum/x.n})).sort((a,b)=>a.avg-b.avg);
+  const fixes=es.flatMap(e=>(e.fixes||[]).map(f=>({...f,date:e.date,kind:e.kind}))).slice(-40);
+  return {n,mean,sd,lo,hi,pIM3,mocks:mocks.length,mockHit,mockN:Math.min(5,mocks.length),trend,slope,weekly,byType,fixes,last:es[n-1]}}
+function barChart(rows,label){const W=600,rh=26,L=110,R=40,H=rows.length*rh+10;const x=v=>L+v*(W-L-R)/8;
+  const g=rows.map((r,k)=>{const y=5+k*rh;return `<text x="${L-8}" y="${y+17}" text-anchor="end" font-size="12" fill="var(--ink)">${label(r)}</text><rect x="${L}" y="${y+5}" width="${Math.max(2,x(r.avg)-L)}" height="16" rx="4" fill="${r.avg>=6?"var(--good)":r.avg>=4?"var(--warn)":"var(--bad)"}"/><text x="${x(r.avg)+6}" y="${y+17}" font-size="11" font-family="var(--mono)" fill="var(--mute)">${LEVELS[Math.round(r.avg)]} · ${r.n}회</text>`}).join("");
+  const tgt=`<line x1="${x(6)}" x2="${x(6)}" y1="0" y2="${H}" stroke="var(--good)" stroke-dasharray="4 4"/>`;
+  return h("div",{html:`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${tgt}${g}</svg>`})}
+function vAnalysis(m){const a=analyze();
+  put(m,h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("today")},"← 오늘"),h("p",{class:"eyebrow",style:"margin-top:10px"},"Progress analysis"),h("h1",{},"분석")));
+  if(a.n<5){put(m,h("div",{class:"card"},h("h3",{},"아직 데이터가 적어요"),h("p",{},"AI 평가·대화·모의시험 기록이 5건 이상 쌓이면 예상 등급과 추세가 열려요. 지금 "+a.n+"건."),h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>go("practice")},"질문 연습하기"),h("button",{class:"btn",onclick:()=>go("chat")},"AI 대화하기"))));return}
+  const trendChip=h("span",{class:"chip "+(a.trend==="상승"?"good":a.trend==="하락"?"bad":"neutral")},a.trend);
+  put(m,
+    h("div",{class:"card"},h("p",{class:"eyebrow"},"예상 등급 · 최근 20회 가중 평균 (최근·모의시험 가중)"),h("div",{class:"lvl"},h("b",{},LEVELS[Math.round(a.mean)]),h("span",{class:"muted"},"범위 "+LEVELS[a.lo]+" ~ "+LEVELS[a.hi]),trendChip),
+      h("p",{class:"small"},"최근 10회 중 IM3 이상 "+Math.round(a.pIM3*100)+"%"+(a.mocks?" · 모의시험 최근 "+a.mockN+"회 중 IM3 이상 "+a.mockHit+"회":" · 모의시험 기록 없음")),
+      h("p",{class:"muted small"},a.pIM3>=0.7&&a.mockHit>=2?"실전에서도 IM3가 안정적으로 나오는 구간이에요. 시험 접수를 고려해도 좋아요.":a.pIM3>=0.4?"IM3가 절반쯤 나와요. 약한 유형을 집중하면 안정권에 들어갑니다.":"아직 IM2 이하가 많아요. 답변 구조(되받기 → 디테일 2–3개 → 마무리)와 과거시제부터 잡아 보세요."),
+      h("p",{class:"muted small"},"AI 판정은 추정치라 실제 등급과 ±1단계 차이가 날 수 있어요. 범위로 보세요.")),
+    h("div",{class:"card"},h("h3",{},"주간 추세"),a.weekly.length>1?chart(a.weekly.map(w=>({date:w.k,level:LEVELS[Math.round(w.avg)]}))):h("p",{class:"muted small"},"2주 이상 기록되면 추세가 보여요."),
+      h("div",{class:"list"},...a.weekly.slice(-4).reverse().map(w=>h("div",{class:"li"},h("span",{class:"d"},w.k.slice(5)+"주"),h("span",{class:"grow small"},w.n+"회 · "+Math.round(w.min)+"분"),lvChip(LEVELS[Math.round(w.avg)]))))),
+    h("div",{class:"card"},h("h3",{},"유형별 평균 레벨"),h("p",{class:"muted small"},"아래쪽일수록 약한 유형. 점선이 IM3 목표."),barChart(a.byType,r=>QTN[r.k]||r.k),
+      a.byType.length?h("p",{class:"small"},h("b",{},"가장 약한 유형: "),QTN[a.byType[0].k]||a.byType[0].k," (",LEVELS[Math.round(a.byType[0].avg)],") → 이번 주엔 이 유형을 하루 1개 더 연습해 보세요."):null),
+    h("div",{class:"card"},h("h3",{},"최근 교정 내역 ("+a.fixes.length+")"),a.fixes.length?h("div",{class:"list"},...a.fixes.slice(-12).reverse().map(f=>h("div",{class:"fix"},f.o?h("span",{class:"o"},f.o):null,f.b?h("span",{class:"b"},f.b):null,h("span",{class:"w"},f.w+" · "+f.date.slice(5))))):h("p",{class:"muted small"},"교정 내역은 이 버전부터 저장돼요. AI 평가·대화를 하면 여기에 쌓입니다."),
+      coachCard(a)),
+  );
+}
+function coachCard(a){const cached=S.analysis;const fresh=cached&&(Date.now()-(cached.ts||0))<7*864e5;
+  const box=h("div",{style:"display:flex;flex-direction:column;gap:8px"});
+  const show=r=>{box.replaceChildren(h("p",{class:"eyebrow"},"AI 코치 · "+new Date(r.ts).toLocaleDateString("ko-KR")),r.categories?.length?h("div",{class:"kx"},...r.categories.map(c=>h("div",{},h("span",{class:"en"},c.name+" ×"+c.count),h("span",{class:"ko"},c.tip)))):null,h("p",{},r.comment||""),r.plan?.length?h("ul",{style:"margin:0;padding-left:18px"},...r.plan.map(x=>h("li",{class:"small"},x))):null)};
+  if(fresh)show(cached);
+  const btn=h("button",{class:"btn",disabled:!sample,onclick:async()=>{btn.disabled=true;btn.textContent="분석 중…";try{
+    const data={expected:LEVELS[Math.round(a.mean)],range:[LEVELS[a.lo],LEVELS[a.hi]],trend:a.trend,pIM3:a.pIM3,byType:a.byType.map(x=>({type:QTN[x.k]||x.k,avg:LEVELS[Math.round(x.avg)],n:x.n})),weekly:a.weekly.map(w=>({week:w.k,avg:LEVELS[Math.round(w.avg)],n:w.n,minutes:Math.round(w.min)})),fixes:a.fixes.slice(-30).map(f=>f.o?f.o+" → "+f.b+" ("+f.w+")":f.w)};
+    const r=await sample.json(`You are an OPIc coach for a Korean learner (target IM3). Here is their progress data (JSON):\n${JSON.stringify(data)}\n\nReply with ONLY JSON: {"categories":[{"name":"실수 유형 (한국어, 예: 과거시제, 관사, 연결어 부족)","count":3,"tip":"한 줄 교정 팁"}],"comment":"한국어 종합 코멘트 3-4문장 (현재 수준, 추세, 가장 중요한 한 가지)","plan":["다음 주 처방 3개, 각 한 줄, 구체적으로"]}\nGroup the fixes into at most 5 categories. Be concrete and encouraging but honest.`,{cache:false});
+    r.ts=Date.now();S.analysis=r;save();show(r);btn.textContent="다시 분석"}catch(e){toast(errMsg(e));btn.textContent="AI 코치 분석"}finally{btn.disabled=false}}},fresh?"다시 분석":"AI 코치 분석 (실수 유형 + 다음 주 처방)");
+  return h("div",{style:"display:flex;flex-direction:column;gap:10px;margin-top:6px"},box,h("div",{class:"row"},btn,sample?null:h("span",{class:"muted small"},"Claude에서 열면 AI 코치 분석이 가능해요")))}
 
 /* ---- CHAT (AI 회화) ---- */
 const SCEN=[
@@ -790,7 +844,7 @@ async function vChatSummary(m){
   if(chat.summary==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"대화 평가 중…")));put(m,h("h1",{},"대화 정리"),box);
     const tr=chat.ui.filter(u=>u.who==="ai"||u.who==="me").map(u=>(u.who==="ai"?"Partner: ":"Learner: ")+u.text).join("\n");
     try{const r=await sample.json(`${RUBRIC}\n\nThis is a transcript of a practice conversation (${chat.sc.en}). Rate ONLY the learner's turns.\n\n${tr}\n\nReply with ONLY JSON: {"level":"IM2","score":60,"summary":"한국어 총평 2-3문장","fixes":[{"original":"...","better":"...","why":"한국어"}],"expressions":[{"en":"useful natural expression the learner could have used","ko":"뜻"}],"next":"다음 대화에서 시도할 한 가지 (한국어)"}\nGive 3-5 fixes and 4-6 expressions.`,{cache:false});
-      chat.summary=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"chat",title:"대화 · "+chat.sc.ko+" · "+chat.n+"턴",level:r.level,score:r.score,secs:chat.n*45});S.today.practice++;save();render()}
+      chat.summary=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"chat",qt:"chat",title:"대화 · "+chat.sc.ko+" · "+chat.n+"턴",level:r.level,score:r.score,secs:chat.n*45,fixes:[...(chat.ui.filter(u=>u.who==="fix").map(u=>({o:u.fix.original,b:u.fix.better,w:u.fix.why}))),...(r.fixes||[]).map(f=>({o:f.original,b:f.better,w:f.why}))].slice(0,8)});S.today.practice++;save();render()}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("button",{class:"btn",onclick:()=>{chat=null;render()}},"닫기"))}return}
   const r=chat.summary;
   put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation review · "+chat.sc.ko),h("h1",{},"대화 정리")),
@@ -831,7 +885,7 @@ async function vMockResult(m){
   if(mock.result==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"15문항 채점 중… (30–90초)")));
     put(m,h("h1",{},"채점 중"),box);
     if(!sample){box.replaceChildren(h("p",{},ERR.not_granted),h("button",{class:"btn",onclick:()=>{mock=null;render()}},"닫기"));return}
-    try{const r=await evalMock(mock.items,null);mock.result=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"mock",title:"모의시험 15문항",level:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0)});save();render()}
+    try{const r=await evalMock(mock.items,null);mock.result=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"mock",qt:"mock",title:"모의시험 15문항",level:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0),fixes:(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)})),perq:(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}))});save();render()}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{render()}},"다시 시도"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"닫기")))}
     return}
   const r=mock.result;
