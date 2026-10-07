@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261007-222806-d5fc41">
+<html lang="ko" data-build="20261007-225101-2b54e9">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -583,10 +583,11 @@ const VIEWS=[
  {id:"cards",ko:"표현카드",ic:'<rect x="3" y="6" width="14" height="12" rx="2"/><path d="M7 3h14v12"/>'},
  {id:"settings",ko:"설정",ic:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'},
 ];
-let view="today", sub=null;
+let view="today", sub=null, gated=false;
 function renderNav(){const n=$("#nav");n.replaceChildren(...VIEWS.map(v=>h("button",{class:view===v.id?"on":"",onclick:()=>go(v.id),"aria-label":v.ko},h("span",{html:`<svg viewBox="0 0 24 24">${v.ic}</svg>`}),v.ko)))}
 function go(v,s=null){view=v;sub=s;timerStop();if(!player.on)ttsStop();render();window.scrollTo({top:0})}
 function render(){renderNav();ensureToday();const m=$("#main");m.replaceChildren();
+  if(gated){$("#nav").hidden=true;put(m,h("div",{class:"login"},h("div",{},h("p",{class:"eyebrow"},"Opic Self Study"),h("div",{class:"brand"},"OSS"),h("p",{class:"muted",style:"margin-top:6px"},"이 앱은 Claude 계정으로 로그인한 사람만 쓸 수 있어요.")),h("div",{class:"card"},h("h3",{},"로그인이 필요해요"),h("p",{class:"small"},"Claude에 로그인한 뒤 이 링크를 다시 열어 주세요. 초대받은 계정으로 로그인하면 AI 대화·평가와 기록 저장이 본인 계정으로 동작합니다."),h("p",{class:"muted small"},"Claude 계정이 없다면 claude.ai에서 무료로 만들 수 있어요."))));return}
   if(cloud.ok&&cloud.ready&&!cloud.user&&!cloud.skip){$("#nav").hidden=true;vLogin(m);return}$("#nav").hidden=false;({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings})[view](m)}
 
 const ART_URL="https://claude.ai/artifact/HuASd2nEpXENsSugPoScyp";
@@ -1043,6 +1044,7 @@ loadLocal();cloudInit();render();loadManifests().then(()=>{if(view==="listen"||v
 (async()=>{
   if(!window.claude?.use)return;
   const [u,d,s]=await Promise.all([claude.use("user"),claude.use("db"),claude.use("sample")]);
+  if(!u){gated=true;render();return}
   sample=s;
   if(u&&d){try{uid=await u.id();db=d;docRef=db.doc("data/users/"+uid+"/state/main");const snap=await docRef.get();
     if(snap.exists){const remote=snap.data();if((remote.updatedAt||0)>(S.updatedAt||0)){S=Object.assign(structuredClone(DEF),remote);try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}
