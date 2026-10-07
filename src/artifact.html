@@ -929,6 +929,8 @@ function vSettings(m){
 }
 
 /* ============ BOOT ============ */
+// web build: auto-refresh when a newer version is deployed (home-screen apps cache the old page)
+(async()=>{if(window.claude?.use||!/github\.io|localhost/.test(location.host))return;try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)return;const v=(await r.json()).v;const cur=document.documentElement.dataset.build;if(cur&&v&&v!==cur){toast("새 버전으로 업데이트 중…");setTimeout(()=>location.reload(),800)}}catch(e){}})();
 loadLocal();render();loadManifests().then(()=>{if(view==="listen"||view==="settings")render()});
 (async()=>{
   if(!window.claude?.use)return;

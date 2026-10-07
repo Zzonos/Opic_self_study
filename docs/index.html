@@ -1,7 +1,8 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-build="20261007-182733-ee0d55">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-cache">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -941,6 +942,8 @@ function vSettings(m){
 }
 
 /* ============ BOOT ============ */
+// web build: auto-refresh when a newer version is deployed (home-screen apps cache the old page)
+(async()=>{if(window.claude?.use||!/github\.io|localhost/.test(location.host))return;try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)return;const v=(await r.json()).v;const cur=document.documentElement.dataset.build;if(cur&&v&&v!==cur){toast("새 버전으로 업데이트 중…");setTimeout(()=>location.reload(),800)}}catch(e){}})();
 loadLocal();render();loadManifests().then(()=>{if(view==="listen"||view==="settings")render()});
 (async()=>{
   if(!window.claude?.use)return;
