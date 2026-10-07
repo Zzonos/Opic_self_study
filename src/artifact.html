@@ -505,7 +505,8 @@ function renderNav(){const n=$("#nav");n.replaceChildren(...VIEWS.map(v=>h("butt
 function go(v,s=null){view=v;sub=s;timerStop();if(!player.on)ttsStop();render();window.scrollTo({top:0})}
 function render(){renderNav();ensureToday();const m=$("#main");m.replaceChildren();({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings})[view](m)}
 
-function aiNote(){if(sample)return null;return h("div",{class:"note ai"},"AI 평가·모범답안은 claude.ai 안에서 열었을 때 작동해요. 지금은 질문 연습과 카드만 사용할 수 있어요.")}
+const ART_URL="https://claude.ai/artifact/HuASd2nEpXENsSugPoScyp";
+function aiNote(){if(sample)return null;return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"AI 평가·대화·스크립트는 Claude 앱에서 열었을 때 작동해요. 여기서는 듣기·카드·질문 연습을 쓸 수 있어요."),h("a",{class:"btn sm",href:ART_URL,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap"},"Claude에서 열기"))}
 
 /* ---- TODAY ---- */
 function vToday(m){
