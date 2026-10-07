@@ -1,4 +1,4 @@
-<title>OPIc 30</title>
+<title>OSS</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 /* Layout: phone-first single column with a bottom tab bar; on desktop the tabs become a left rail and content sits in a 720px column. */
@@ -781,7 +781,7 @@ let keep=null;
 function keepAlive(on){try{if(!keep){keep=new Audio(KEEP_URI);keep.loop=true;keep.volume=0.01;keep.preload="auto"}
   if(on){keep.play().catch(()=>{})}else{keep.pause()}}catch(e){}}
 function mediaSession(){if(!("mediaSession" in navigator))return;try{const it=player.items[player.i]||{};
-  navigator.mediaSession.metadata=new MediaMetadata({title:(it.en||"OPIc 30").slice(0,80),artist:it.label||"OPIc 30 무한 재생",album:"OPIc 30"});
+  navigator.mediaSession.metadata=new MediaMetadata({title:(it.en||"OSS").slice(0,80),artist:it.label||"OSS 무한 재생",album:"OSS · Opic Self Study"});
   navigator.mediaSession.playbackState=player.paused?"paused":"playing";
   const H={play:()=>{if(player.paused)playerPause()},pause:()=>{if(!player.paused)playerPause()},nexttrack:playerNext,previoustrack:()=>{player.segs=[];player.si=0;clearTimeout(player.t);player.t=null;audStop();if(tts.ok)speechSynthesis.cancel();playerStep()},stop:playerStop};
   for(const k in H){try{navigator.mediaSession.setActionHandler(k,H[k])}catch(e){}}}catch(e){}}

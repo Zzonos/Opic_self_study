@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261007-202731-eeeb96">
+<html lang="ko" data-build="20261007-203110-e2d4fe">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -7,14 +7,14 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#0f7a68">
-<meta name="apple-mobile-web-app-title" content="OPIc 30">
+<meta name="apple-mobile-web-app-title" content="OSS">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
-<title>OPIc 30</title>
+<title>OSS</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 /* Layout: phone-first single column with a bottom tab bar; on desktop the tabs become a left rail and content sits in a 720px column. */
@@ -797,7 +797,7 @@ let keep=null;
 function keepAlive(on){try{if(!keep){keep=new Audio(KEEP_URI);keep.loop=true;keep.volume=0.01;keep.preload="auto"}
   if(on){keep.play().catch(()=>{})}else{keep.pause()}}catch(e){}}
 function mediaSession(){if(!("mediaSession" in navigator))return;try{const it=player.items[player.i]||{};
-  navigator.mediaSession.metadata=new MediaMetadata({title:(it.en||"OPIc 30").slice(0,80),artist:it.label||"OPIc 30 무한 재생",album:"OPIc 30"});
+  navigator.mediaSession.metadata=new MediaMetadata({title:(it.en||"OSS").slice(0,80),artist:it.label||"OSS 무한 재생",album:"OSS · Opic Self Study"});
   navigator.mediaSession.playbackState=player.paused?"paused":"playing";
   const H={play:()=>{if(player.paused)playerPause()},pause:()=>{if(!player.paused)playerPause()},nexttrack:playerNext,previoustrack:()=>{player.segs=[];player.si=0;clearTimeout(player.t);player.t=null;audStop();if(tts.ok)speechSynthesis.cancel();playerStep()},stop:playerStop};
   for(const k in H){try{navigator.mediaSession.setActionHandler(k,H[k])}catch(e){}}}catch(e){}}
