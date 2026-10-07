@@ -655,12 +655,12 @@ function vChat(m){
     if(u.who==="wait")return h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")))};
   chat.ui.forEach(u=>bub.append(render1(u)));
   const ta=h("textarea",{id:"chat_in",style:"min-height:64px",placeholder:"받아쓰기(마이크 키)로 말하거나 입력하세요"});
-  const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ta.value="";chat.busy=true;
+  const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ttsStop();ta.value="";chat.busy=true;
     chat.ui.push({who:"me",text:t});chat.turns.push({role:"user",content:t});bub.append(render1({who:"me",text:t}));const w=render1({who:"wait"});bub.append(w);w.scrollIntoView({block:"end"});
     try{const r=await sample.json([{role:"user",content:chatRules(sc)},...chat.turns],{cache:false,modelTier:"quick"});
       w.remove();if(r?.fix?.better&&r.fix.original){chat.ui.push({who:"fix",fix:r.fix});bub.append(render1({who:"fix",fix:r.fix}))}
       const reply=String(r?.reply||"").trim()||"Sorry, could you say that again?";chat.turns.push({role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});bub.append(render1({who:"ai",text:reply,ko:r?.reply_ko||""}));
-      if(chat.auto){speak(reply);setTimeout(()=>{if(tts.ok&&!speechSynthesis.speaking&&!speechSynthesis.pending&&chat.auto)speak(reply)},600)}bub.lastChild.scrollIntoView({block:"end"});chat.n++;const cnt=$("#chat_cnt");if(cnt)cnt.textContent=sc.en+" · "+chat.n+"턴";
+      if(chat.auto)speak(reply);bub.lastChild.scrollIntoView({block:"end"});chat.n++;const cnt=$("#chat_cnt");if(cnt)cnt.textContent=sc.en+" · "+chat.n+"턴";
       if(chat.turns.length>24)chat.turns.splice(0,2);
     }catch(e){w.remove();bub.append(h("div",{class:"note"},errMsg(e)));chat.turns.pop();chat.ui.pop()}
     finally{chat.busy=false;last="";if(chatMode!=="voice")ta.focus()}};
@@ -670,8 +670,9 @@ function vChat(m){
   let vt=null,last="";const status=h("span",{class:"muted small mono"});
   const armAuto=()=>{clearTimeout(vt);const now=ta.value.trim();if(now.length<3||now===last){status.textContent=now?"":"말하면 자동으로 보내요";return}
     let left=2;status.textContent="말이 끝나면 "+left+"초 후 전송";const tick=()=>{if(ta.value.trim()!==now){armAuto();return}left--;if(left<=0){status.textContent="";last=ta.value.trim();send()}else{status.textContent="말이 끝나면 "+left+"초 후 전송";vt=setTimeout(tick,1000)}};vt=setTimeout(tick,1000)};
+  ta.addEventListener("input",()=>{if(tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending))ttsStop()},{once:false});
   if(chatMode==="voice"){ta.addEventListener("input",armAuto);ta.placeholder="키보드의 마이크 키를 누르고 말하세요"}
-  const micBtn_=SR_OK?micBtn(ta,{onFinal:v=>{if(v.trim().length>2){clearTimeout(vt);send()}}}):h("button",{class:"btn primary",style:"min-width:140px;justify-content:center",onclick:()=>{ta.focus();toast("키보드의 🎤 키를 눌러 말하세요")}},"🎤 말하기");
+  const micBtn_=SR_OK?micBtn(ta,{onFinal:v=>{if(v.trim().length>2){clearTimeout(vt);send()}}}):h("button",{class:"btn primary",style:"min-width:140px;justify-content:center",onclick:()=>{ttsStop();ta.focus();toast("키보드의 🎤 키를 눌러 말하세요")}},"🎤 말하기");
   const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn_,h("button",{class:"btn",onclick:()=>{clearTimeout(vt);send()}},"지금 보내기"),status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
   put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow",id:"chat_cnt"},sc.en+" · "+chat.n+"턴"+(chatMode==="voice"?" · 말하기 모드":"")),h("h2",{},sc.ko)),h("div",{class:"row"},h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_auto",checked:chat.auto,onchange:e=>chat.auto=e.target.checked}),"자동 읽기"),chatMode==="voice"?h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_hide",checked:chat.hide,onchange:e=>{chat.hide=e.target.checked;bub.classList.toggle("hidetext",chat.hide)}}),"상대 말 숨기기"):null,h("button",{class:"btn sm",onclick:()=>endChat()},"대화 끝내기"))),
     bub,
@@ -955,7 +956,7 @@ function offlineCard(){if(!WEB)return null;const urls=[];for(const t of Object.k
 let rec=null;
 function micBtn(ta,{onFinal=null,label="🎤 말하기"}={}){if(!SR_OK)return null;const b=h("button",{class:"btn primary"},label);let on=false;
   const stop=()=>{on=false;b.textContent=label;b.classList.remove("rec");try{rec?.stop()}catch(e){}rec=null};
-  b.onclick=()=>{if(on){stop();return}const R=window.SpeechRecognition||window.webkitSpeechRecognition;rec=new R();rec.lang="en-US";rec.continuous=true;rec.interimResults=true;let base=ta.value?ta.value.trim()+" ":"";let fin="";
+  b.onclick=()=>{ttsStop();if(on){stop();return}const R=window.SpeechRecognition||window.webkitSpeechRecognition;rec=new R();rec.lang="en-US";rec.continuous=true;rec.interimResults=true;let base=ta.value?ta.value.trim()+" ":"";let fin="";
     rec.onresult=e=>{let interim="";fin="";for(let i=0;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t+" ";else interim+=t}ta.value=base+fin+interim;ta.dispatchEvent(new Event("input"))};
     rec.onerror=e=>{if(e.error==="not-allowed")toast("마이크 권한을 허용해 주세요 (설정 → Safari → 마이크)");stop()};
     rec.onend=()=>{if(on){stop();ta.value=(base+fin).trim();ta.dispatchEvent(new Event("input"));onFinal&&onFinal(ta.value)}};
