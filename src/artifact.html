@@ -476,7 +476,7 @@ Reply with ONLY one JSON object:
 }
 
 /* ============ RECORDED AUDIO (Kokoro neural voices, pre-rendered) ============ */
-const AUD={tags:{m:"남성 · Michael",f:"여성 · Heart"},man:{},tag:"m",el:null,ready:false};
+const AUD={tags:{m:"남성 · Andrew",f:"여성 · Ava"},man:{},tag:"m",el:null,ready:false};
 try{const t=localStorage.getItem("opic30_aud");if(t)AUD.tag=t}catch(e){}
 function audEl(){if(!AUD.el){AUD.el=new Audio();AUD.el.preload="auto"}return AUD.el}
 async function loadManifests(){for(const t of [...Object.keys(AUD.tags),"ko"]){try{const r=await fetch("audio/"+t+"/manifest.json");if(r.ok)AUD.man[t]=await r.json()}catch(e){}}AUD.ready=true;if(!AUD.man[AUD.tag]){AUD.tag=Object.keys(AUD.man).find(t=>t!=="ko")||"off"}}
@@ -518,7 +518,7 @@ function voiceCard(){
     other:"브라우저가 제공하는 기기 음성을 사용합니다. ★ 표시가 자연스러운 음성이에요."};
   const recSel=h("select",{id:"aud_sel",onchange:e=>{AUD.tag=e.target.value;try{localStorage.setItem("opic30_aud",AUD.tag)}catch(x){}toast("음성을 바꿨어요")}},...Object.keys(AUD.man).map(t=>h("option",{value:t,selected:AUD.tag===t},AUD.tags[t]+" (녹음·고음질)")),h("option",{value:"off",selected:AUD.tag==="off"},"기기 내장 음성만 사용"));
   return h("div",{class:"card"},h("h3",{},"음성 선택"),
-    h("p",{class:"muted small"},"시험 질문·표현카드와 그 한국어 해석은 녹음 음성(AI 성우)으로 재생돼요. 녹음이 없는 모범답안·스크립트·내 자료는 아래 기기 음성을 씁니다."),
+    h("p",{class:"muted small"},"시험 질문·표현카드와 그 한국어 해석은 Microsoft 신경망 음성(Andrew/Ava, 한국어 SunHi)으로 녹음되어 재생돼요. 녹음이 없는 모범답안·스크립트·내 자료는 아래 기기 음성을 씁니다."),
     h("label",{class:"f"},"녹음 음성 (질문·표현카드)",recSel),
     h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>speak("Hi, I'm calling to ask about the gym membership. Could you tell me what time it opens on weekends?",{key:"rp_gym_11"})},"▶ 녹음 음성 들어보기")),
     h("p",{class:"eyebrow",style:"margin-top:4px"},"기기 음성 (그 외)"),

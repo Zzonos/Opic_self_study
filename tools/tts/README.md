@@ -4,9 +4,10 @@
 
 | 폴더 | 음성 | 엔진 |
 |---|---|---|
-| `audio/m` | 남성 (Michael) | Kokoro-82M v1.0 (ONNX) |
-| `audio/f` | 여성 (Heart) | Kokoro-82M v1.0 (ONNX) |
-| `audio/ko` | 한국어 해석 (여성) | Mimic3 `ko_KO/kss_low` VITS (ONNX, sherpa-onnx 배포본) |
+| `audio/m` | 남성 (en-US Andrew Multilingual Neural) | edge-tts (`edge_render.py`) — 현재 사용 |
+| `audio/f` | 여성 (en-US Ava Multilingual Neural) | edge-tts — 현재 사용 |
+| `audio/ko` | 한국어 해석 (ko-KR SunHi Neural) | edge-tts — 현재 사용 |
+| (예전) | Kokoro-82M / Mimic3 ko_KO | `synth.py`, `synth_ko.py` — 오프라인 대안 |
 | `audio/silence_*.mp3` | 무음 | ffmpeg |
 
 ## 준비물
