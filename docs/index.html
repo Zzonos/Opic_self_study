@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261007-182733-ee0d55">
+<html lang="ko" data-build="20261007-183350-f8d1ce">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -7,6 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#0f7a68">
+<meta name="apple-mobile-web-app-title" content="OPIc 30">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
@@ -133,6 +136,7 @@ label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--mu
 .thinking i:nth-child(2){animation-delay:.2s}.thinking i:nth-child(3){animation-delay:.4s}
 @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
 svg.chart{width:100%;height:auto;display:block}
+.btn.rec{background:var(--bad);border-color:var(--bad);color:#fff;animation:pulse 1.2s infinite}
 .spk{appearance:none;border:1px solid var(--line);background:var(--panel);border-radius:999px;width:34px;height:34px;display:inline-grid;place-items:center;cursor:pointer;flex:none;color:var(--accent)}
 .spk.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .spk svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -363,6 +367,11 @@ const todayStr=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMo
 function loadLocal(){try{const r=localStorage.getItem("opic30");if(r)S=Object.assign(structuredClone(DEF),JSON.parse(r))}catch(e){}}
 function save(){S.updatedAt=Date.now();try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}
   if(docRef){docRef.set(structuredClone(S)).catch(()=>{})}}
+function mergeState(o){if(!o||typeof o!=="object")return;const key=l=>l.date+"|"+l.kind+"|"+l.title+"|"+(l.score??"");const seen=new Set(S.log.map(key));for(const l of (o.log||[]))if(!seen.has(key(l))){S.log.push(l);seen.add(key(l))}S.log.sort((a,b)=>a.date<b.date?-1:1);
+  for(const [k,v] of Object.entries(o.scripts||{}))if(!S.scripts[k]||(v.date||"")>(S.scripts[k].date||""))S.scripts[k]=v;
+  Object.assign(S.models=S.models||{},o.models||{});Object.assign(S.trans=S.trans||{},o.trans||{});Object.assign(S.cards,o.cards||{});
+  for(const c of (o.custom||[]))if(!S.custom.some(x=>x.en===c.en))S.custom.push(c);for(const t of (o.texts||[]))if(!S.texts.some(x=>x.id===t.id||x.text===t.text))S.texts.push(t);
+  if((o.updatedAt||0)>(S.updatedAt||0)&&o.profile)S.profile=Object.assign(S.profile,o.profile);if(o.today&&o.today.date===todayStr()){for(const k of ["cards","script","practice"])S.today[k]=Math.max(S.today[k]||0,o.today[k]||0)}save()}
 function ensureToday(){if(S.today.date!==todayStr()){S.today={date:todayStr(),cards:0,script:0,practice:0}}}
 
 /* ============ UTIL ============ */
@@ -609,7 +618,7 @@ function vAnswer(m,s){
   put(m,
     h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("practice",topic.qs?{topic,q:null}:null)},"← 뒤로"),h("p",{class:"eyebrow",style:"margin-top:10px"},topic.en+" · "+(s.kind||"")),h("div",{class:"row",style:"flex-wrap:nowrap;align-items:flex-start"},h("p",{class:"q grow"},q.q),spkBtn(q.q,null,qKey(topic,q,s)))),
     h("div",{class:"card"},h("div",{class:"row"},tEl,h("div",{class:"grow"},bar,h("p",{class:"muted small",style:"margin-top:4px"},"권장 1:00–2:00. 질문을 되받고 → 2–3가지 디테일 → 한 줄 마무리.")),startBtn),
-      ta,h("div",{class:"row"},evalBtn,stopBtn,h("span",{class:"muted small"},sample?"":"AI 평가는 claude.ai 안에서 열었을 때 가능"))),
+      ta,h("div",{class:"row"},micBtn(ta,{onFinal:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}}}),sample?evalBtn:null,stopBtn,sample?null:h("button",{class:"btn",onclick:()=>{const a=ta.value.trim();if(!a){toast("먼저 답변을 말하거나 입력하세요");return}navigator.clipboard?.writeText("[OPIc 연습 평가 요청]\nQ: "+q.q+"\nA: "+a).catch(()=>{});window.open(ART_URL,"_blank");toast("답변을 복사했어요. Claude에서 붙여넣어 평가하세요")}},"Claude에서 평가"),h("span",{class:"muted small"},SR_OK?"마이크로 말하면 바로 글자로 바뀌어요":sample?"":""))),
     myScript?h("details",{class:"card"},h("summary",{},"내 스크립트 보기"),h("div",{class:"model"},myScript)):null,
     fbBox);
 }
@@ -674,8 +683,8 @@ function vChat(m){
   const armAuto=()=>{clearTimeout(vt);const now=ta.value.trim();if(now.length<3||now===last){status.textContent=now?"":"말하면 자동으로 보내요";return}
     let left=2;status.textContent="말이 끝나면 "+left+"초 후 전송";const tick=()=>{if(ta.value.trim()!==now){armAuto();return}left--;if(left<=0){status.textContent="";last=ta.value.trim();send()}else{status.textContent="말이 끝나면 "+left+"초 후 전송";vt=setTimeout(tick,1000)}};vt=setTimeout(tick,1000)};
   if(chatMode==="voice"){ta.addEventListener("input",armAuto);ta.placeholder="키보드의 마이크 키를 누르고 말하세요"}
-  const micBtn=h("button",{class:"btn primary",style:"min-width:140px;justify-content:center",onclick:()=>{ta.focus();toast("키보드의 🎤 키를 눌러 말하세요")}},"🎤 말하기");
-  const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn,h("button",{class:"btn",onclick:()=>{clearTimeout(vt);send()}},"지금 보내기"),status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
+  const micBtn_=SR_OK?micBtn(ta,{onFinal:v=>{if(v.trim().length>2){clearTimeout(vt);send()}}}):h("button",{class:"btn primary",style:"min-width:140px;justify-content:center",onclick:()=>{ta.focus();toast("키보드의 🎤 키를 눌러 말하세요")}},"🎤 말하기");
+  const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn_,h("button",{class:"btn",onclick:()=>{clearTimeout(vt);send()}},"지금 보내기"),status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
   put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow",id:"chat_cnt"},sc.en+" · "+chat.n+"턴"+(chatMode==="voice"?" · 말하기 모드":"")),h("h2",{},sc.ko)),h("div",{class:"row"},h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_auto",checked:chat.auto,onchange:e=>chat.auto=e.target.checked}),"자동 읽기"),chatMode==="voice"?h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_hide",checked:chat.hide,onchange:e=>{chat.hide=e.target.checked;bub.classList.toggle("hidetext",chat.hide)}}),"상대 말 숨기기"):null,h("button",{class:"btn sm",onclick:()=>endChat()},"대화 끝내기"))),
     bub,
     h("div",{class:"chatin"},h("div",{class:"card",style:"gap:8px"},ta,inputRow,h("div",{class:"row"},h("div",{class:"grow"},prompt_ko),hintBtn),hintOut)));
@@ -727,7 +736,7 @@ function vMock(m){
   const replay=h("button",{class:"btn sm",onclick:()=>{if(plays>=2){toast("실제 시험에서는 2번까지만 들을 수 있어요");return}plays++;speak(it.q,{key:it.key});replay.textContent="다시 듣기 ("+(2-plays)+"회 남음)"}},"질문 듣기 (2회)");
   if(mock.listen){qText.hidden=true;setTimeout(()=>{plays=1;speak(it.q,{key:it.key});replay.textContent="다시 듣기 (1회 남음)"},300)}else{hid.hidden=true;reveal.hidden=true}
   put(m,h("div",{},h("p",{class:"eyebrow"},"Question "+(mock.i+1)+" / "+n+" · "+it.kind),nav,qText,hid,h("div",{class:"row",style:"margin-top:8px"},replay,reveal)),
-    h("div",{class:"card"},h("div",{class:"row"},tEl,h("div",{class:"grow"},bar),h("button",{class:"btn primary",onclick:e=>{if(timer.on){it.secs=timerStop();e.target.textContent="다시 시작"}else{timerStart(tEl,bar.firstChild);e.target.textContent="답변 끝";ta.focus()}}},"말하기 시작")),ta,
+    h("div",{class:"card"},h("div",{class:"row"},tEl,h("div",{class:"grow"},bar),h("button",{class:"btn primary",onclick:e=>{if(timer.on){it.secs=timerStop();e.target.textContent="다시 시작"}else{timerStart(tEl,bar.firstChild);e.target.textContent="답변 끝";ta.focus()}}},"말하기 시작")),ta,SR_OK?h("div",{class:"row"},micBtn(ta,{label:"🎤 마이크로 답하기"})):null,
       h("div",{class:"row"},h("button",{class:"btn primary",onclick:next},mock.i<n-1?"다음 문항 →":"제출하고 채점"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"시험 중단"))));
 }
 async function vMockResult(m){
@@ -879,6 +888,7 @@ function vListen(m){
   const playBtn=h("button",{class:"btn primary",onclick:()=>{ld.plays++;speak(it.q.q,{key:qKey(it.topic,it.q,it)});cnt.textContent=ld.plays+"회 들음"}},"▶ 질문 듣기");const cnt=h("span",{class:"muted small mono"},ld.plays?ld.plays+"회 들음":"");
   put(m,h("div",{},h("p",{class:"eyebrow"},"Listening"),h("h1",{},"듣기")),
     vPlayer(),
+    offlineCard(),
     voiceCard(),
     vTexts(),
     h("div",{class:"note"},"실제 OPIc은 질문이 음성으로만 나옵니다. 텍스트 없이 먼저 듣고, 무엇을 묻는지(주제·시제·유형) 파악한 뒤 확인하세요. 영어 음성은 기기 내장 음성을 사용해요."),
@@ -937,11 +947,32 @@ function vSettings(m){
     h("div",{class:"card"},h("h3",{},"서베이 선택 주제"),h("p",{class:"muted small"},"IM3 전략: 겹치는 스크립트를 재활용할 수 있는 주제로 5–6개를 고르세요. (예: 공원·조깅·걷기는 같은 장소 이야기로 묶기)"),cks),
     h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{p.name=name.value.trim();p.job=job.value;p.home=home.value;p.extra=extra.value.trim();p.survey=survey.filter(t=>cks.querySelector("#sv_"+t.id).checked).map(t=>t.id);save();toast("저장했어요")}},"저장")),
     tts.ok?voiceCard():null,
+    h("div",{class:"card"},h("h3",{},"기록 옮기기 (웹 ↔ Claude)"),h("p",{class:"muted small"},"학습 기록·스크립트·내 표현·해석·프로필을 코드로 복사해 다른 곳에서 붙여넣으면 합쳐져요. 양쪽 기록이 모두 남습니다."),
+      h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{const code=btoa(unescape(encodeURIComponent(JSON.stringify(S))));navigator.clipboard?.writeText(code).then(()=>toast("기록 코드를 복사했어요 ("+Math.round(code.length/1024)+"KB)")).catch(()=>{$("#imp").value=code;toast("아래 칸에 코드를 넣었어요. 전체 선택해 복사하세요")})}},"기록 코드 복사")),
+      h("textarea",{id:"imp",style:"min-height:70px;font-family:var(--mono);font-size:11px",placeholder:"다른 곳에서 복사한 기록 코드를 붙여넣기"}),
+      h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{try{const o=JSON.parse(decodeURIComponent(escape(atob($("#imp").value.trim()))));mergeState(o);$("#imp").value="";toast("기록을 합쳤어요");render()}catch(e){toast("코드를 읽을 수 없어요")}}},"가져와서 합치기"))),
     h("div",{class:"card"},h("h3",{},"데이터"),h("p",{class:"muted small"},uid?"학습 기록은 내 Claude 계정에 저장되어 다른 기기에서도 이어집니다.":"지금은 이 브라우저에만 저장돼요. claude.ai 안에서 열면 계정에 저장됩니다."),
       h("div",{class:"row",id:"resetrow"},h("button",{class:"btn sm ghost",onclick:e=>{if(e.currentTarget.nextSibling)return;e.currentTarget.after(h("button",{class:"btn sm",style:"color:var(--bad)",onclick:()=>{S=structuredClone(DEF);save();deck.order=[];render();toast("초기화했어요")}},"정말 초기화할게요"))}},"기록 전체 초기화…"))));
 }
 
 /* ============ BOOT ============ */
+const WEB=!window.claude?.use&&/github\.io|localhost/.test(location.host);
+const SR_OK=WEB&&("SpeechRecognition" in window||"webkitSpeechRecognition" in window);
+let swReg=null;if(WEB&&"serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").then(r=>{swReg=r}).catch(()=>{});navigator.serviceWorker.addEventListener("message",e=>{if(e.data?.type==="prefetch-progress"){const el=$("#offl");if(el)el.textContent=e.data.done>=e.data.total?"오프라인 저장 완료 ("+e.data.total+"개)":"오프라인 저장 중 "+e.data.done+"/"+e.data.total}})}
+function offlineCard(){if(!WEB)return null;const urls=[];for(const t of Object.keys(AUD.man))for(const k of Object.keys(AUD.man[t]))urls.push("audio/"+t+"/"+k+".mp3");[1,2,3,5,10,20].forEach(n=>urls.push("audio/silence_"+n+".mp3"));
+  const st=h("span",{class:"muted small",id:"offl"},"");
+  return h("div",{class:"card"},h("h3",{},"오프라인 사용"),h("p",{class:"muted small"},"음성 클립 전체("+urls.length+"개, 약 14MB)를 기기에 저장하면 인터넷 없이도 무한 재생·듣기 훈련이 돼요. Wi-Fi에서 한 번만 받으면 됩니다."),
+    h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{const sw=navigator.serviceWorker?.controller;if(!sw){toast("잠시 후 다시 시도해 주세요 (오프라인 기능 준비 중)");return}st.textContent="오프라인 저장 중 0/"+urls.length;sw.postMessage({type:"prefetch",urls})}},"전체 음성 오프라인 저장"),st))}
+// Web Speech API (web build only): real microphone → text
+let rec=null;
+function micBtn(ta,{onFinal=null,label="🎤 말하기"}={}){if(!SR_OK)return null;const b=h("button",{class:"btn primary"},label);let on=false;
+  const stop=()=>{on=false;b.textContent=label;b.classList.remove("rec");try{rec?.stop()}catch(e){}rec=null};
+  b.onclick=()=>{if(on){stop();return}const R=window.SpeechRecognition||window.webkitSpeechRecognition;rec=new R();rec.lang="en-US";rec.continuous=true;rec.interimResults=true;let base=ta.value?ta.value.trim()+" ":"";let fin="";
+    rec.onresult=e=>{let interim="";fin="";for(let i=0;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t+" ";else interim+=t}ta.value=base+fin+interim;ta.dispatchEvent(new Event("input"))};
+    rec.onerror=e=>{if(e.error==="not-allowed")toast("마이크 권한을 허용해 주세요 (설정 → Safari → 마이크)");stop()};
+    rec.onend=()=>{if(on){stop();ta.value=(base+fin).trim();ta.dispatchEvent(new Event("input"));onFinal&&onFinal(ta.value)}};
+    try{rec.start();on=true;b.textContent="■ 말하기 끝";b.classList.add("rec")}catch(e){toast("음성 인식을 시작할 수 없어요");stop()}};
+  return b}
 // web build: auto-refresh when a newer version is deployed (home-screen apps cache the old page)
 (async()=>{if(window.claude?.use||!/github\.io|localhost/.test(location.host))return;try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)return;const v=(await r.json()).v;const cur=document.documentElement.dataset.build;if(cur&&v&&v!==cur){toast("새 버전으로 업데이트 중…");setTimeout(()=>location.reload(),800)}}catch(e){}})();
 loadLocal();render();loadManifests().then(()=>{if(view==="listen"||view==="settings")render()});
