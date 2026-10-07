@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261007-183350-f8d1ce">
+<html lang="ko" data-build="20261007-202404-117065">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -489,6 +489,10 @@ function voiceCard(){
     h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>{const t=AUD.tag;AUD.tag="off";speak("Hi, I'm calling to ask about the gym membership. Could you tell me what time it opens on weekends?",{onend:()=>AUD.tag=t});AUD.tag=t}},"▶ 기기 음성 들어보기"),h("label",{class:"row small",style:"gap:6px"},"속도",rateCtl())),
     h("div",{class:"note"},tips[os]),
     vs.length?null:h("p",{class:"small",style:"color:var(--bad)"},"영어 음성을 찾지 못했어요. 위 안내대로 기기에 영어 음성을 설치한 뒤 새로고침하세요."))}
+let ttsUnlocked=false;
+function ttsUnlock(){if(!tts.ok||ttsUnlocked)return;try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;u.rate=2;speechSynthesis.speak(u);ttsUnlocked=true}catch(e){}}
+document.addEventListener("click",ttsUnlock,{capture:true,once:false});
+document.addEventListener("touchend",ttsUnlock,{capture:true});
 function ttsStop(){audStop();if(!tts.ok)return;speechSynthesis.cancel();if(tts.cur){tts.cur.btn?.classList.remove("on");if(tts.cur.btn)tts.cur.btn.innerHTML=SPK_ICON}tts.cur=null}
 function speak(text,{btn=null,rate=null,onend=null,key=null}={}){
   const src=audSrc(key);
@@ -501,7 +505,7 @@ function speak(text,{btn=null,rate=null,onend=null,key=null}={}){
   const u=new SpeechSynthesisUtterance(ttsText(text));u.lang=tts.voice?.lang||"en-US";if(tts.voice)u.voice=tts.voice;u.rate=rate??tts.rate;u.pitch=1;
   tts.cur={u,btn};if(btn){btn.classList.add("on");btn.innerHTML=STOP_ICON}
   u.onend=u.onerror=()=>{if(tts.cur&&tts.cur.u===u){if(btn){btn.classList.remove("on");btn.innerHTML=SPK_ICON}tts.cur=null;onend&&onend()}};
-  speechSynthesis.speak(u)}
+  setTimeout(()=>{if(tts.cur&&tts.cur.u===u)speechSynthesis.speak(u)},80)}
 function spkBtn(text,rate=null,key=null){const b=h("button",{class:"spk","aria-label":"듣기",title:"듣기",html:SPK_ICON});b.onclick=()=>speak(text,{btn:b,rate,key});return b}
 const splitSent=t=>(t||"").replace(/\s+/g," ").match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g)?.map(x=>x.trim()).filter(Boolean)||[];
 function rateCtl(){const r=h("select",{id:"rate_"+Math.random().toString(36).slice(2,6),onchange:e=>{tts.rate=parseFloat(e.target.value);try{localStorage.setItem("opic30_rate",tts.rate)}catch(x){}}},...[[0.7,"0.7x 느리게"],[0.85,"0.85x"],[0.95,"0.95x 자연"],[1,"1.0x"],[1.1,"1.1x"],[1.25,"1.25x 빠르게"]].map(([v,l])=>h("option",{value:v,selected:Math.abs(tts.rate-v)<.01},l)));r.style.width="auto";return r}
@@ -672,7 +676,7 @@ function vChat(m){
     try{const r=await sample.json([{role:"user",content:chatRules(sc)},...chat.turns],{cache:false,modelTier:"quick"});
       w.remove();if(r?.fix?.better&&r.fix.original){chat.ui.push({who:"fix",fix:r.fix});bub.append(render1({who:"fix",fix:r.fix}))}
       const reply=String(r?.reply||"").trim()||"Sorry, could you say that again?";chat.turns.push({role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});bub.append(render1({who:"ai",text:reply,ko:r?.reply_ko||""}));
-      if(chat.auto)speak(reply);bub.lastChild.scrollIntoView({block:"end"});chat.n++;const cnt=$("#chat_cnt");if(cnt)cnt.textContent=sc.en+" · "+chat.n+"턴";
+      if(chat.auto){speak(reply);setTimeout(()=>{if(tts.ok&&!speechSynthesis.speaking&&!speechSynthesis.pending&&chat.auto)speak(reply)},600)}bub.lastChild.scrollIntoView({block:"end"});chat.n++;const cnt=$("#chat_cnt");if(cnt)cnt.textContent=sc.en+" · "+chat.n+"턴";
       if(chat.turns.length>24)chat.turns.splice(0,2);
     }catch(e){w.remove();bub.append(h("div",{class:"note"},errMsg(e)));chat.turns.pop();chat.ui.pop()}
     finally{chat.busy=false;last="";if(chatMode!=="voice")ta.focus()}};
