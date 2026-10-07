@@ -37,6 +37,13 @@ tools/tts/          # 음성 클립 생성 스크립트 (Kokoro / Mimic3, 오프
 - 브라우저 음성인식(Web Speech)으로 마이크 입력 — 연습·모의시험·대화 말하기 모드
 - 설정 → 기록 코드 복사/가져오기로 웹 ↔ Claude 기록 합치기
 
+## 계정 · 기기 간 동기화 (Firebase, 웹 버전)
+- Firebase Authentication(이메일/비밀번호) + Cloud Firestore `users/{uid}` 문서 1개에 전체 상태(JSON) 저장
+- 가입 시 초대 코드 필요 — 코드는 `firestore.rules`의 `inviteOk()`에만 있고 앱 코드에는 없음
+- 로그인하면 클라우드 기록을 내려받아 병합 → 저장할 때마다 1.5초 디바운스 업로드 → 다른 기기 변경은 onSnapshot으로 자동 병합
+- Firebase 콘솔 설정: Authentication → 이메일/비밀번호 사용, Firestore 생성(프로덕션), 규칙에 `firestore.rules` 붙여넣기, Authentication → 설정 → 승인된 도메인에 `zzonos.github.io` 추가
+- Claude 아티팩트 안에서는 외부 네트워크가 막혀 Firebase를 쓰지 않음(Claude 계정 db 사용). 웹 ↔ Claude는 설정의 "기록 코드"로 옮김
+
 ## 로드맵
 - [ ] API 키 직접 연결 옵션 (웹에서도 AI 평가·대화)
 - [ ] 생성된 스크립트도 녹음 클립으로 변환하는 파이프라인

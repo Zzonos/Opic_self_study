@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 초대 코드: 가입(첫 저장) 때만 검사. 아래 값을 원하는 코드로 바꾸세요.
+    function inviteOk() { return request.resource.data.invite == "OPIC2026"; }
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid && inviteOk();
+      allow update: if request.auth != null && request.auth.uid == uid;
+      allow delete: if false;
+    }
+  }
+}

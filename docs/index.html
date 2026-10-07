@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261007-203110-e2d4fe">
+<html lang="ko" data-build="20261007-213845-36a46a">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -11,6 +11,9 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
@@ -166,6 +169,9 @@ svg.chart{width:100%;height:auto;display:block}
 .scen{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .chatin{position:sticky;bottom:calc(66px + env(safe-area-inset-bottom,0px));background:var(--bg);padding-top:8px}
 @media (min-width:900px){.chatin{bottom:0}}
+.login{max-width:420px;margin:24px auto;display:flex;flex-direction:column;gap:14px}
+.login .brand{font-family:var(--display);font-size:34px;font-weight:700;line-height:1}
+.login input[type=password],.login input[type=email]{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:var(--bg)}
 .hdr{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
 details summary{cursor:pointer;font-weight:500}
 .mocknav{display:flex;gap:4px;flex-wrap:wrap}
@@ -366,13 +372,44 @@ let db=null, uid=null, sample=null, docRef=null;
 const todayStr=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 function loadLocal(){try{const r=localStorage.getItem("opic30");if(r)S=Object.assign(structuredClone(DEF),JSON.parse(r))}catch(e){}}
 function save(){S.updatedAt=Date.now();try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}
-  if(docRef){docRef.set(structuredClone(S)).catch(()=>{})}}
-function mergeState(o){if(!o||typeof o!=="object")return;const key=l=>l.date+"|"+l.kind+"|"+l.title+"|"+(l.score??"");const seen=new Set(S.log.map(key));for(const l of (o.log||[]))if(!seen.has(key(l))){S.log.push(l);seen.add(key(l))}S.log.sort((a,b)=>a.date<b.date?-1:1);
+  if(docRef){docRef.set(structuredClone(S)).catch(()=>{})}
+  if(cloud.ref)cloudPush(false)}
+function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;const key=l=>l.date+"|"+l.kind+"|"+l.title+"|"+(l.score??"");const seen=new Set(S.log.map(key));for(const l of (o.log||[]))if(!seen.has(key(l))){S.log.push(l);seen.add(key(l))}S.log.sort((a,b)=>a.date<b.date?-1:1);
   for(const [k,v] of Object.entries(o.scripts||{}))if(!S.scripts[k]||(v.date||"")>(S.scripts[k].date||""))S.scripts[k]=v;
   Object.assign(S.models=S.models||{},o.models||{});Object.assign(S.trans=S.trans||{},o.trans||{});Object.assign(S.cards,o.cards||{});
   for(const c of (o.custom||[]))if(!S.custom.some(x=>x.en===c.en))S.custom.push(c);for(const t of (o.texts||[]))if(!S.texts.some(x=>x.id===t.id||x.text===t.text))S.texts.push(t);
-  if((o.updatedAt||0)>(S.updatedAt||0)&&o.profile)S.profile=Object.assign(S.profile,o.profile);if(o.today&&o.today.date===todayStr()){for(const k of ["cards","script","practice"])S.today[k]=Math.max(S.today[k]||0,o.today[k]||0)}save()}
+  if((o.updatedAt||0)>(S.updatedAt||0)&&o.profile)S.profile=Object.assign(S.profile,o.profile);if(o.today&&o.today.date===todayStr()){for(const k of ["cards","script","practice"])S.today[k]=Math.max(S.today[k]||0,o.today[k]||0)}if((o.updatedAt||0)>(S.updatedAt||0))S.updatedAt=o.updatedAt;if(!fromCloud)save();else{try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}
 function ensureToday(){if(S.today.date!==todayStr()){S.today={date:todayStr(),cards:0,script:0,practice:0}}}
+
+/* ============ CLOUD ACCOUNT (Firebase, web build only) ============ */
+const FB_CONFIG={apiKey:"AIzaSyAkIuOOuG_MUlgE3GRrqlC3THnVcZHeq8M",authDomain:"opic-self-study.firebaseapp.com",projectId:"opic-self-study",storageBucket:"opic-self-study.firebasestorage.app",messagingSenderId:"542185929571",appId:"1:542185929571:web:11560af55c5c3e928cb156"};
+const cloud={ok:false,user:null,ref:null,unsub:null,pushT:null,lastPush:0,skip:false,ready:false};
+try{cloud.skip=localStorage.getItem("oss_skiplogin")==="1"}catch(e){}
+function cloudInit(){if(!window.firebase?.initializeApp||!window.firebase?.auth)return;try{firebase.initializeApp(FB_CONFIG);cloud.ok=true;const auth=firebase.auth();auth.useDeviceLanguage();
+  auth.onAuthStateChanged(async u=>{cloud.ready=true;if(cloud.unsub){cloud.unsub();cloud.unsub=null}cloud.user=u;cloud.ref=null;
+    if(u){cloud.ref=firebase.firestore().collection("users").doc(u.uid);try{await cloudPull(true)}catch(e){toast("클라우드 기록을 불러오지 못했어요: "+(e.code||e.message))}
+      cloud.unsub=cloud.ref.onSnapshot(snap=>{if(!snap.exists||snap.metadata.hasPendingWrites)return;const d=snap.data();if((d.updatedAt||0)>cloud.lastPush&&(d.updatedAt||0)>(S.updatedAt||0)){try{mergeState(JSON.parse(d.state||"{}"),true);render()}catch(e){}}})}
+    render()})}catch(e){cloud.ok=false}}
+async function cloudPull(first){if(!cloud.ref)return;const snap=await cloud.ref.get();if(snap.exists){const d=snap.data();let remote={};try{remote=JSON.parse(d.state||"{}")}catch(e){}mergeState(remote,true);if(first)toast("계정 기록을 불러왔어요")}await cloudPush(true)}
+async function cloudPush(now){if(!cloud.ref)return;clearTimeout(cloud.pushT);const doIt=async()=>{try{cloud.lastPush=S.updatedAt||Date.now();await cloud.ref.set({state:JSON.stringify(S),updatedAt:cloud.lastPush,email:cloud.user?.email||""},{merge:true});const el=$("#syncst");if(el)el.textContent="동기화됨 "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}catch(e){const el=$("#syncst");if(el)el.textContent="동기화 실패: "+(e.code||e.message)}};
+  if(now)await doIt();else cloud.pushT=setTimeout(doIt,1500)}
+function cloudErr(e){const m={"auth/invalid-email":"이메일 형식을 확인해 주세요","auth/user-not-found":"가입되지 않은 이메일이에요","auth/wrong-password":"비밀번호가 틀렸어요","auth/invalid-credential":"이메일 또는 비밀번호가 틀렸어요","auth/email-already-in-use":"이미 가입된 이메일이에요. 로그인해 주세요","auth/weak-password":"비밀번호는 6자 이상이어야 해요","auth/too-many-requests":"시도가 너무 많아요. 잠시 후 다시","auth/network-request-failed":"인터넷 연결을 확인해 주세요","permission-denied":"초대 코드가 틀렸어요"};return m[e?.code]||(e?.message||"오류가 났어요")}
+function vLogin(m){const email=h("input",{type:"email",id:"lg_email",placeholder:"이메일",autocomplete:"username"});const pw=h("input",{type:"password",id:"lg_pw",placeholder:"비밀번호 (6자 이상)",autocomplete:"current-password"});const inv=h("input",{type:"text",id:"lg_inv",placeholder:"초대 코드 (가입할 때만)"});const msg=h("p",{class:"small",style:"color:var(--bad);min-height:1.2em"});
+  const busy=b=>{[...m.querySelectorAll("button")].forEach(x=>x.disabled=b)};
+  const login=async()=>{msg.textContent="";busy(true);try{await firebase.auth().signInWithEmailAndPassword(email.value.trim(),pw.value)}catch(e){msg.textContent=cloudErr(e)}finally{busy(false)}};
+  const signup=async()=>{msg.textContent="";if(!inv.value.trim()){msg.textContent="초대 코드를 입력해 주세요";return}busy(true);let cred=null;try{cred=await firebase.auth().createUserWithEmailAndPassword(email.value.trim(),pw.value);
+      // the invite code is checked by the server rule on this first write; a wrong code rejects it and we roll the account back
+      await firebase.firestore().collection("users").doc(cred.user.uid).set({state:JSON.stringify(S),updatedAt:Date.now(),email:cred.user.email,invite:inv.value.trim(),createdAt:Date.now()});toast("가입 완료!")}
+    catch(e){if(cred?.user&&(e.code==="permission-denied")){try{await cred.user.delete()}catch(x){}}msg.textContent=cloudErr(e)}finally{busy(false)}};
+  const reset=async()=>{msg.textContent="";if(!email.value.trim()){msg.textContent="이메일을 먼저 입력해 주세요";return}try{await firebase.auth().sendPasswordResetEmail(email.value.trim());msg.style.color="var(--good)";msg.textContent="재설정 메일을 보냈어요. 메일함(스팸함 포함)을 확인하세요"}catch(e){msg.style.color="var(--bad)";msg.textContent=cloudErr(e)}};
+  pw.addEventListener("keydown",e=>{if(e.key==="Enter")login()});
+  put(m,h("div",{class:"login"},h("div",{},h("p",{class:"eyebrow"},"Opic Self Study"),h("div",{class:"brand"},"OSS"),h("p",{class:"muted",style:"margin-top:6px"},"로그인하면 휴대폰·PC 어디서든 같은 기록으로 이어서 공부해요.")),
+    h("div",{class:"card"},email,pw,h("div",{class:"row"},h("button",{class:"btn primary grow",onclick:login},"로그인"),h("button",{class:"btn sm ghost",onclick:reset},"비밀번호 찾기")),msg),
+    h("details",{class:"card"},h("summary",{},"처음이에요 — 가입하기"),h("p",{class:"muted small",style:"margin-top:6px"},"위에 이메일·비밀번호를 적고, 초대 코드를 넣은 뒤 가입을 누르세요."),inv,h("button",{class:"btn primary",onclick:signup},"가입")),
+    h("button",{class:"btn ghost",onclick:()=>{cloud.skip=true;try{localStorage.setItem("oss_skiplogin","1")}catch(e){}render()}},"로그인 없이 이 기기에서만 쓰기")));}
+function accountCard(){if(!cloud.ok)return null;if(!cloud.user)return h("div",{class:"card"},h("h3",{},"계정"),h("p",{class:"muted small"},"지금은 이 기기에만 저장돼요. 로그인하면 기기 간에 기록이 같아집니다."),h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{cloud.skip=false;try{localStorage.removeItem("oss_skiplogin")}catch(e){}render()}},"로그인 / 가입")));
+  return h("div",{class:"card"},h("h3",{},"계정"),h("p",{},cloud.user.email),h("p",{class:"muted small",id:"syncst"},"기록은 저장할 때마다 클라우드에 올라가고, 다른 기기의 변경도 자동으로 합쳐져요."),
+    h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>cloudPull(false).then(()=>toast("동기화했어요")).catch(e=>toast(cloudErr(e)))},"지금 동기화"),h("button",{class:"btn sm",onclick:async()=>{try{await firebase.auth().sendPasswordResetEmail(cloud.user.email);toast("비밀번호 재설정 메일을 보냈어요")}catch(e){toast(cloudErr(e))}}},"비밀번호 변경"),h("button",{class:"btn sm ghost",onclick:async()=>{await firebase.auth().signOut();toast("로그아웃했어요")}},"로그아웃")))}
 
 /* ============ UTIL ============ */
 const $=s=>document.querySelector(s);
@@ -529,7 +566,8 @@ const VIEWS=[
 let view="today", sub=null;
 function renderNav(){const n=$("#nav");n.replaceChildren(...VIEWS.map(v=>h("button",{class:view===v.id?"on":"",onclick:()=>go(v.id),"aria-label":v.ko},h("span",{html:`<svg viewBox="0 0 24 24">${v.ic}</svg>`}),v.ko)))}
 function go(v,s=null){view=v;sub=s;timerStop();if(!player.on)ttsStop();render();window.scrollTo({top:0})}
-function render(){renderNav();ensureToday();const m=$("#main");m.replaceChildren();({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings})[view](m)}
+function render(){renderNav();ensureToday();const m=$("#main");m.replaceChildren();
+  if(cloud.ok&&cloud.ready&&!cloud.user&&!cloud.skip){$("#nav").hidden=true;vLogin(m);return}$("#nav").hidden=false;({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings})[view](m)}
 
 const ART_URL="https://claude.ai/artifact/HuASd2nEpXENsSugPoScyp";
 function aiNote(){if(sample)return null;return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"AI 평가·대화·스크립트는 Claude 앱에서 열었을 때 작동해요. 여기서는 듣기·카드·질문 연습을 쓸 수 있어요."),h("a",{class:"btn sm",href:ART_URL,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap"},"Claude에서 열기"))}
@@ -947,6 +985,7 @@ function vSettings(m){
   const extra=h("textarea",{id:"p_extra",style:"min-height:80px",placeholder:"스크립트에 녹여 넣을 나의 디테일. 예: 용인 수지 거주, 주말마다 탄천 조깅, 좋아하는 영화는 인터스텔라, 반려견 이름 코코"},p.extra);
   const cks=h("div",{class:"cks"},...survey.map(t=>h("label",{},h("input",{type:"checkbox",id:"sv_"+t.id,checked:p.survey.includes(t.id)}),t.ko)));
   put(m,h("div",{},h("p",{class:"eyebrow"},"Profile & survey"),h("h1",{},"설정")),
+    accountCard(),
     h("div",{class:"card"},h("h3",{},"내 프로필"),h("p",{class:"muted small"},"AI 평가와 스크립트에 쓰입니다. 실제 시험 서베이와 같은 선택으로 맞춰 두세요."),
       h("label",{class:"f"},"이름",name),h("label",{class:"f"},"직업",job),h("label",{class:"f"},"거주 형태",home),h("label",{class:"f"},"나만의 디테일 (선택)",extra)),
     h("div",{class:"card"},h("h3",{},"서베이 선택 주제"),h("p",{class:"muted small"},"IM3 전략: 겹치는 스크립트를 재활용할 수 있는 주제로 5–6개를 고르세요. (예: 공원·조깅·걷기는 같은 장소 이야기로 묶기)"),cks),
@@ -956,7 +995,7 @@ function vSettings(m){
       h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{const code=btoa(unescape(encodeURIComponent(JSON.stringify(S))));navigator.clipboard?.writeText(code).then(()=>toast("기록 코드를 복사했어요 ("+Math.round(code.length/1024)+"KB)")).catch(()=>{$("#imp").value=code;toast("아래 칸에 코드를 넣었어요. 전체 선택해 복사하세요")})}},"기록 코드 복사")),
       h("textarea",{id:"imp",style:"min-height:70px;font-family:var(--mono);font-size:11px",placeholder:"다른 곳에서 복사한 기록 코드를 붙여넣기"}),
       h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{try{const o=JSON.parse(decodeURIComponent(escape(atob($("#imp").value.trim()))));mergeState(o);$("#imp").value="";toast("기록을 합쳤어요");render()}catch(e){toast("코드를 읽을 수 없어요")}}},"가져와서 합치기"))),
-    h("div",{class:"card"},h("h3",{},"데이터"),h("p",{class:"muted small"},uid?"학습 기록은 내 Claude 계정에 저장되어 다른 기기에서도 이어집니다.":"지금은 이 브라우저에만 저장돼요. claude.ai 안에서 열면 계정에 저장됩니다."),
+    h("div",{class:"card"},h("h3",{},"데이터"),h("p",{class:"muted small"},uid?"학습 기록은 내 Claude 계정에 저장되어 다른 기기에서도 이어집니다.":cloud.user?"학습 기록은 OSS 계정("+cloud.user.email+")에 저장돼요.":"지금은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장됩니다."),
       h("div",{class:"row",id:"resetrow"},h("button",{class:"btn sm ghost",onclick:e=>{if(e.currentTarget.nextSibling)return;e.currentTarget.after(h("button",{class:"btn sm",style:"color:var(--bad)",onclick:()=>{S=structuredClone(DEF);save();deck.order=[];render();toast("초기화했어요")}},"정말 초기화할게요"))}},"기록 전체 초기화…"))));
 }
 
@@ -980,7 +1019,7 @@ function micBtn(ta,{onFinal=null,label="🎤 말하기"}={}){if(!SR_OK)return nu
   return b}
 // web build: auto-refresh when a newer version is deployed (home-screen apps cache the old page)
 (async()=>{if(window.claude?.use||!/github\.io|localhost/.test(location.host))return;try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)return;const v=(await r.json()).v;const cur=document.documentElement.dataset.build;if(cur&&v&&v!==cur){toast("새 버전으로 업데이트 중…");setTimeout(()=>location.reload(),800)}}catch(e){}})();
-loadLocal();render();loadManifests().then(()=>{if(view==="listen"||view==="settings")render()});
+loadLocal();cloudInit();render();loadManifests().then(()=>{if(view==="listen"||view==="settings")render()});
 (async()=>{
   if(!window.claude?.use)return;
   const [u,d,s]=await Promise.all([claude.use("user"),claude.use("db"),claude.use("sample")]);
