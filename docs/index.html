@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261007-225101-2b54e9">
+<html lang="ko" data-build="20261007-225934-db3287">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -381,6 +381,28 @@ function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;const key=l=>
   if((o.updatedAt||0)>(S.updatedAt||0)&&o.profile)S.profile=Object.assign(S.profile,o.profile);if(o.today&&o.today.date===todayStr()){for(const k of ["cards","script","practice"])S.today[k]=Math.max(S.today[k]||0,o.today[k]||0)}if((o.updatedAt||0)>(S.updatedAt||0))S.updatedAt=o.updatedAt;if(!fromCloud)save();else{try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}
 function ensureToday(){if(S.today.date!==todayStr()){S.today={date:todayStr(),cards:0,script:0,practice:0}}}
 
+/* ============ CLAUDE → WEB SYNC (state carried in the web URL hash) ============ */
+const WEB_URL="https://zzonos.github.io/Opic_self_study/";
+const b64u=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const unb64u=t=>{t=t.replace(/-/g,"+").replace(/_/g,"/");t+="=".repeat((4-t.length%4)%4);const bin=atob(t);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u};
+async function packState(){const json=JSON.stringify({log:S.log,scripts:S.scripts,models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,updatedAt:S.updatedAt});
+  const bytes=new TextEncoder().encode(json);
+  if("CompressionStream" in window){const cs=new CompressionStream("deflate-raw");const w=cs.writable.getWriter();w.write(bytes);w.close();const buf=await new Response(cs.readable).arrayBuffer();return "z"+b64u(buf)}
+  return "r"+b64u(bytes.buffer)}
+async function unpackState(t){const kind=t[0];const u=unb64u(t.slice(1));let bytes=u;
+  if(kind==="z"){const ds=new DecompressionStream("deflate-raw");const w=ds.writable.getWriter();w.write(u);w.close();bytes=new Uint8Array(await new Response(ds.readable).arrayBuffer())}
+  return JSON.parse(new TextDecoder().decode(bytes))}
+async function syncToWeb(){try{const code=await packState();const url=WEB_URL+"#s_"+code;if(url.length>60000){toast("기록이 너무 커서 링크로 못 보내요. 설정의 기록 코드를 사용해 주세요");return}
+  S.syncedAt=Date.now();save();const a=document.createElement("a");a.href=url;a.target="_blank";a.rel="noopener";document.body.append(a);a.click();a.remove();toast("웹 앱이 열리면 로그인 후 자동으로 합쳐져요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
+function unsyncedCount(){const t=S.syncedAt||0;return S.log.filter(l=>(l.ts||0)>t||(!l.ts&&t===0)).length}
+function syncCard(){if(window.claude?.use===undefined)return null;const n=unsyncedCount();
+  return h("div",{class:"card"},h("h3",{},"웹 계정으로 기록 보내기"),h("p",{class:"muted small"},"여기(Claude)에서 한 AI 대화·평가 기록을 웹 버전(OSS 계정)으로 보내요. 버튼을 누르면 웹 앱이 열리고, 로그인된 계정에 자동으로 합쳐집니다."),
+    h("div",{class:"row"},h("button",{class:"btn primary",onclick:syncToWeb},"웹으로 보내기"+(n?" ("+n+"건)":"")),S.syncedAt?h("span",{class:"muted small"},"마지막 전송 "+new Date(S.syncedAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})):null))}
+// web side: pick up a payload from the URL hash and merge it once signed in (or right away without an account)
+let pendingSync=null;
+(async()=>{if(window.claude?.use)return;const m=location.hash.match(/^#s_(.+)$/);if(!m)return;try{pendingSync=await unpackState(m[1]);history.replaceState(null,"",location.pathname+location.search)}catch(e){toast("가져온 기록을 읽을 수 없어요")}})();
+function applyPendingSync(){if(!pendingSync)return;const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;toast("Claude 기록 "+n+"건을 합쳤어요");render()}
+
 /* ============ CLOUD ACCOUNT (Firebase, web build only) ============ */
 const FB_CONFIG={apiKey:"AIzaSyAkIuOOuG_MUlgE3GRrqlC3THnVcZHeq8M",authDomain:"opic-self-study.firebaseapp.com",projectId:"opic-self-study",storageBucket:"opic-self-study.firebasestorage.app",messagingSenderId:"542185929571",appId:"1:542185929571:web:11560af55c5c3e928cb156"};
 const cloud={ok:false,user:null,ref:null,unsub:null,pushT:null,lastPush:0,skip:false,ready:false};
@@ -390,6 +412,7 @@ function cloudInit(){if(!window.firebase?.initializeApp||!window.firebase?.auth)
     if(u&&cloud.signingUp){return} // signup writes the first document itself (with the invite code), then calls cloudAttach
     if(u)await cloudAttach(u);render()})}catch(e){cloud.ok=false}}
 async function cloudAttach(u){cloud.user=u;cloud.ref=firebase.firestore().collection("users").doc(u.uid);try{await cloudPull(true)}catch(e){toast("클라우드 기록을 불러오지 못했어요: "+(e.code||e.message))}
+  setTimeout(applyPendingSync,300);
   if(cloud.unsub)cloud.unsub();cloud.unsub=cloud.ref.onSnapshot(snap=>{if(!snap.exists||snap.metadata.hasPendingWrites)return;const d=snap.data();if((d.updatedAt||0)>cloud.lastPush&&(d.updatedAt||0)>(S.updatedAt||0)){try{mergeState(JSON.parse(d.state||"{}"),true);render()}catch(e){}}})}
 async function cloudPull(first){if(!cloud.ref)return;const snap=await cloud.ref.get();if(snap.exists){const d=snap.data();let remote={};try{remote=JSON.parse(d.state||"{}")}catch(e){}mergeState(remote,true);if(first)toast("계정 기록을 불러왔어요")}await cloudPush(true)}
 async function cloudPush(now){if(!cloud.ref)return;clearTimeout(cloud.pushT);const doIt=async()=>{try{cloud.lastPush=S.updatedAt||Date.now();await cloud.ref.set({state:JSON.stringify(S),updatedAt:cloud.lastPush,email:cloud.user?.email||""},{merge:true});const el=$("#syncst");if(el)el.textContent="동기화됨 "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}catch(e){const el=$("#syncst");if(el)el.textContent="동기화 실패: "+(e.code||e.message)}};
@@ -398,7 +421,7 @@ function cloudErr(e){const m={"auth/invalid-email":"이메일 형식을 확인�
 let loginMode="login";
 function vLogin(m){
   const msg=h("p",{class:"small",style:"color:var(--bad);min-height:1.2em"},cloud.flash||"");cloud.flash="";const busy=b=>{[...m.querySelectorAll("button")].forEach(x=>x.disabled=b)};
-  const brand=h("div",{},h("p",{class:"eyebrow"},"Opic Self Study"),h("div",{class:"brand"},"OSS"),h("p",{class:"muted",style:"margin-top:6px"},"로그인하면 휴대폰·PC 어디서든 같은 기록으로 이어서 공부해요."));
+  const brand=h("div",{},h("p",{class:"eyebrow"},"Opic Self Study"),h("div",{class:"brand"},"OSS"),h("p",{class:"muted",style:"margin-top:6px"},pendingSync?"Claude에서 보낸 기록이 도착했어요. 로그인하면 계정에 합쳐집니다.":"로그인하면 휴대폰·PC 어디서든 같은 기록으로 이어서 공부해요."));
   if(loginMode==="login"){
     const email=h("input",{type:"email",id:"lg_email",placeholder:"이메일",autocomplete:"username"});const pw=h("input",{type:"password",id:"lg_pw",placeholder:"비밀번호",autocomplete:"current-password"});
     const login=async()=>{msg.textContent="";busy(true);try{await firebase.auth().signInWithEmailAndPassword(email.value.trim(),pw.value)}catch(e){msg.textContent=cloudErr(e)}finally{busy(false)}};
@@ -406,7 +429,7 @@ function vLogin(m){
     pw.addEventListener("keydown",e=>{if(e.key==="Enter")login()});
     put(m,h("div",{class:"login"},brand,
       h("div",{class:"card"},h("h3",{},"로그인"),email,pw,h("div",{class:"row"},h("button",{class:"btn primary grow",onclick:login},"로그인"),h("button",{class:"btn sm ghost",onclick:reset},"비밀번호 찾기")),msg),
-      h("div",{class:"row",style:"justify-content:center;gap:14px"},h("button",{class:"btn",onclick:()=>{loginMode="signup";render()}},"처음이에요 — 가입하기"),h("button",{class:"btn ghost sm",onclick:()=>{cloud.skip=true;try{localStorage.setItem("oss_skiplogin","1")}catch(e){}render()}},"로그인 없이 이 기기에서만"))));
+      h("div",{class:"row",style:"justify-content:center;gap:14px"},h("button",{class:"btn",onclick:()=>{loginMode="signup";render()}},"처음이에요 — 가입하기"),h("button",{class:"btn ghost sm",onclick:()=>{cloud.skip=true;try{localStorage.setItem("oss_skiplogin","1")}catch(e){}render();setTimeout(applyPendingSync,200)}},"로그인 없이 이 기기에서만"))));
     return}
   // ---- signup: 1) invite code → 2) email + password → 3) confirm password ----
   const step=h("p",{class:"eyebrow"});const box=h("div",{class:"card"});let inv="";
@@ -612,6 +635,7 @@ function vToday(m){
       planItem(done[0],"워밍업: 표현카드 10장",`${t.cards}/10`,"5분",()=>go("cards")),
       planItem(done[1],"스크립트 1개 소리 내어 읽고 외우기",`${t.script}/1`,"10분",()=>go("scripts")),
       planItem(done[2],"질문 3개 말하기 또는 AI 대화 + 피드백",`${t.practice}/3`,"15분",()=>go("practice"))),
+    (window.claude?.use&&unsyncedCount()>=3)?h("div",{class:"note",style:"align-items:center"},h("span",{class:"grow"},"웹 계정으로 안 보낸 기록이 "+unsyncedCount()+"건 있어요."),h("button",{class:"btn sm",onclick:syncToWeb},"웹으로 보내기")):null,
     h("div",{class:"card"},h("h2",{},"레벨 추이"),logs.length?chart(logs.slice(-12)):h("p",{class:"muted small"},"연습을 시작하면 평가 레벨이 여기에 쌓여요. 목표선은 IM3입니다.")),
     h("div",{class:"card"},h("h2",{},"최근 기록"),logs.length?h("div",{class:"list"},...logs.slice(-6).reverse().map(l=>h("div",{class:"li"},h("span",{class:"d"},l.date.slice(5)),h("span",{class:"grow"},l.title),lvChip(l.level)))):h("p",{class:"muted small"},"아직 기록이 없어요."),
       h("div",{class:"row"},h("button",{class:"btn",onclick:()=>go("mock")},"15문항 모의시험 보기"))),
@@ -670,7 +694,7 @@ function vAnswer(m,s){
     fbBox.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"Claude가 평가 중… (10–40초)")));
     try{const r=await evaluate(q.q,a,secs||Math.round(a.split(/\s+/).length/2.3),null);
       renderFeedback(fbBox,r,q.q,a);if(r.model_im3){S.models=S.models||{};S.models[q.q]=r.model_im3}
-      S.log.push({date:todayStr(),kind:"practice",title:topic.en+" · "+(s.kind||""),level:r.level,score:r.score,secs:secs||0});S.today.practice++;save();
+      S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",title:topic.en+" · "+(s.kind||""),level:r.level,score:r.score,secs:secs||0});S.today.practice++;save();
       const nextRp=s.rp&&s.step<13?h("button",{class:"btn primary",onclick:()=>{const st=s.step+1;go("practice",{topic,q:{t:"rp",q:s.rp["q"+st]},kind:"롤플레이 "+st+"번 · "+(st===12?"문제 해결":"관련 경험"),rp:s.rp,step:st})}},"다음: "+(s.step+1)+"번 →"):null;
       put(fbBox,h("div",{class:"row"},nextRp,h("button",{class:"btn",onclick:()=>{ta.value="";fbBox.replaceChildren();secs=0;tEl.textContent="0:00";bar.firstChild.style.width="0";evalBtn.disabled=false}},"같은 질문 다시"),h("button",{class:"btn",onclick:()=>go("practice")},"다른 질문")));
     }catch(e){fbBox.replaceChildren(h("p",{class:"small",style:"color:var(--bad)"},errMsg(e)));if(e.code!=="not_granted"&&e.code!=="sampling_disabled")evalBtn.disabled=false}
@@ -766,7 +790,7 @@ async function vChatSummary(m){
   if(chat.summary==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"대화 평가 중…")));put(m,h("h1",{},"대화 정리"),box);
     const tr=chat.ui.filter(u=>u.who==="ai"||u.who==="me").map(u=>(u.who==="ai"?"Partner: ":"Learner: ")+u.text).join("\n");
     try{const r=await sample.json(`${RUBRIC}\n\nThis is a transcript of a practice conversation (${chat.sc.en}). Rate ONLY the learner's turns.\n\n${tr}\n\nReply with ONLY JSON: {"level":"IM2","score":60,"summary":"한국어 총평 2-3문장","fixes":[{"original":"...","better":"...","why":"한국어"}],"expressions":[{"en":"useful natural expression the learner could have used","ko":"뜻"}],"next":"다음 대화에서 시도할 한 가지 (한국어)"}\nGive 3-5 fixes and 4-6 expressions.`,{cache:false});
-      chat.summary=r;S.log.push({date:todayStr(),kind:"chat",title:"대화 · "+chat.sc.ko+" · "+chat.n+"턴",level:r.level,score:r.score,secs:chat.n*45});S.today.practice++;save();render()}
+      chat.summary=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"chat",title:"대화 · "+chat.sc.ko+" · "+chat.n+"턴",level:r.level,score:r.score,secs:chat.n*45});S.today.practice++;save();render()}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("button",{class:"btn",onclick:()=>{chat=null;render()}},"닫기"))}return}
   const r=chat.summary;
   put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation review · "+chat.sc.ko),h("h1",{},"대화 정리")),
@@ -807,7 +831,7 @@ async function vMockResult(m){
   if(mock.result==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"15문항 채점 중… (30–90초)")));
     put(m,h("h1",{},"채점 중"),box);
     if(!sample){box.replaceChildren(h("p",{},ERR.not_granted),h("button",{class:"btn",onclick:()=>{mock=null;render()}},"닫기"));return}
-    try{const r=await evalMock(mock.items,null);mock.result=r;S.log.push({date:todayStr(),kind:"mock",title:"모의시험 15문항",level:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0)});save();render()}
+    try{const r=await evalMock(mock.items,null);mock.result=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"mock",title:"모의시험 15문항",level:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0)});save();render()}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{render()}},"다시 시도"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"닫기")))}
     return}
   const r=mock.result;
@@ -1012,6 +1036,7 @@ function vSettings(m){
     h("div",{class:"card"},h("h3",{},"서베이 선택 주제"),h("p",{class:"muted small"},"IM3 전략: 겹치는 스크립트를 재활용할 수 있는 주제로 5–6개를 고르세요. (예: 공원·조깅·걷기는 같은 장소 이야기로 묶기)"),cks),
     h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{p.name=name.value.trim();p.job=job.value;p.home=home.value;p.extra=extra.value.trim();p.survey=survey.filter(t=>cks.querySelector("#sv_"+t.id).checked).map(t=>t.id);save();toast("저장했어요")}},"저장")),
     tts.ok?voiceCard():null,
+    syncCard(),
     h("div",{class:"card"},h("h3",{},"기록 옮기기 (웹 ↔ Claude)"),h("p",{class:"muted small"},"학습 기록·스크립트·내 표현·해석·프로필을 코드로 복사해 다른 곳에서 붙여넣으면 합쳐져요. 양쪽 기록이 모두 남습니다."),
       h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{const code=btoa(unescape(encodeURIComponent(JSON.stringify(S))));navigator.clipboard?.writeText(code).then(()=>toast("기록 코드를 복사했어요 ("+Math.round(code.length/1024)+"KB)")).catch(()=>{$("#imp").value=code;toast("아래 칸에 코드를 넣었어요. 전체 선택해 복사하세요")})}},"기록 코드 복사")),
       h("textarea",{id:"imp",style:"min-height:70px;font-family:var(--mono);font-size:11px",placeholder:"다른 곳에서 복사한 기록 코드를 붙여넣기"}),
@@ -1040,7 +1065,7 @@ function micBtn(ta,{onFinal=null,label="🎤 말하기"}={}){if(!SR_OK)return nu
   return b}
 // web build: auto-refresh when a newer version is deployed (home-screen apps cache the old page)
 (async()=>{if(window.claude?.use||!/github\.io|localhost/.test(location.host))return;try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)return;const v=(await r.json()).v;const cur=document.documentElement.dataset.build;if(cur&&v&&v!==cur){toast("새 버전으로 업데이트 중…");setTimeout(()=>location.reload(),800)}}catch(e){}})();
-loadLocal();cloudInit();render();loadManifests().then(()=>{if(view==="listen"||view==="settings")render()});
+loadLocal();cloudInit();render();setTimeout(()=>{if(!cloud.ok||cloud.skip)applyPendingSync()},800);loadManifests().then(()=>{if(view==="listen"||view==="settings")render()});
 (async()=>{
   if(!window.claude?.use)return;
   const [u,d,s]=await Promise.all([claude.use("user"),claude.use("db"),claude.use("sample")]);
