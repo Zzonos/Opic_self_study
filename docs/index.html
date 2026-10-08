@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261008-203257-256e44">
+<html lang="ko" data-build="20261008-204145-ef3ca4">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -599,19 +599,21 @@ function ttsVoices(){if(!tts.ok)return[];return speechSynthesis.getVoices().filt
 const MALE=/\b(guy|davis|christopher|eric|andrew|brian|jason|tony|roger|steffan|ryan|thomas|william|liam|daniel|david|mark|alex|fred|tom|aaron|arthur|james|oliver|rishi|george|matthew|rocko|reed|grandpa|eddy|male|jacob|connor|sam\b|jamie|noah|ethan|lee|hamish|ravi|neerja)\b/i;
 const FEMALE=/\b(aria|jenny|michelle|ana|emma|ava|sonia|libby|natasha|hazel|zira|susan|samantha|karen|moira|tessa|fiona|victoria|allison|nicky|flo|shelley|sandy|grandma|kathy|female|olivia|clara|sara|amy|joanna|salli|ivy|kendra|kimberly|lily|serena|veena)\b/i;
 const vGender=v=>MALE.test(v.name)?"m":FEMALE.test(v.name)?"f":"?";
-const vQuality=v=>/natural|neural|premium|enhanced|online|siri|google|wavenet/i.test(v.name)?2:/compact|espeak|eloquence/i.test(v.name)?0:1;
-const vLabel=v=>v.name.replace(/Microsoft |Google |English \(.*?\) /g,"")+" · "+({m:"남",f:"여","?":"?"}[vGender(v)])+" · "+v.lang.replace("_","-")+(vQuality(v)===2?" ★":"");
+const vId=v=>v.voiceURI||v.name;
+const vTier=v=>{const u=(v.voiceURI||"")+" "+v.name;return /premium/i.test(u)?"프리미엄":/enhanced|natural|neural|online|wavenet|siri/i.test(u)?"향상":/google/i.test(u)?"고품질":/compact|espeak|eloquence/i.test(u)?"기본":""};
+const vQuality=v=>{const t=vTier(v);return t==="프리미엄"?3:(t==="향상"||t==="고품질")?2:t==="기본"?0:1};
+const vLabel=v=>v.name.replace(/Microsoft |Google |English \(.*?\) /g,"")+(vTier(v)&&!new RegExp(vTier(v),"i").test(v.name)&&vTier(v)!=="고품질"?" ("+vTier(v)+")":"")+" · "+({m:"남",f:"여","?":"?"}[vGender(v)])+" · "+v.lang.replace("_","-")+(vQuality(v)>=2?" ★":"");
 function pickVoice(){const vs=ttsVoices();let want=null;try{want=localStorage.getItem("opic30_voice")}catch(e){}
   const sorted=[...vs].sort((a,b)=>vQuality(b)-vQuality(a)||(/en[-_]US/i.test(b.lang)?1:0)-(/en[-_]US/i.test(a.lang)?1:0));
-  return vs.find(v=>v.name===want)||sorted[0]||null}
+  return vs.find(v=>vId(v)===want)||vs.find(v=>v.name===want)||sorted[0]||null}
 if(tts.ok){speechSynthesis.onvoiceschanged=()=>{tts.voice=pickVoice();if(view==="listen"||view==="settings")render()};tts.voice=pickVoice()}
 function koVoice(){if(!tts.ok)return null;const vs=speechSynthesis.getVoices().filter(v=>/^ko/i.test(v.lang));return vs.sort((a,b)=>vQuality(b)-vQuality(a))[0]||null}
-function setVoice(name){tts.voice=ttsVoices().find(v=>v.name===name)||tts.voice;try{localStorage.setItem("opic30_voice",name)}catch(e){}}
+function setVoice(id){tts.voice=ttsVoices().find(v=>vId(v)===id)||tts.voice;try{localStorage.setItem("opic30_voice",id)}catch(e){}}
 function voiceCard(){
   const vs=ttsVoices();const ua=navigator.userAgent;const os=/iPhone|iPad/.test(ua)?"ios":/Mac/.test(ua)?"mac":/Android/.test(ua)?"android":/Windows/.test(ua)?"win":"other";const isEdge=/Edg\//.test(ua);
   let filter="all";const sel=h("select",{id:"voice_sel",onchange:e=>{setVoice(e.target.value);toast("음성을 바꿨어요")}});
   const fill=()=>{const list=vs.filter(v=>filter==="all"||vGender(v)===filter).sort((a,b)=>vQuality(b)-vQuality(a)||a.name.localeCompare(b.name));
-    sel.replaceChildren(...list.map(v=>h("option",{value:v.name,selected:tts.voice&&v.name===tts.voice.name},vLabel(v))));if(!list.length)sel.append(h("option",{},"해당 음성 없음"))};
+    sel.replaceChildren(...list.map(v=>h("option",{value:vId(v),selected:tts.voice&&vId(v)===vId(tts.voice)},vLabel(v))));if(!list.length)sel.append(h("option",{},"해당 음성 없음"))};
   fill();
   const fb=g=>h("button",{class:"btn sm"+(filter===g?" primary":""),onclick:e=>{filter=g;[...e.target.parentNode.children].forEach(b=>b.classList.remove("primary"));e.target.classList.add("primary");fill()}},g==="all"?"전체":g==="m"?"남성":"여성");
   const tips={win:isEdge?"Edge에서는 'Online (Natural)' 음성(★)이 가장 자연스러워요. Guy·Christopher·Eric이 남성, Aria·Jenny가 여성입니다.":"Windows에서는 Edge 브라우저로 열면 'Online (Natural)' 음성(★)을 쓸 수 있어 훨씬 자연스러워요. Chrome에서는 설정 → 시간 및 언어 → 음성에서 영어 음성 패키지를 추가하세요.",
@@ -626,7 +628,7 @@ function voiceCard(){
     h("label",{class:"f"},"녹음 음성 (질문·표현카드)",recSel),
     h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>speak("Hi, I'm calling to ask about the gym membership. Could you tell me what time it opens on weekends?",{key:"rp_gym_11"})},"▶ 녹음 음성 들어보기")),
     h("p",{class:"eyebrow",style:"margin-top:4px"},"기기 음성 (그 외)"),
-    h("div",{class:"row"},fb("all"),fb("m"),fb("f"),h("span",{class:"muted small"},vs.length+"개 영어 음성")),
+    h("div",{class:"row"},fb("all"),fb("m"),fb("f"),h("span",{class:"muted small"},vs.length+"개 영어 음성"),h("button",{class:"btn sm ghost",onclick:()=>{speechSynthesis.getVoices();setTimeout(()=>{tts.voice=pickVoice();render();toast(ttsVoices().length+"개 음성을 다시 읽었어요")},300)}},"목록 새로고침")),
     sel,
     h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>{const t=AUD.tag;AUD.tag="off";speak("Hi, I'm calling to ask about the gym membership. Could you tell me what time it opens on weekends?",{onend:()=>AUD.tag=t});AUD.tag=t}},"▶ 기기 음성 들어보기"),h("label",{class:"row small",style:"gap:6px"},"속도",rateCtl())),
     h("div",{class:"note"},tips[os]),
