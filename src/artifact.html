@@ -111,6 +111,9 @@ label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--mu
 .note.ai{background:var(--warn-soft);color:var(--warn)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:9}
 .toast.show{opacity:1}
+.segs{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px}
+.segs .seg{flex:1;border:0;background:none;border-radius:9px;padding:9px 6px;font-size:14px;font-weight:600;color:var(--mute);cursor:pointer}
+.segs .seg.on{background:var(--panel);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .cks{display:flex;flex-wrap:wrap;gap:6px}
 .cks label{display:inline-flex;gap:5px;align-items:center;border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:13px;cursor:pointer;background:var(--panel)}
 .cks label:has(input:checked){background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
@@ -304,39 +307,39 @@ const CARDS=[
  {c:"filler",en:"That's a good question.",ko:"좋은 질문이네요 (시간 벌기)"},
  {c:"filler",en:"How should I put it...",ko:"뭐라고 해야 하지..."},
  {c:"filler",en:"You know what I mean?",ko:"무슨 말인지 아시죠?"},
- {c:"opener",en:"Okay, so you want to know about my ___.",ko:"오케이, 제 ___에 대해 알고 싶으시군요 (질문 되받기)"},
- {c:"opener",en:"To be honest, I'm a big fan of ___.",ko:"솔직히 저는 ___을 정말 좋아해요"},
+ {c:"opener",en:"Okay, so you want to know about my ___.",ko:"오케이, 제 ___에 대해 알고 싶으시군요 (질문 되받기)",ex:"Okay, so you want to know about my favorite movie. Well, it's definitely Inception."},
+ {c:"opener",en:"To be honest, I'm a big fan of ___.",ko:"솔직히 저는 ___을 정말 좋아해요",ex:"To be honest, I'm a big fan of hip-hop, especially Korean artists like Epik High."},
  {c:"opener",en:"There are a couple of reasons why I like it.",ko:"제가 좋아하는 이유는 두어 가지예요"},
  {c:"connector",en:"First of all, ... / On top of that, ...",ko:"우선... / 게다가..."},
  {c:"connector",en:"What I mean is, ...",ko:"제 말은..."},
  {c:"connector",en:"Speaking of which, ...",ko:"말이 나온 김에..."},
  {c:"connector",en:"The thing is, ...",ko:"문제는 / 중요한 건..."},
  {c:"connector",en:"Anyway, long story short, ...",ko:"어쨌든 간단히 말하면..."},
- {c:"past",en:"It was about two years ago when I ___.",ko:"약 2년 전에 제가 ___했을 때였어요"},
- {c:"past",en:"Out of the blue, ___.",ko:"갑자기 ___"},
- {c:"past",en:"At first I thought ___, but it turned out that ___.",ko:"처음엔 ___라고 생각했는데 알고 보니 ___"},
+ {c:"past",en:"It was about two years ago when I ___.",ko:"약 2년 전에 제가 ___했을 때였어요",ex:"It was about two years ago when I went to Jeju with my friends."},
+ {c:"past",en:"Out of the blue, ___.",ko:"갑자기 ___",ex:"Out of the blue, it started pouring, and we had no umbrellas."},
+ {c:"past",en:"At first I thought ___, but it turned out that ___.",ko:"처음엔 ___라고 생각했는데 알고 보니 ___",ex:"At first I thought the gym was closed, but it turned out that they had just changed the hours."},
  {c:"past",en:"I was so relieved / embarrassed / frustrated.",ko:"정말 안도했어요 / 창피했어요 / 답답했어요"},
  {c:"past",en:"Looking back, it was one of the best days of my life.",ko:"돌이켜보면 인생 최고의 날 중 하나였어요"},
- {c:"routine",en:"I usually ___ on weekends, or whenever I have free time.",ko:"주말이나 시간 날 때마다 보통 ___해요"},
- {c:"routine",en:"The first thing I do is ___. After that, ___.",ko:"제일 먼저 ___하고, 그다음엔 ___"},
+ {c:"routine",en:"I usually ___ on weekends, or whenever I have free time.",ko:"주말이나 시간 날 때마다 보통 ___해요",ex:"I usually go jogging along the river on weekends, or whenever I have free time."},
+ {c:"routine",en:"The first thing I do is ___. After that, ___.",ko:"제일 먼저 ___하고, 그다음엔 ___",ex:"The first thing I do is stretch for ten minutes. After that, I run for about thirty minutes."},
  {c:"routine",en:"It helps me relieve stress and recharge.",ko:"스트레스 풀고 재충전하는 데 도움이 돼요"},
- {c:"desc",en:"It's located in ___, about ___ minutes from my place.",ko:"___에 있고, 집에서 약 ___분 거리예요"},
- {c:"desc",en:"What I like most about it is ___.",ko:"제가 가장 마음에 드는 점은 ___"},
+ {c:"desc",en:"It's located in ___, about ___ minutes from my place.",ko:"___에 있고, 집에서 약 ___분 거리예요",ex:"It's located in Suji, about ten minutes from my place."},
+ {c:"desc",en:"What I like most about it is ___.",ko:"제가 가장 마음에 드는 점은 ___",ex:"What I like most about it is that it's never too crowded, even on weekends."},
  {c:"desc",en:"It's cozy and well-organized.",ko:"아늑하고 잘 정돈되어 있어요"},
  {c:"desc",en:"There's a huge window that lets in a lot of sunlight.",ko:"햇빛이 많이 들어오는 큰 창문이 있어요"},
- {c:"compare",en:"Compared to the past, ___ is way more ___.",ko:"예전에 비해 ___이 훨씬 더 ___"},
+ {c:"compare",en:"Compared to the past, ___ is way more ___.",ko:"예전에 비해 ___이 훨씬 더 ___",ex:"Compared to the past, shopping is way more convenient because everything is online."},
  {c:"compare",en:"Back in the day, ... but these days, ...",ko:"예전에는... 그런데 요즘은..."},
- {c:"compare",en:"The biggest difference is that ___.",ko:"가장 큰 차이는 ___"},
- {c:"roleplay",en:"Hi, I'm calling to ask about ___.",ko:"안녕하세요, ___에 대해 여쭤보려고 전화했어요"},
+ {c:"compare",en:"The biggest difference is that ___.",ko:"가장 큰 차이는 ___",ex:"The biggest difference is that people rarely carry cash these days."},
+ {c:"roleplay",en:"Hi, I'm calling to ask about ___.",ko:"안녕하세요, ___에 대해 여쭤보려고 전화했어요",ex:"Hi, I'm calling to ask about the membership plans at your gym."},
  {c:"roleplay",en:"Could you tell me what time it opens?",ko:"몇 시에 여는지 알려주실 수 있나요?"},
- {c:"roleplay",en:"I'm afraid there's been a problem with ___.",ko:"___에 문제가 있는 것 같아요"},
- {c:"roleplay",en:"Would it be possible to ___ instead?",ko:"대신 ___하는 게 가능할까요?"},
- {c:"roleplay",en:"If that doesn't work, how about ___?",ko:"그게 안 되면 ___은 어떨까요?"},
- {c:"opinion",en:"In my opinion, ___ / If you ask me, ___.",ko:"제 생각에는 ___"},
- {c:"opinion",en:"I'm not 100% sure, but I'd say ___.",ko:"확실하진 않지만 ___인 것 같아요"},
- {c:"opinion",en:"On the other hand, ___.",ko:"반면에 ___"},
+ {c:"roleplay",en:"I'm afraid there's been a problem with ___.",ko:"___에 문제가 있는 것 같아요",ex:"I'm afraid there's been a problem with my reservation. It says the wrong date."},
+ {c:"roleplay",en:"Would it be possible to ___ instead?",ko:"대신 ___하는 게 가능할까요?",ex:"Would it be possible to get a refund instead?"},
+ {c:"roleplay",en:"If that doesn't work, how about ___?",ko:"그게 안 되면 ___은 어떨까요?",ex:"If that doesn't work, how about meeting next Saturday?"},
+ {c:"opinion",en:"In my opinion, ___ / If you ask me, ___.",ko:"제 생각에는 ___",ex:"If you ask me, recycling should be mandatory in every apartment complex."},
+ {c:"opinion",en:"I'm not 100% sure, but I'd say ___.",ko:"확실하진 않지만 ___인 것 같아요",ex:"I'm not 100% sure, but I'd say the weather here has gotten much hotter."},
+ {c:"opinion",en:"On the other hand, ___.",ko:"반면에 ___",ex:"On the other hand, online classes can be really distracting at home."},
  {c:"closer",en:"So yeah, that's pretty much it.",ko:"네, 대충 그 정도예요 (마무리)"},
- {c:"closer",en:"That's why I really enjoy ___.",ko:"그래서 제가 ___을 정말 즐기는 거예요"},
+ {c:"closer",en:"That's why I really enjoy ___.",ko:"그래서 제가 ___을 정말 즐기는 거예요",ex:"That's why I really enjoy spending my weekends at the park."},
  {c:"closer",en:"I hope that answers your question.",ko:"답변이 됐길 바라요"},
  {c:"emotion",en:"I was over the moon.",ko:"정말 기뻤어요"},
  {c:"emotion",en:"It was a total disaster.",ko:"완전 엉망이었어요"},
@@ -513,7 +516,7 @@ function audStop(){audCb=null;try{const a=audEl();a.onended=null;a.pause();a.rem
 const SPK_ICON='<svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg>';
 const STOP_ICON='<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
 const tts={ok:"speechSynthesis" in window,voice:null,rate:1,cur:null,onend:null};
-try{tts.rate=parseFloat(localStorage.getItem("opic30_rate"))||0.95}catch(e){}
+try{const rv=localStorage.getItem("opic30_rate");tts.rate=rv==null||Math.abs(parseFloat(rv)-0.95)<.01?0.9:(parseFloat(rv)||0.9)}catch(e){}
 const ttsText=t=>String(t||"").replace(/___/g,"something").replace(/\s*\/\s*/g,", or ").replace(/\.{3}/g,",").replace(/\s+/g," ").trim();
 function ttsVoices(){if(!tts.ok)return[];return speechSynthesis.getVoices().filter(v=>/^en[-_]/i.test(v.lang))}
 const MALE=/\b(guy|davis|christopher|eric|andrew|brian|jason|tony|roger|steffan|ryan|thomas|william|liam|daniel|david|mark|alex|fred|tom|aaron|arthur|james|oliver|rishi|george|matthew|rocko|reed|grandpa|eddy|male|jacob|connor|sam\b|jamie|noah|ethan|lee|hamish|ravi|neerja)\b/i;
@@ -569,7 +572,7 @@ function speak(text,{btn=null,rate=null,onend=null,key=null}={}){
   setTimeout(()=>{if(tts.cur&&tts.cur.u===u)speechSynthesis.speak(u)},80)}
 function spkBtn(text,rate=null,key=null){const b=h("button",{class:"spk","aria-label":"듣기",title:"듣기",html:SPK_ICON});b.onclick=()=>speak(text,{btn:b,rate,key});return b}
 const splitSent=t=>(t||"").replace(/\s+/g," ").match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g)?.map(x=>x.trim()).filter(Boolean)||[];
-function rateCtl(){const r=h("select",{id:"rate_"+Math.random().toString(36).slice(2,6),onchange:e=>{tts.rate=parseFloat(e.target.value);try{localStorage.setItem("opic30_rate",tts.rate)}catch(x){}}},...[[0.7,"0.7x 느리게"],[0.85,"0.85x"],[0.95,"0.95x 자연"],[1,"1.0x"],[1.1,"1.1x"],[1.25,"1.25x 빠르게"]].map(([v,l])=>h("option",{value:v,selected:Math.abs(tts.rate-v)<.01},l)));r.style.width="auto";return r}
+function rateCtl(){const r=h("select",{id:"rate_"+Math.random().toString(36).slice(2,6),onchange:e=>{tts.rate=parseFloat(e.target.value);try{localStorage.setItem("opic30_rate",tts.rate)}catch(x){}}},...[[0.7,"0.7x 느리게"],[0.8,"0.8x"],[0.9,"0.9x 기본"],[1,"1.0x 원래 속도"],[1.1,"1.1x"],[1.25,"1.25x 빠르게"]].map(([v,l])=>h("option",{value:v,selected:Math.abs(tts.rate-v)<.01},l)));r.style.width="auto";return r}
 
 /* ============ TIMER ============ */
 let timer={on:false,start:0,secs:0,int:null,el:null,bar:null};
@@ -921,16 +924,20 @@ function mediaSession(){if(!("mediaSession" in navigator))return;try{const it=pl
   for(const k in H){try{navigator.mediaSession.setActionHandler(k,H[k])}catch(e){}}}catch(e){}}
 
 /* ============ INFINITE PLAYER ============ */
-const player={on:false,paused:false,items:[],i:0,s:0,sents:[],t:null,lock:null,opts:{q:true,scripts:true,cards:true,texts:true,shuffle:true,think:5,gap:1.5,ko:"sent",repeat:1}};
+const player={on:false,paused:false,items:[],i:0,s:0,sents:[],t:null,lock:null,opts:{mode:"sent",q:true,scripts:true,cards:true,texts:true,shuffle:true,think:5,gap:1.5,ko:"sent",repeat:1,withQ:true,topics:[]}};
 try{Object.assign(player.opts,JSON.parse(localStorage.getItem("opic30_player")||"{}"))}catch(e){}
-function buildPlaylist(){const o=player.opts;const items=[];const ts=TOPICS.filter(t=>t.id!=="intro"&&(S.profile.survey.includes(t.id)||t.group==="돌발"));
-  for(const t of ts)for(const q of t.qs){const model=S.scripts[t.id]?.scripts?.[t.qs.indexOf(q)]?.answer||S.models?.[q.q];
-    if(o.q)items.push({kind:"Q",key:"q_"+t.id+"_"+t.qs.indexOf(q),label:t.en+" · "+QT[q.t],en:q.q,ko:q.k||"",think:o.think});
-    if(o.scripts&&model)items.push({kind:"A",label:t.en+" · 모범답안/스크립트",en:model,ko:""})}
+function scriptTopics(){return TOPICS.filter(t=>S.scripts[t.id]&&(S.scripts[t.id].scripts||[]).length)}
+function buildPlaylist(){const o=player.opts;const items=[];
+  if(o.mode==="script"){const ts=scriptTopics().filter(t=>!o.topics.length||o.topics.includes(t.id));
+    for(const t of ts)(S.scripts[t.id].scripts||[]).forEach((x,i)=>{const q=t.qs[i];if(!x.answer)return;
+      if(o.withQ&&q)items.push({kind:"Q",key:"q_"+t.id+"_"+i,label:t.en+" · "+QT[q.t],en:q.q,ko:q.k||"",think:0,quiet:true});
+      items.push({kind:"A",label:t.en+" · 예시 스크립트 "+(i+1),en:x.answer,ko:"",ex:""})});
+    if(!o.shuffle)return items;const pairs=[];for(const it of items){if(it.kind==="A"&&pairs.length&&pairs[pairs.length-1].length===1&&pairs[pairs.length-1][0].quiet)pairs[pairs.length-1].push(it);else pairs.push([it])}return pick(pairs,pairs.length).flat()}
+  const ts=TOPICS.filter(t=>t.id!=="intro"&&(S.profile.survey.includes(t.id)||t.group==="돌발"));
+  for(const t of ts)for(const q of t.qs){if(o.q)items.push({kind:"Q",key:"q_"+t.id+"_"+t.qs.indexOf(q),label:t.en+" · "+QT[q.t],en:q.q,ko:q.k||"",think:o.think})}
   if(o.q)for(const r of ROLEPLAYS)items.push({kind:"Q",key:r.id+"_11",label:"Role-play · "+r.ko,en:r.q11,ko:r.k11||"",think:o.think});
   if(o.q)ADVANCED.forEach((q,i)=>items.push({kind:"Q",key:"adv_"+i,label:"Advanced",en:q,ko:ADVANCED_KO[i]||"",think:o.think}));
-  if(o.cards)for(const c of [...CARDS,...S.custom])items.push({kind:"C",key:c.c==="custom"?null:c.id,label:CAT[c.c]||"내 표현",en:c.en.replace(/___/g,"something"),ko:c.ko});
-  if(o.texts)for(const t of S.texts)items.push({kind:"T",label:t.title,en:t.text,ko:""});
+  if(o.cards)for(const c of [...CARDS,...S.custom])items.push({kind:"C",key:c.c==="custom"?null:c.id,label:CAT[c.c]||"내 표현",en:c.en.replace(/___/g,"something"),ko:c.ko,ex:c.ex||""});
   return o.shuffle?pick(items,items.length):items}
 function playerStart(){if(!tts.ok&&!Object.keys(AUD.man).length){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
   player.items=buildPlaylist();if(!player.items.length){toast("재생할 항목이 없어요. 아래에서 내용을 선택하세요");return}
@@ -970,32 +977,35 @@ function renderMini(){const m=$("#mini");if(!player.on){m.hidden=true;return}m.h
   m.replaceChildren(h("span",{class:"now"},(player.paused?"⏸ ":"▶ ")+(it.label||"")+" — "+(it.en||"")),h("button",{onclick:playerPause},player.paused?"재생":"일시정지"),h("button",{onclick:playerNext},"다음"),h("button",{onclick:playerStop},"끄기"))}
 function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[player.i]||{};const seg=player.cur||{};
   const en=(seg.t==="file"&&seg.text)||seg.t==="en"?(seg.text||it.en):it.en;const ko=seg.t==="ko"?seg.text:(seg.ko||"");
-  b.replaceChildren(h("span",{class:"eyebrow"},({Q:"질문",A:"답변",C:"표현",T:"내 자료"}[it.kind]||"")+" · "+(it.label||"")+" · "+(player.i+1)+"/"+player.items.length+(audSrc(it.key)?" · 🎧":"")),h("span",{class:"en"},en||it.en||""),ko?h("span",{class:"muted small"},ko):h("span",{class:"muted small"},"(해석 없음)"))}
-function transBtn(){const missing=[];for(const sc of Object.values(S.scripts))for(const x of (sc.scripts||[]))missing.push(...needTrans(x.answer));for(const m of Object.values(S.models||{}))missing.push(...needTrans(m));for(const t of S.texts)missing.push(...needTrans(t.text));
+  b.replaceChildren(...[h("span",{class:"eyebrow"},({Q:"질문",A:"답변",C:"표현",T:"내 자료"}[it.kind]||"")+" · "+(it.label||"")+" · "+(player.i+1)+"/"+player.items.length+(audSrc(it.key)?" · 🎧":"")),h("span",{class:"en"},en||it.en||""),ko?h("span",{class:"muted small"},ko):h("span",{class:"muted small"},"(해석 없음)"),it.ex?h("span",{class:"small",style:"color:var(--accent);margin-top:4px"},"예) "+it.ex):null].filter(Boolean))}
+function transBtn(){const missing=[];for(const sc of Object.values(S.scripts))for(const x of (sc.scripts||[]))missing.push(...needTrans(x.answer));
   const n=new Set(missing).size;if(!n)return h("span",{class:"chip good"},"해석 준비됨");
   const b=h("button",{class:"btn sm",disabled:!sample,onclick:async()=>{b.disabled=true;try{await translateSents([...new Set(missing)],(d,t)=>b.textContent=`해석 중 ${d}/${t}`);toast("해석을 만들었어요");render()}catch(e){toast(errMsg(e));b.disabled=false}}},"AI 해석 만들기 ("+n+"문장)");return b}
 function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem("opic30_player",JSON.stringify(o))}catch(e){}};
   const ck=(k,l)=>h("label",{},h("input",{type:"checkbox",id:"pl_"+k,checked:o[k],onchange:e=>{o[k]=e.target.checked;saveO()}}),l);
-  const nModels=Object.values(S.scripts).reduce((a,sc)=>a+(sc.scripts||[]).length,0)+Object.keys(S.models||{}).length;
+  const setMode=m=>{if(o.mode===m)return;o.mode=m;saveO();if(player.on){player.items=buildPlaylist();player.i=0;player.segs=[];player.si=0;audStop();if(tts.ok)speechSynthesis.cancel();if(!player.items.length){playerStop();toast("재생할 항목이 없어요")}else{clearTimeout(player.t);player.t=null;playerStep()}}render()};
+  const tabs=h("div",{class:"segs"},...[["sent","짧은 문장"],["script","예시 스크립트"]].map(([v,l])=>h("button",{class:"seg"+(o.mode===v?" on":""),onclick:()=>setMode(v)},l)));
   const now=h("div",{class:"nowbox",id:"nowbox"},h("span",{class:"muted small"},"재생을 누르면 여기에 지금 나오는 문장이 표시돼요."));
-  const box=h("div",{class:"card"},h("div",{class:"hdr"},h("div",{},h("h3",{},"무한 재생"),h("p",{class:"muted small"},"업무 중 배경으로 계속 듣기. 끝나면 처음부터 다시 섞어서 반복합니다.")),rateCtl()),
-    now,
-    h("div",{class:"row"},player.on?h("button",{class:"btn primary",onclick:playerPause},player.paused?"▶ 이어서":"⏸ 일시정지"):h("button",{class:"btn primary",onclick:playerStart},"▶ 무한 재생 시작"),player.on?h("button",{class:"btn",onclick:playerNext},"다음 ▶▶"):null,player.on?h("button",{class:"btn ghost",onclick:playerStop},"■ 끄기"):null),
-    h("p",{class:"eyebrow"},"재생 내용"),
-    h("div",{class:"cks"},ck("q","시험 질문 (80+)"),ck("scripts","모범답안·내 스크립트 ("+nModels+")"),ck("cards","표현카드 ("+(CARDS.length+S.custom.length)+")"),ck("texts","내 자료 ("+S.texts.length+")"),ck("shuffle","섞기")),
-    h("div",{class:"row"},h("label",{class:"f"},"한국어 해석",h("select",{id:"pl_ko",onchange:e=>{o.ko=e.target.value;saveO()}},...[["sent","영어 뒤에 한국어로 듣기"],["off","영어만"]].map(([v,l])=>h("option",{value:v,selected:o.ko===v},l)))),transBtn()),
-    h("div",{class:"row"},h("label",{class:"f"},"질문 뒤 생각할 시간",h("select",{id:"pl_think",onchange:e=>{o.think=+e.target.value;saveO()}},...[0,3,5,10,20].map(v=>h("option",{value:v,selected:o.think===v},v?v+"초 (속으로 답해보기)":"없음")))),
+  const sts=scriptTopics();const nScripts=sts.reduce((a,t)=>a+(S.scripts[t.id].scripts||[]).length,0);
+  const topicPick=h("div",{class:"cks"},...sts.map(t=>h("label",{},h("input",{type:"checkbox",checked:!o.topics.length||o.topics.includes(t.id),onchange:e=>{const all=sts.map(x=>x.id);let cur=o.topics.length?o.topics.slice():all.slice();cur=e.target.checked?[...new Set([...cur,t.id])]:cur.filter(x=>x!==t.id);o.topics=cur.length===all.length?[]:cur;saveO()}}),t.ko+" ("+(S.scripts[t.id].scripts||[]).length+")")));
+  const common=[h("div",{class:"row"},h("label",{class:"f"},"한국어 해석",h("select",{id:"pl_ko",onchange:e=>{o.ko=e.target.value;saveO()}},...[["sent","영어 뒤에 한국어로 듣기"],["off","영어만"]].map(([v,l])=>h("option",{value:v,selected:o.ko===v},l)))),o.mode==="script"?transBtn():null),
+    h("div",{class:"row"},o.mode==="sent"?h("label",{class:"f"},"질문 뒤 생각할 시간",h("select",{id:"pl_think",onchange:e=>{o.think=+e.target.value;saveO()}},...[0,3,5,10,20].map(v=>h("option",{value:v,selected:o.think===v},v?v+"초 (속으로 답해보기)":"없음")))):null,
       h("label",{class:"f"},"반복 횟수",h("select",{id:"pl_rep",onchange:e=>{o.repeat=+e.target.value;saveO()}},...[1,2,3,4,5].map(v=>h("option",{value:v,selected:o.repeat===v},v===1?"1회":v+"회 (영어 → 해석 → 영어 ×"+(v-1)+")")))),
-      h("label",{class:"f"},"항목 사이 간격",h("select",{id:"pl_gap",onchange:e=>{o.gap=+e.target.value;saveO()}},...[0.5,1.5,3].map(v=>h("option",{value:v,selected:o.gap===v},v+"초"))))),
-    h("div",{class:"note"},"백그라운드 재생: 🎧 표시가 있는 항목(시험 질문·표현카드)은 영어·한국어 해석 모두 녹음 파일이라 화면을 꺼도, 다른 앱을 써도 이어지고 잠금화면·이어폰 버튼으로 조작돼요. 모범답안·내 자료(녹음 없음)는 기기 음성이라 iPhone에서는 화면이 켜져 있을 때만 나오고, 꺼져 있으면 건너뜁니다."));
+      h("label",{class:"f"},"항목 사이 간격",h("select",{id:"pl_gap",onchange:e=>{o.gap=+e.target.value;saveO()}},...[0.5,1.5,3].map(v=>h("option",{value:v,selected:o.gap===v},v+"초")))))];
+  const sentOpts=[h("p",{class:"eyebrow"},"재생 내용"),
+    h("div",{class:"cks"},ck("q","시험 질문 (80+)"),ck("cards","표현카드 ("+(CARDS.length+S.custom.length)+")"),ck("shuffle","섞기")),
+    ...common,
+    h("div",{class:"note"},"시험 질문과 표현카드는 영어·한국어 해석 모두 녹음 파일이라 화면을 꺼도, 다른 앱을 써도 이어지고 잠금화면·이어폰 버튼으로 조작돼요. 빈칸(___)이 있는 표현은 화면에 실제 예문이 함께 표시됩니다.")];
+  const scriptOpts=[h("p",{class:"eyebrow"},"재생할 주제 · 내 스크립트 "+nScripts+"개"),
+    sts.length?topicPick:h("p",{class:"muted small"},"저장된 스크립트가 아직 없어요. 스크립트 탭에서 주제별로 만들면 여기에 나타납니다."),
+    h("div",{class:"cks"},ck("withQ","질문 먼저 듣기"),ck("shuffle","섞기")),
+    ...common,
+    h("div",{class:"note"},"내 상황에 맞춰 만든 예시 스크립트를 문장 단위로 영어 → 한국어 해석 순으로 들어요. 스크립트는 녹음이 없어 기기 음성으로 나오므로 iPhone에서는 화면이 켜져 있을 때만 재생되고, 꺼져 있으면 건너뜁니다. 해석이 없는 문장은 'AI 해석 만들기'로 채울 수 있어요(Claude에서만).")];
+  const box=h("div",{class:"card"},h("div",{class:"hdr"},h("div",{},h("h3",{},"무한 재생"),h("p",{class:"muted small"},"업무 중 배경으로 계속 듣기. 끝나면 처음부터 다시 반복합니다.")),rateCtl()),
+    tabs,now,
+    h("div",{class:"row"},player.on?h("button",{class:"btn primary",onclick:playerPause},player.paused?"▶ 이어서":"⏸ 일시정지"):h("button",{class:"btn primary",onclick:playerStart},"▶ 무한 재생 시작"),player.on?h("button",{class:"btn",onclick:playerNext},"다음 ▶▶"):null,player.on?h("button",{class:"btn ghost",onclick:playerStop},"■ 끄기"):null),
+    ...(o.mode==="script"?scriptOpts:sentOpts));
   if(player.on)setTimeout(updateNow,0);return box}
-
-/* ---- MY TEXTS ---- */
-function vTexts(){const title=h("input",{type:"text",id:"tx_title",placeholder:"제목 (예: TED-Ed · Why do we dream?)"});const body=h("textarea",{id:"tx_body",style:"min-height:110px",placeholder:"영어 스크립트를 붙여넣으세요. TED-Ed 영상 페이지의 'Transcript' 탭이나 YouTube '스크립트 표시'에서 복사하면 됩니다."});
-  const add=()=>{const t=body.value.trim();if(t.length<30){toast("스크립트를 붙여넣어 주세요");return}S.texts.push({id:"t"+Date.now(),title:title.value.trim()||"내 자료 "+(S.texts.length+1),text:t.replace(/\s+/g," "),date:todayStr()});save();title.value="";body.value="";toast("추가했어요");render()};
-  return h("div",{class:"card"},h("h3",{},"내 듣기 자료 (TED-Ed 등)"),h("p",{class:"muted small"},"좋아하는 TED-Ed·팟캐스트 스크립트를 붙여넣으면 무한 재생 목록과 쉐도잉에 들어가요. 'AI 해석 만들기'를 누르면 문장마다 한국어 해석이 붙습니다."),
-    title,body,h("div",{class:"row"},h("button",{class:"btn primary",onclick:add},"추가")),
-    S.texts.length?h("div",{class:"list"},...S.texts.map(t=>{const miss=needTrans(t.text).length;return h("div",{class:"li",style:"flex-wrap:wrap"},h("span",{class:"grow"},h("b",{},t.title),h("span",{class:"muted small"}," · "+splitSent(t.text).length+"문장"+(miss?" · 해석 "+miss+"문장 없음":" · 해석 완료")),h("br"),h("span",{class:"muted small"},t.text.slice(0,90)+"…")),h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>go("listen",{text:t.text,title:t.title})},"쉐도잉"),h("button",{class:"btn sm ghost",onclick:()=>{S.texts=S.texts.filter(x=>x.id!==t.id);save();render()}},"삭제")))})):null)}
 
 /* ---- LISTEN ---- */
 let ld={mode:"quiz",q:null,revealed:false,plays:0};
@@ -1013,8 +1023,7 @@ function vListen(m){
     vPlayer(),
     offlineCard(),
     voiceCard(),
-    vTexts(),
-    h("div",{class:"note"},"실제 OPIc은 질문이 음성으로만 나옵니다. 텍스트 없이 먼저 듣고, 무엇을 묻는지(주제·시제·유형) 파악한 뒤 확인하세요. 영어 음성은 기기 내장 음성을 사용해요."),
+    h("div",{class:"note"},"실제 OPIc은 질문이 음성으로만 나옵니다. 텍스트 없이 먼저 듣고, 무엇을 묻는지(주제·시제·유형) 파악한 뒤 확인하세요."),
     h("div",{class:"card"},h("p",{class:"eyebrow"},"질문 듣기 · "+it.topic.ko),h("div",{class:"row"},playBtn,cnt),guess,ans,
       h("div",{class:"row"},ld.revealed?null:h("button",{class:"btn",onclick:()=>{ld.revealed=true;render()}},"정답 확인"),ld.revealed?h("button",{class:"btn primary",onclick:()=>go("practice",{topic:it.topic,q:it.q,kind:it.kind,rp:it.rp,step:it.step})},"이 질문에 답하기 →"):null,h("button",{class:"btn ghost",onclick:()=>{ld.q=null;render()}},"다음 질문"))),
     h("div",{class:"card"},h("h3",{},"쉐도잉"),h("p",{class:"muted small"},"모범답안이나 내 스크립트를 문장 단위로 듣고 바로 따라 말하기. 스크립트 탭과 AI 피드백에서 '쉐도잉' 버튼으로 바로 올 수 있어요."),
@@ -1046,7 +1055,7 @@ function vCards(m){
   const sel=h("select",{id:"cardcat",onchange:e=>{deck.cat=e.target.value;deck.order=[];render()}},...cats.map(c=>h("option",{value:c,selected:deck.cat===c},c==="all"?"전체 ("+all.length+")":c==="custom"?"내가 추가한 표현 ("+S.custom.length+")":CAT[c]+" ("+CARDS.filter(x=>x.c===c).length+")")));
   const fl=h("div",{class:"flash"+(deck.flip?" flip":""),onclick:()=>{deck.flip=!deck.flip;fl.classList.toggle("flip",deck.flip)}},h("div",{class:"in"},
     h("div",{class:"face"},h("span",{class:"eyebrow"},CAT[card?.c]||"추가 표현"),h("span",{class:"big"},card?.en||"—"),h("span",{class:"muted small"},"탭해서 뜻 보기")),
-    h("div",{class:"face back"},h("span",{class:"big"},card?.ko||"—"),card?.src?h("span",{class:"muted small"},"출처: "+card.src):null,h("span",{class:"muted small"},"소리 내어 3번 말해 보세요"))));
+    h("div",{class:"face back"},h("span",{class:"big"},card?.ko||"—"),card?.ex?h("span",{class:"small",style:"color:var(--accent)"},"예) "+card.ex):null,card?.src?h("span",{class:"muted small"},"출처: "+card.src):null,h("span",{class:"muted small"},"소리 내어 3번 말해 보세요"))));
   const mark=v=>{if(!card)return;S.cards[card.id]=v;S.today.cards++;save();deck.i=(deck.i+1)%deck.order.length;deck.flip=false;render()};
   put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},"Expression cards · 외운 표현 "+known),h("h1",{},"표현카드")),h("div",{style:"min-width:170px"},sel)),
     h("p",{class:"muted small mono"},(deck.i+1)+" / "+deck.order.length+(card&&S.cards[card.id]==="known"?" · 외움":card&&S.cards[card.id]==="again"?" · 다시":"")),
