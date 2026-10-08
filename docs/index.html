@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261008-145429-3ab71d">
+<html lang="ko" data-build="20261008-150343-0b7f8c">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -369,7 +369,7 @@ const CAT={filler:"시간 벌기",opener:"시작",connector:"연결",past:"과�
 
 /* ============ STATE ============ */
 const DEF={profile:{name:"",job:"회사원 (직장인)",home:"아파트에서 가족과 거주",extra:"",survey:["movies","park","music","jogging","dtravel"]},
-  log:[], scripts:{}, models:{}, texts:[], trans:{}, cards:{}, custom:[], today:{date:"",cards:0,script:0,practice:0}, updatedAt:0};
+  log:[], scripts:{}, samples:{}, models:{}, texts:[], trans:{}, cards:{}, custom:[], today:{date:"",cards:0,script:0,practice:0}, updatedAt:0};
 let S=structuredClone(DEF);
 let db=null, uid=null, sample=null, docRef=null;
 const todayStr=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
@@ -379,6 +379,7 @@ function save(){S.updatedAt=Date.now();try{localStorage.setItem("opic30",JSON.st
   if(cloud.ref)cloudPush(false)}
 function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;const key=l=>l.date+"|"+l.kind+"|"+l.title+"|"+(l.score??"");const seen=new Set(S.log.map(key));for(const l of (o.log||[]))if(!seen.has(key(l))){S.log.push(l);seen.add(key(l))}S.log.sort((a,b)=>a.date<b.date?-1:1);
   for(const [k,v] of Object.entries(o.scripts||{}))if(!S.scripts[k]||(v.date||"")>(S.scripts[k].date||""))S.scripts[k]=v;
+  S.samples=S.samples||{};for(const [k,v] of Object.entries(o.samples||{}))if(!S.samples[k]||(v.date||"")>(S.samples[k].date||""))S.samples[k]=v;
   Object.assign(S.models=S.models||{},o.models||{});Object.assign(S.trans=S.trans||{},o.trans||{});Object.assign(S.cards,o.cards||{});
   for(const c of (o.custom||[]))if(!S.custom.some(x=>x.en===c.en))S.custom.push(c);for(const t of (o.texts||[]))if(!S.texts.some(x=>x.id===t.id||x.text===t.text))S.texts.push(t);
   if((o.updatedAt||0)>(S.updatedAt||0)&&o.profile)S.profile=Object.assign(S.profile,o.profile);if(o.analysis&&(o.analysis.ts||0)>(S.analysis?.ts||0))S.analysis=o.analysis;if(o.today&&o.today.date===todayStr()){for(const k of ["cards","script","practice"])S.today[k]=Math.max(S.today[k]||0,o.today[k]||0)}if((o.updatedAt||0)>(S.updatedAt||0))S.updatedAt=o.updatedAt;if(!fromCloud)save();else{try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}
@@ -388,7 +389,7 @@ function ensureToday(){if(S.today.date!==todayStr()){S.today={date:todayStr(),ca
 const WEB_URL="https://zzonos.github.io/Opic_self_study/";
 const b64u=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 const unb64u=t=>{t=t.replace(/-/g,"+").replace(/_/g,"/");t+="=".repeat((4-t.length%4)%4);const bin=atob(t);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u};
-async function packState(){const json=JSON.stringify({log:S.log,scripts:S.scripts,models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,updatedAt:S.updatedAt});
+async function packState(){const json=JSON.stringify({log:S.log,scripts:S.scripts,samples:S.samples||{},models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,updatedAt:S.updatedAt});
   const bytes=new TextEncoder().encode(json);
   if("CompressionStream" in window){const cs=new CompressionStream("deflate-raw");const w=cs.writable.getWriter();w.write(bytes);w.close();const buf=await new Response(cs.readable).arrayBuffer();return "z"+b64u(buf)}
   return "r"+b64u(bytes.buffer)}
@@ -506,6 +507,18 @@ Reply with ONLY one JSON object: {"scripts":[{"n":1,"answer":"..."}],"expression
 Include 6-8 reusable expressions taken from the scripts.`;
   return sample.json(prompt,{onText,cache:false});
 }
+async function genSample(topic){
+  const qs=topic.qs.map((q,i)=>`${i+1}. [${QT[q.t]}] ${q.q}`).join("\n");
+  const prompt=`You write example OPIc answers for a Korean learner to listen to repeatedly (shadowing / background listening). Target level: solid ${TARGET}.
+Learner profile: ${profileText()}
+Topic: ${topic.en} (${topic.ko})
+Write one spoken-style answer for each question below, 90-130 words, first person, natural conversational English with clear structure (restate the question → 2-3 concrete details or a short past-tense story → one-line closer). Use the learner's profile and invent plausible, specific, memorable details. Keep sentences short enough to repeat after (max ~18 words each).
+Questions:
+${qs}
+
+Reply with ONLY one JSON object: {"scripts":[{"n":1,"answer":"..."}]}`;
+  return sample.json(prompt,{cache:false});
+}
 async function evalMock(items,onText){
   const body=items.map((it,i)=>`Q${i+1} (${it.kind}): ${it.q}\nA${i+1} (${it.secs}s): ${it.a||"(no answer)"}`).join("\n\n");
   const prompt=`${RUBRIC}
@@ -535,7 +548,7 @@ function audStop(){audCb=null;try{const a=audEl();a.onended=null;a.pause();a.rem
 const SPK_ICON='<svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg>';
 const STOP_ICON='<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
 const tts={ok:"speechSynthesis" in window,voice:null,rate:1,cur:null,onend:null};
-try{const rv=localStorage.getItem("opic30_rate");tts.rate=rv==null||Math.abs(parseFloat(rv)-0.95)<.01?0.9:(parseFloat(rv)||0.9)}catch(e){}
+try{tts.rate=parseFloat(localStorage.getItem("opic30_rate"))||0.95}catch(e){}
 const ttsText=t=>String(t||"").replace(/___/g,"something").replace(/\s*\/\s*/g,", or ").replace(/\.{3}/g,",").replace(/\s+/g," ").trim();
 function ttsVoices(){if(!tts.ok)return[];return speechSynthesis.getVoices().filter(v=>/^en[-_]/i.test(v.lang))}
 const MALE=/\b(guy|davis|christopher|eric|andrew|brian|jason|tony|roger|steffan|ryan|thomas|william|liam|daniel|david|mark|alex|fred|tom|aaron|arthur|james|oliver|rishi|george|matthew|rocko|reed|grandpa|eddy|male|jacob|connor|sam\b|jamie|noah|ethan|lee|hamish|ravi|neerja)\b/i;
@@ -591,7 +604,7 @@ function speak(text,{btn=null,rate=null,onend=null,key=null}={}){
   setTimeout(()=>{if(tts.cur&&tts.cur.u===u)speechSynthesis.speak(u)},80)}
 function spkBtn(text,rate=null,key=null){const b=h("button",{class:"spk","aria-label":"듣기",title:"듣기",html:SPK_ICON});b.onclick=()=>speak(text,{btn:b,rate,key});return b}
 const splitSent=t=>(t||"").replace(/\s+/g," ").match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g)?.map(x=>x.trim()).filter(Boolean)||[];
-function rateCtl(){const r=h("select",{id:"rate_"+Math.random().toString(36).slice(2,6),onchange:e=>{tts.rate=parseFloat(e.target.value);try{localStorage.setItem("opic30_rate",tts.rate)}catch(x){}}},...[[0.7,"0.7x 느리게"],[0.8,"0.8x"],[0.9,"0.9x 기본"],[1,"1.0x 원래 속도"],[1.1,"1.1x"],[1.25,"1.25x 빠르게"]].map(([v,l])=>h("option",{value:v,selected:Math.abs(tts.rate-v)<.01},l)));r.style.width="auto";return r}
+function rateCtl(){const r=h("select",{id:"rate_"+Math.random().toString(36).slice(2,6),onchange:e=>{tts.rate=parseFloat(e.target.value);try{localStorage.setItem("opic30_rate",tts.rate)}catch(x){}}},...Array.from({length:13},(_,i)=>+(0.7+i*0.05).toFixed(2)).map(v=>h("option",{value:v,selected:Math.abs(tts.rate-v)<.01},v.toFixed(2)+"x"+(v===0.95?" 기본 (시험 속도)":v===1?" 원속도":v===0.7?" 느리게":v===1.3?" 빠르게":""))));r.style.width="auto";return r}
 
 /* ============ TIMER ============ */
 let timer={on:false,start:0,secs:0,int:null,el:null,bar:null};
@@ -943,14 +956,16 @@ function mediaSession(){if(!("mediaSession" in navigator))return;try{const it=pl
   for(const k in H){try{navigator.mediaSession.setActionHandler(k,H[k])}catch(e){}}}catch(e){}}
 
 /* ============ INFINITE PLAYER ============ */
-const player={on:false,paused:false,items:[],i:0,s:0,sents:[],t:null,lock:null,opts:{mode:"sent",q:true,scripts:true,cards:true,texts:true,shuffle:true,think:5,gap:1.5,ko:"sent",repeat:1,withQ:true,topics:[]}};
+const player={on:false,paused:false,items:[],i:0,s:0,sents:[],t:null,lock:null,opts:{mode:"sent",q:true,scripts:true,cards:true,texts:true,shuffle:true,think:5,gap:1.5,ko:"sent",repeat:1,withQ:true,topics:[],stopics:[]}};
 try{Object.assign(player.opts,JSON.parse(localStorage.getItem("opic30_player")||"{}"))}catch(e){}
 function scriptTopics(){return TOPICS.filter(t=>S.scripts[t.id]&&(S.scripts[t.id].scripts||[]).length)}
+function sampleTopics(){return TOPICS.filter(t=>t.id!=="intro"&&(S.profile.survey.includes(t.id)||t.group==="돌발"))}
 function buildPlaylist(){const o=player.opts;const items=[];
-  if(o.mode==="script"){const ts=scriptTopics().filter(t=>!o.topics.length||o.topics.includes(t.id));
-    for(const t of ts)(S.scripts[t.id].scripts||[]).forEach((x,i)=>{const q=t.qs[i];if(!x.answer)return;
+  if(o.mode==="sample"||o.mode==="script"){const store=o.mode==="sample"?(S.samples||{}):S.scripts;const sel=o.mode==="sample"?o.stopics:o.topics;
+    const ts=(o.mode==="sample"?sampleTopics():scriptTopics()).filter(t=>store[t.id]&&(store[t.id].scripts||[]).length&&(!sel.length||sel.includes(t.id)));
+    for(const t of ts)(store[t.id].scripts||[]).forEach((x,i)=>{const q=t.qs[i];if(!x.answer)return;
       if(o.withQ&&q)items.push({kind:"Q",key:"q_"+t.id+"_"+i,label:t.en+" · "+QT[q.t],en:q.q,ko:q.k||"",think:0,quiet:true});
-      items.push({kind:"A",label:t.en+" · 예시 스크립트 "+(i+1),en:x.answer,ko:"",ex:""})});
+      items.push({kind:"A",label:t.en+" · "+(o.mode==="sample"?"예시 답변 ":"내 스크립트 ")+(i+1),en:x.answer,ko:"",ex:""})});
     if(!o.shuffle)return items;const pairs=[];for(const it of items){if(it.kind==="A"&&pairs.length&&pairs[pairs.length-1].length===1&&pairs[pairs.length-1][0].quiet)pairs[pairs.length-1].push(it);else pairs.push([it])}return pick(pairs,pairs.length).flat()}
   const ts=TOPICS.filter(t=>t.id!=="intro"&&(S.profile.survey.includes(t.id)||t.group==="돌발"));
   for(const t of ts)for(const q of t.qs){if(o.q)items.push({kind:"Q",key:"q_"+t.id+"_"+t.qs.indexOf(q),label:t.en+" · "+QT[q.t],en:q.q,ko:q.k||"",think:o.think})}
@@ -997,17 +1012,24 @@ function renderMini(){const m=$("#mini");if(!player.on){m.hidden=true;return}m.h
 function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[player.i]||{};const seg=player.cur||{};
   const en=(seg.t==="file"&&seg.text)||seg.t==="en"?(seg.text||it.en):it.en;const ko=seg.t==="ko"?seg.text:(seg.ko||"");
   b.replaceChildren(...[h("span",{class:"eyebrow"},({Q:"질문",A:"답변",C:"표현",T:"내 자료"}[it.kind]||"")+" · "+(it.label||"")+" · "+(player.i+1)+"/"+player.items.length+(audSrc(it.key)?" · 🎧":"")),h("span",{class:"en"},en||it.en||""),ko?h("span",{class:"muted small"},ko):h("span",{class:"muted small"},"(해석 없음)"),it.ex?h("span",{class:"small",style:"color:var(--accent);margin-top:4px"},"예) "+it.ex):null].filter(Boolean))}
-function transBtn(){const missing=[];for(const sc of Object.values(S.scripts))for(const x of (sc.scripts||[]))missing.push(...needTrans(x.answer));
+function transBtn(){const missing=[];for(const sc of [...Object.values(S.scripts),...Object.values(S.samples||{})])for(const x of (sc.scripts||[]))missing.push(...needTrans(x.answer));
   const n=new Set(missing).size;if(!n)return h("span",{class:"chip good"},"해석 준비됨");
   const b=h("button",{class:"btn sm",disabled:!sample,onclick:async()=>{b.disabled=true;try{await translateSents([...new Set(missing)],(d,t)=>b.textContent=`해석 중 ${d}/${t}`);toast("해석을 만들었어요");render()}catch(e){toast(errMsg(e));b.disabled=false}}},"AI 해석 만들기 ("+n+"문장)");return b}
 function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem("opic30_player",JSON.stringify(o))}catch(e){}};
   const ck=(k,l)=>h("label",{},h("input",{type:"checkbox",id:"pl_"+k,checked:o[k],onchange:e=>{o[k]=e.target.checked;saveO()}}),l);
   const setMode=m=>{if(o.mode===m)return;o.mode=m;saveO();if(player.on){player.items=buildPlaylist();player.i=0;player.segs=[];player.si=0;audStop();if(tts.ok)speechSynthesis.cancel();if(!player.items.length){playerStop();toast("재생할 항목이 없어요")}else{clearTimeout(player.t);player.t=null;playerStep()}}render()};
-  const tabs=h("div",{class:"segs"},...[["sent","짧은 문장"],["script","예시 스크립트"]].map(([v,l])=>h("button",{class:"seg"+(o.mode===v?" on":""),onclick:()=>setMode(v)},l)));
+  const tabs=h("div",{class:"segs"},...[["sent","짧은 문장"],["sample","예시 스크립트"],["script","내 스크립트"]].map(([v,l])=>h("button",{class:"seg"+(o.mode===v?" on":""),onclick:()=>setMode(v)},l)));
   const now=h("div",{class:"nowbox",id:"nowbox"},h("span",{class:"muted small"},"재생을 누르면 여기에 지금 나오는 문장이 표시돼요."));
   const sts=scriptTopics();const nScripts=sts.reduce((a,t)=>a+(S.scripts[t.id].scripts||[]).length,0);
-  const topicPick=h("div",{class:"cks"},...sts.map(t=>h("label",{},h("input",{type:"checkbox",checked:!o.topics.length||o.topics.includes(t.id),onchange:e=>{const all=sts.map(x=>x.id);let cur=o.topics.length?o.topics.slice():all.slice();cur=e.target.checked?[...new Set([...cur,t.id])]:cur.filter(x=>x!==t.id);o.topics=cur.length===all.length?[]:cur;saveO()}}),t.ko+" ("+(S.scripts[t.id].scripts||[]).length+")")));
-  const common=[h("div",{class:"row"},h("label",{class:"f"},"한국어 해석",h("select",{id:"pl_ko",onchange:e=>{o.ko=e.target.value;saveO()}},...[["sent","영어 뒤에 한국어로 듣기"],["off","영어만"]].map(([v,l])=>h("option",{value:v,selected:o.ko===v},l)))),o.mode==="script"?transBtn():null),
+  const pickTopics=(list,key,label)=>h("div",{class:"cks"},...list.map(t=>h("label",{},h("input",{type:"checkbox",checked:!o[key].length||o[key].includes(t.id),onchange:e=>{const all=list.map(x=>x.id);let cur=o[key].length?o[key].slice():all.slice();cur=e.target.checked?[...new Set([...cur,t.id])]:cur.filter(x=>x!==t.id);o[key]=cur.length===all.length?[]:cur;saveO();if(player.on){player.items=buildPlaylist();player.i=Math.min(player.i,Math.max(0,player.items.length-1))}}}),label(t))));
+  const topicPick=pickTopics(sts,"topics",t=>t.ko+" ("+(S.scripts[t.id].scripts||[]).length+")");
+  const smp=S.samples||{};const sList=sampleTopics();const sSel=sList.filter(t=>!o.stopics.length||o.stopics.includes(t.id));const sMissing=sSel.filter(t=>!(smp[t.id]?.scripts||[]).length);const nSamples=sList.reduce((a,t)=>a+(smp[t.id]?.scripts||[]).length,0);
+  const samplePick=pickTopics(sList,"stopics",t=>t.ko+((smp[t.id]?.scripts||[]).length?" ✓":""));
+  const genBtn=h("button",{class:"btn primary",disabled:!sample||!sMissing.length,onclick:async e=>{const b=e.target;b.disabled=true;S.samples=S.samples||{};let k=0;
+    try{for(const t of sMissing){k++;b.textContent=`예시 만드는 중 ${k}/${sMissing.length} · ${t.ko}`;const r=await genSample(t);if(r&&Array.isArray(r.scripts)){S.samples[t.id]={scripts:r.scripts.map(x=>({answer:(x.answer||"").trim()})).filter(x=>x.answer),date:todayStr()};save()}}
+      const sents=[];for(const t of sMissing)for(const x of (S.samples[t.id]?.scripts||[]))sents.push(...needTrans(x.answer));if(sents.length){await translateSents([...new Set(sents)],(d,n)=>b.textContent=`해석 중 ${d}/${n}`)}
+      toast("예시 스크립트를 만들었어요");if(player.on&&o.mode==="sample"){player.items=buildPlaylist()}render()}catch(x){toast(errMsg(x));b.disabled=false;b.textContent="선택한 주제 예시 만들기"}}},sMissing.length?"선택한 주제 예시 만들기 ("+sMissing.length+")":"선택한 주제 모두 준비됨");
+  const common=[h("div",{class:"row"},h("label",{class:"f"},"한국어 해석",h("select",{id:"pl_ko",onchange:e=>{o.ko=e.target.value;saveO()}},...[["sent","영어 뒤에 한국어로 듣기"],["off","영어만"]].map(([v,l])=>h("option",{value:v,selected:o.ko===v},l)))),o.mode!=="sent"?transBtn():null),
     h("div",{class:"row"},o.mode==="sent"?h("label",{class:"f"},"질문 뒤 생각할 시간",h("select",{id:"pl_think",onchange:e=>{o.think=+e.target.value;saveO()}},...[0,3,5,10,20].map(v=>h("option",{value:v,selected:o.think===v},v?v+"초 (속으로 답해보기)":"없음")))):null,
       h("label",{class:"f"},"반복 횟수",h("select",{id:"pl_rep",onchange:e=>{o.repeat=+e.target.value;saveO()}},...[1,2,3,4,5].map(v=>h("option",{value:v,selected:o.repeat===v},v===1?"1회":v+"회 (영어 → 해석 → 영어 ×"+(v-1)+")")))),
       h("label",{class:"f"},"항목 사이 간격",h("select",{id:"pl_gap",onchange:e=>{o.gap=+e.target.value;saveO()}},...[0.5,1.5,3].map(v=>h("option",{value:v,selected:o.gap===v},v+"초")))))];
@@ -1015,15 +1037,21 @@ function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem
     h("div",{class:"cks"},ck("q","시험 질문 (80+)"),ck("cards","표현카드 ("+(CARDS.length+S.custom.length)+")"),ck("shuffle","섞기")),
     ...common,
     h("div",{class:"note"},"시험 질문과 표현카드는 영어·한국어 해석 모두 녹음 파일이라 화면을 꺼도, 다른 앱을 써도 이어지고 잠금화면·이어폰 버튼으로 조작돼요. 빈칸(___)이 있는 표현은 화면에 실제 예문이 함께 표시됩니다.")];
-  const scriptOpts=[h("p",{class:"eyebrow"},"재생할 주제 · 내 스크립트 "+nScripts+"개"),
+  const scriptOpts=[h("p",{class:"eyebrow"},"주제 선택 · 스크립트 탭에서 만든 내 스크립트 "+nScripts+"개"),
     sts.length?topicPick:h("p",{class:"muted small"},"저장된 스크립트가 아직 없어요. 스크립트 탭에서 주제별로 만들면 여기에 나타납니다."),
     h("div",{class:"cks"},ck("withQ","질문 먼저 듣기"),ck("shuffle","섞기")),
     ...common,
-    h("div",{class:"note"},"내 상황에 맞춰 만든 예시 스크립트를 문장 단위로 영어 → 한국어 해석 순으로 들어요. 스크립트는 녹음이 없어 기기 음성으로 나오므로 iPhone에서는 화면이 켜져 있을 때만 재생되고, 꺼져 있으면 건너뜁니다. 해석이 없는 문장은 'AI 해석 만들기'로 채울 수 있어요(Claude에서만).")];
+    h("div",{class:"note"},"스크립트 탭에서 공부한 내 스크립트를 문장 단위로 영어 → 한국어 해석 순으로 들어요. 스크립트는 녹음이 없어 기기 음성으로 나오므로 iPhone에서는 화면이 켜져 있을 때만 재생되고, 꺼져 있으면 건너뜁니다. 해석이 없는 문장은 'AI 해석 만들기'로 채울 수 있어요(Claude에서만).")];
+  const sampleOpts=[h("p",{class:"eyebrow"},"주제 선택 · 예시 답변 "+nSamples+"개 준비됨 (✓)"),
+    samplePick,
+    h("div",{class:"row"},genBtn,sample?null:h("span",{class:"muted small"},"예시 생성은 Claude에서 열었을 때만 가능해요")),
+    h("div",{class:"cks"},ck("withQ","질문 먼저 듣기"),ck("shuffle","섞기")),
+    ...common,
+    h("div",{class:"note"},"설정의 프로필(직업·거주지 등)을 바탕으로 AI가 주제별 예시 답변을 만들어 두고 무한재생해요. 한 번 만들면 저장되어 웹에서도 들을 수 있고, 다시 만들고 싶으면 설정 → 초기화에서 예시만 지울 수 있어요. 예시는 녹음이 없어 기기 음성으로 나오므로 iPhone에서는 화면이 켜져 있을 때만 재생됩니다.")];
   const box=h("div",{class:"card"},h("div",{class:"hdr"},h("div",{},h("h3",{},"무한 재생"),h("p",{class:"muted small"},"업무 중 배경으로 계속 듣기. 끝나면 처음부터 다시 반복합니다.")),rateCtl()),
     tabs,now,
     h("div",{class:"row"},player.on?h("button",{class:"btn primary",onclick:playerPause},player.paused?"▶ 이어서":"⏸ 일시정지"):h("button",{class:"btn primary",onclick:playerStart},"▶ 무한 재생 시작"),player.on?h("button",{class:"btn",onclick:playerNext},"다음 ▶▶"):null,player.on?h("button",{class:"btn ghost",onclick:playerStop},"■ 끄기"):null),
-    ...(o.mode==="script"?scriptOpts:sentOpts));
+    ...(o.mode==="script"?scriptOpts:o.mode==="sample"?sampleOpts:sentOpts));
   if(player.on)setTimeout(updateNow,0);return box}
 
 /* ---- LISTEN ---- */
@@ -1105,7 +1133,7 @@ function vSettings(m){
       h("textarea",{id:"imp",style:"min-height:70px;font-family:var(--mono);font-size:11px",placeholder:"다른 곳에서 복사한 기록 코드를 붙여넣기"}),
       h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{try{const o=JSON.parse(decodeURIComponent(escape(atob($("#imp").value.trim()))));mergeState(o);$("#imp").value="";toast("기록을 합쳤어요");render()}catch(e){toast("코드를 읽을 수 없어요")}}},"가져와서 합치기"))),
     h("div",{class:"card"},h("h3",{},"데이터"),h("p",{class:"muted small"},uid?"학습 기록은 내 Claude 계정에 저장되어 다른 기기에서도 이어집니다.":cloud.user?"학습 기록은 OSS 계정("+cloud.user.email+")에 저장돼요.":"지금은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장됩니다."),
-      h("div",{class:"row",id:"resetrow"},h("button",{class:"btn sm ghost",onclick:e=>{if(e.currentTarget.nextSibling)return;e.currentTarget.after(h("button",{class:"btn sm",style:"color:var(--bad)",onclick:()=>{S=structuredClone(DEF);save();deck.order=[];render();toast("초기화했어요")}},"정말 초기화할게요"))}},"기록 전체 초기화…"))));
+      h("div",{class:"row",id:"resetrow"},Object.keys(S.samples||{}).length?h("button",{class:"btn sm ghost",onclick:()=>{S.samples={};save();toast("예시 스크립트를 지웠어요. 듣기 탭에서 다시 만들 수 있어요");render()}},"듣기용 예시 스크립트 지우기"):null,h("button",{class:"btn sm ghost",onclick:e=>{if(e.currentTarget.nextSibling)return;e.currentTarget.after(h("button",{class:"btn sm",style:"color:var(--bad)",onclick:()=>{S=structuredClone(DEF);save();deck.order=[];render();toast("초기화했어요")}},"정말 초기화할게요"))}},"기록 전체 초기화…"))));
 }
 
 /* ============ BOOT ============ */
