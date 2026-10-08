@@ -630,7 +630,9 @@ function speak(text,{btn=null,rate=null,onend=null,key=null}={}){
   const u=new SpeechSynthesisUtterance(ttsText(text));u.lang=tts.voice?.lang||"en-US";if(tts.voice)u.voice=tts.voice;u.rate=rate??tts.rate;u.pitch=1;
   tts.cur={u,btn};if(btn){btn.classList.add("on");btn.innerHTML=STOP_ICON}
   u.onend=u.onerror=()=>{if(tts.cur&&tts.cur.u===u){if(btn){btn.classList.remove("on");btn.innerHTML=SPK_ICON}tts.cur=null;onend&&onend()}};
-  setTimeout(()=>{if(tts.cur&&tts.cur.u===u)speechSynthesis.speak(u)},80)}
+  let started=false;u.onstart=()=>{started=true};
+  setTimeout(()=>{if(tts.cur&&tts.cur.u===u){if(!speechSynthesis.getVoices().length&&!tts.voice){toast("이 앱에는 사용할 수 있는 음성이 없어요. Edge나 Chrome 브라우저로 열어 보세요");}speechSynthesis.speak(u);
+    setTimeout(()=>{if(!started&&tts.cur&&tts.cur.u===u&&!speechSynthesis.speaking){speechSynthesis.cancel();speechSynthesis.speak(u);setTimeout(()=>{if(!started&&tts.cur&&tts.cur.u===u)toast("음성이 재생되지 않아요. 말풍선의 ▶ 버튼을 눌러 보고, 안 되면 설정 → 음성 선택에서 다른 음성을 고르세요")},1500)}},1500)}},80)}
 function spkBtn(text,rate=null,key=null){const b=h("button",{class:"spk","aria-label":"듣기",title:"듣기",html:SPK_ICON});b.onclick=()=>speak(text,{btn:b,rate,key});return b}
 const splitSent=t=>(t||"").replace(/\s+/g," ").match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g)?.map(x=>x.trim()).filter(Boolean)||[];
 function rateCtl(){const r=h("select",{id:"rate_"+Math.random().toString(36).slice(2,6),onchange:e=>{tts.rate=parseFloat(e.target.value);try{localStorage.setItem("opic30_rate",tts.rate)}catch(x){}}},...Array.from({length:13},(_,i)=>+(0.7+i*0.05).toFixed(2)).map(v=>h("option",{value:v,selected:Math.abs(tts.rate-v)<.01},v.toFixed(2)+"x"+(v===0.95?" 기본 (시험 속도)":v===1?" 원속도":v===0.7?" 느리게":v===1.3?" 빠르게":""))));r.style.width="auto";return r}
@@ -854,7 +856,7 @@ function vChat(m){
     if(u.who==="fix")return h("div",{class:"fixc"},h("span",{class:"eyebrow"},"이렇게 말하면 더 자연스러워요"),h("span",{class:"o"},u.fix.original),h("span",{class:"b"},u.fix.better),h("span",{class:"w"},u.fix.why),h("button",{class:"btn sm",style:"align-self:flex-start;margin-top:4px",onclick:()=>{addCards([{en:u.fix.better,ko:u.fix.why}],sc.ko)}},"표현카드에 추가"));
     if(u.who==="wait")return h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")))};
   chat.ui.forEach(u=>bub.append(render1(u)));
-  const ta=h("textarea",{id:"chat_in",style:"min-height:64px",placeholder:"받아쓰기(마이크 키)로 말하거나 입력하세요"});
+  const ta=h("textarea",{id:"chat_in",style:"min-height:64px",placeholder:"입력하거나 받아쓰기로 말하세요 — "+DICT_HINT});
   const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ttsStop();ta.value="";chat.busy=true;
     chat.ui.push({who:"me",text:t});chat.turns.push({role:"user",content:t});bub.append(render1({who:"me",text:t}));const w=render1({who:"wait"});bub.append(w);w.scrollIntoView({block:"end"});
     try{const r=await sample.json([{role:"user",content:chatRules(sc)},...chat.turns],{cache:false,modelTier:"quick"});
@@ -871,8 +873,8 @@ function vChat(m){
   const armAuto=()=>{clearTimeout(vt);const now=ta.value.trim();if(now.length<3||now===last){status.textContent=now?"":"말하면 자동으로 보내요";return}
     let left=2;status.textContent="말이 끝나면 "+left+"초 후 전송";const tick=()=>{if(ta.value.trim()!==now){armAuto();return}left--;if(left<=0){status.textContent="";last=ta.value.trim();send()}else{status.textContent="말이 끝나면 "+left+"초 후 전송";vt=setTimeout(tick,1000)}};vt=setTimeout(tick,1000)};
   ta.addEventListener("input",()=>{if(tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending))ttsStop()},{once:false});
-  if(chatMode==="voice"){ta.addEventListener("input",armAuto);ta.placeholder="키보드의 마이크 키를 누르고 말하세요"}
-  const micBtn_=SR_OK?micBtn(ta,{onFinal:v=>{if(v.trim().length>2){clearTimeout(vt);send()}}}):h("button",{class:"btn primary",style:"min-width:140px;justify-content:center",onclick:()=>{ttsStop();ta.focus();toast("키보드의 🎤 키를 눌러 말하세요")}},"🎤 말하기");
+  if(chatMode==="voice"){ta.addEventListener("input",armAuto);ta.placeholder=DICT_HINT}
+  const micBtn_=SR_OK?micBtn(ta,{onFinal:v=>{if(v.trim().length>2){clearTimeout(vt);send()}}}):h("button",{class:"btn primary",style:"min-width:140px;justify-content:center",onclick:()=>{ttsStop();ta.focus();toast(DICT_HINT)}},"🎤 말하기");
   const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn_,h("button",{class:"btn",onclick:()=>{clearTimeout(vt);send()}},"지금 보내기"),status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
   put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow",id:"chat_cnt"},sc.en+" · "+chat.n+"턴"+(chatMode==="voice"?" · 말하기 모드":"")),h("h2",{},sc.ko)),h("div",{class:"row"},h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_auto",checked:chat.auto,onchange:e=>chat.auto=e.target.checked}),"자동 읽기"),chatMode==="voice"?h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_hide",checked:chat.hide,onchange:e=>{chat.hide=e.target.checked;bub.classList.toggle("hidetext",chat.hide)}}),"상대 말 숨기기"):null,h("button",{class:"btn sm",onclick:()=>endChat()},"대화 끝내기"))),
     bub,
@@ -1177,6 +1179,7 @@ function vSettings(m){
 /* ============ BOOT ============ */
 const WEB=!window.claude?.use&&/github\.io|localhost/.test(location.host);
 const SR_OK=WEB&&("SpeechRecognition" in window||"webkitSpeechRecognition" in window);
+const DICT_HINT=(()=>{const ua=navigator.userAgent;if(/iPhone|iPad/.test(ua))return "키보드의 🎤 키를 눌러 말하세요";if(/Android/.test(ua))return "키보드의 🎤 키를 눌러 말하세요";if(/Windows/.test(ua))return "입력칸을 누른 뒤 Win + H 를 누르면 Windows 음성 입력이 켜져요";if(/Mac/.test(ua))return "입력칸을 누른 뒤 fn 키를 두 번 누르면 받아쓰기가 켜져요 (시스템 설정 → 키보드 → 받아쓰기 켜기)";return "운영체제의 음성 입력(받아쓰기)을 켜고 말하세요"})();
 let swReg=null;if(WEB&&"serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").then(r=>{swReg=r}).catch(()=>{});navigator.serviceWorker.addEventListener("message",e=>{if(e.data?.type==="prefetch-progress"){const el=$("#offl");if(el)el.textContent=e.data.done>=e.data.total?"오프라인 저장 완료 ("+e.data.total+"개)":"오프라인 저장 중 "+e.data.done+"/"+e.data.total}})}
 function offlineCard(){if(!WEB)return null;const urls=[];for(const t of Object.keys(AUD.man))for(const k of Object.keys(AUD.man[t]))urls.push("audio/"+t+"/"+k+".mp3");[1,2,3,5,10,20].forEach(n=>urls.push("audio/silence_"+n+".mp3"));
   const st=h("span",{class:"muted small",id:"offl"},"");
