@@ -8,23 +8,28 @@ h1{font-size:17px;margin:0}p{margin:0;font-size:14px;color:#556}.big{width:150px
 <div class="st" id="st"></div>
 <div class="box" id="out">…</div>
 <label><input type="checkbox" id="cont" checked> 계속 듣기 (전송 후 자동으로 다시 듣기)</label>
+<label>말을 멈추고 <select id="gap"><option value="2000">2초</option><option value="3000" selected>3초</option><option value="5000">5초</option></select> 지나면 전송</label>
 <div class="log" id="log"></div>
 <script>
 const $=s=>document.querySelector(s);const R=window.SpeechRecognition||window.webkitSpeechRecognition;const linked=!!window.opener;
 const log=t=>{$("#log").textContent=t};
 if(!R){$("#st").textContent="이 브라우저는 음성 인식을 지원하지 않아요. Chrome/Edge/Safari로 열어 주세요";$("#mic").disabled=true}
 if(!linked)$("#hint").textContent="이 창은 Claude 앱의 '🎤 말하기' 버튼으로 열어야 대화창에 글자가 들어갑니다. (지금은 연결 안 됨 — 인식 결과만 표시)";
-let rec=null,on=false,fin="",sentN=0;
+let rec=null,on=false,fin="",sentN=0,silT=null,stopping=false;
 const send=text=>{text=text.trim();if(!text)return;sentN++;try{if(window.opener)window.opener.postMessage({type:"oss-stt",text,n:sentN},"*")}catch(e){}$("#st").textContent="전송됨 ("+sentN+"): "+text.slice(0,60);
-  // also copy as a fallback for devices that cannot message the opener
   try{navigator.clipboard?.writeText(text).catch(()=>{})}catch(e){}};
-const start=()=>{if(on)return;rec=new R();rec.lang="en-US";rec.continuous=false;rec.interimResults=true;fin="";
-  rec.onresult=e=>{let interim="";fin="";for(let i=0;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t+" ";else interim+=t}$("#out").textContent=(fin+interim)||"…"};
-  rec.onerror=e=>{log("오류: "+e.error+(e.error==="not-allowed"?" — 브라우저 주소창의 마이크 권한을 허용해 주세요":""));stop(false)};
-  rec.onend=()=>{const t=fin.trim();on=false;$("#mic").textContent="🎤 말하기";$("#mic").classList.remove("rec");if(t)send(t);if($("#cont").checked&&t)setTimeout(start,400)};
-  try{rec.start();on=true;$("#mic").textContent="■ 듣는 중";$("#mic").classList.add("rec");$("#st").textContent="영어로 말하세요…"}catch(e){log("시작 실패: "+e.message)}};
-const stop=(quiet)=>{on=false;try{rec?.stop()}catch(e){}$("#mic").textContent="🎤 말하기";$("#mic").classList.remove("rec")};
-$("#mic").onclick=()=>{if(on){$("#cont").checked=false;stop()}else start()};
-window.addEventListener("message",e=>{if(e.data&&e.data.type==="oss-ping")$("#st").textContent="Claude 대화창과 연결됨 ✓"});
+const flush=()=>{clearTimeout(silT);silT=null;const t=fin.trim();fin="";if(t){send(t);$("#out").textContent="…"}};
+const armSilence=()=>{clearTimeout(silT);silT=setTimeout(flush,+$("#gap").value)};
+const start=()=>{if(on)return;rec=new R();rec.lang="en-US";rec.continuous=true;rec.interimResults=true;fin="";stopping=false;
+  rec.onresult=e=>{let interim="";fin="";for(let i=0;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t+" ";else interim+=t}$("#out").textContent=(fin+interim)||"…";if(fin.trim())armSilence()};
+  rec.onerror=e=>{if(e.error==="no-speech"||e.error==="aborted")return;log("오류: "+e.error+(e.error==="not-allowed"?" — 브라우저 주소창의 마이크 권한을 허용해 주세요":""));if(e.error==="not-allowed"){stopping=true;stop()}};
+  rec.onend=()=>{on=false;flush();if(!stopping&&$("#cont").checked){setTimeout(start,250);return}$("#mic").textContent="🎤 말하기";$("#mic").classList.remove("rec");$("#st").textContent="멈춤"};
+  try{rec.start();on=true;$("#mic").textContent="■ 듣는 중 (누르면 멈춤)";$("#mic").classList.add("rec");$("#st").textContent="영어로 말하세요… 말을 멈추면 보내요"}catch(e){log("시작 실패: "+e.message)}};
+const stop=()=>{stopping=true;on=false;try{rec?.stop()}catch(e){}$("#mic").textContent="🎤 말하기";$("#mic").classList.remove("rec")};
+$("#mic").onclick=()=>{if(on)stop();else start()};
+window.addEventListener("message",e=>{const d=e.data||{};if(d.type==="oss-ping")$("#st").textContent="Claude 대화창과 연결됨 ✓";if(d.type==="oss-start"){window.focus();if(!on)start()}if(d.type==="oss-stop")stop()});
+window.addEventListener("pagehide",()=>{try{window.opener&&window.opener.postMessage({type:"oss-mic-bye"},"*")}catch(e){}});
+// auto-start when opened from Claude (Chrome needs one click for mic permission the first time)
+if(linked)setTimeout(()=>{try{start()}catch(e){}},300);
 if(linked){try{window.opener.postMessage({type:"oss-mic-ready"},"*")}catch(e){}}
 </script></body></html>
