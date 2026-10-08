@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261008-231621-fa3b29">
+<html lang="ko" data-build="20261008-232927-241660">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -874,7 +874,7 @@ Reply with ONLY a JSON object: {"reply":"your in-character reply","reply_ko":"re
 function vChat(m){
   if(!chat){put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation practice"),h("h1",{},"AI와 대화")),aiNote(),
     h("div",{class:"note"},"말하기 → 상대가 답하면서 틀린 표현은 그 자리에서 고쳐 주고 → 대화를 이어가는 연습이에요. '뭐라고 말하지?'에 한국어로 쓰면 영어 표현을 알려줍니다. 끝내면 레벨 추정과 표현 정리가 나와요."),
-    SR_OK?null:h("div",{class:"note"},h("b",{},"말하기 입력: "),"🎤 버튼을 누르면 'OSS 마이크' 창이 열리고, 거기서 말하면 키보드 언어와 상관없이 영어로 인식돼 이 대화창에 들어옵니다. PC에서는 창을 옆에 띄워 두면 계속 쓸 수 있어요. (대안: "+DICT_HINT+")"),
+    SR_OK?null:h("div",{class:"note"},h("b",{},"말하기 입력 (영어로 인식되게): "),DICT_HINT+". Claude 안에서는 마이크를 직접 쓸 수 없어 기기 받아쓰기를 사용해요. "+(/Windows/.test(navigator.userAgent)?"영어 음성 팩이 없으면 한글로 적히니 설정 → 시간 및 언어 → 언어에서 English (United States)와 음성 인식을 설치해 두세요.":"한국어 키보드 상태에서 말하면 한글로 적히니 영어 키보드로 바꾼 뒤 🎤를 누르세요.")),
     tts.ok?h("div",{class:"note",style:"align-items:center"},h("span",{class:"grow"},"상대 목소리: ",h("b",{},tts.voice?vLabel(tts.voice):"기기 기본 음성"),vQuality(tts.voice||{name:""})===2?" — 고품질 음성이에요.":" — 기계음처럼 들리면 기기에 고품질(향상됨/프리미엄) 음성을 설치하고 바꿔 보세요."),h("button",{class:"btn sm",onclick:()=>{go("settings");setTimeout(()=>$("#voicecard")?.scrollIntoView({behavior:"smooth",block:"start"}),50)}},"음성 바꾸기")):null,
     h("div",{class:"card"},h("h3",{},"모드"),h("div",{class:"cks"},h("label",{},h("input",{type:"radio",name:"cmode",value:"text",checked:chatMode==="text",onchange:()=>{chatMode="text";saveMode()}}),"텍스트 모드 — 입력하고 보내기"),h("label",{},h("input",{type:"radio",name:"cmode",value:"voice",checked:chatMode==="voice",onchange:()=>{chatMode="voice";saveMode()}}),"말하기 모드 — 말하면 자동 전송, 답은 음성으로")),
       h("p",{class:"muted small"},"말하기 모드: 마이크 버튼을 누르면 키보드 받아쓰기가 열려요. 말을 멈추고 2초가 지나면 자동으로 보내고, 상대의 답은 읽어 줍니다. 이 앱은 마이크에 직접 접근할 수 없어서 받아쓰기 엔진은 iPhone 키보드(Siri 받아쓰기)를 씁니다.")),
@@ -888,7 +888,7 @@ function vChat(m){
     if(u.who==="fix")return h("div",{class:"fixc"},h("span",{class:"eyebrow"},"이렇게 말하면 더 자연스러워요"),h("span",{class:"o"},u.fix.original),h("span",{class:"b"},u.fix.better),h("span",{class:"w"},u.fix.why),h("button",{class:"btn sm",style:"align-self:flex-start;margin-top:4px",onclick:()=>{addCards([{en:u.fix.better,ko:u.fix.why}],sc.ko)}},"표현카드에 추가"));
     if(u.who==="wait")return h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")))};
   chat.ui.forEach(u=>bub.append(render1(u)));
-  const ta=h("textarea",{id:"chat_in",style:"min-height:64px",placeholder:"입력하거나 🎤 마이크 창으로 말하세요"});
+  const ta=h("textarea",{id:"chat_in",style:"min-height:64px",placeholder:"입력하거나 받아쓰기로 말하세요 — "+DICT_HINT});
   const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ttsStop();ta.value="";chat.busy=true;
     chat.ui.push({who:"me",text:t});chat.turns.push({role:"user",content:t});bub.append(render1({who:"me",text:t}));const w=render1({who:"wait"});bub.append(w);w.scrollIntoView({block:"end"});
     try{const r=await sample.json([{role:"user",content:chatRules(sc)},...chat.turns],{cache:false,modelTier:"quick"});
@@ -905,9 +905,9 @@ function vChat(m){
   const armAuto=()=>{clearTimeout(vt);const now=ta.value.trim();if(now.length<3||now===last){status.textContent=now?"":"말하면 자동으로 보내요";return}
     let left=2;status.textContent="말이 끝나면 "+left+"초 후 전송";const tick=()=>{if(ta.value.trim()!==now){armAuto();return}left--;if(left<=0){status.textContent="";last=ta.value.trim();send()}else{status.textContent="말이 끝나면 "+left+"초 후 전송";vt=setTimeout(tick,1000)}};vt=setTimeout(tick,1000)};
   ta.addEventListener("input",()=>{if(tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending))ttsStop()},{once:false});
-  if(chatMode==="voice"){ta.addEventListener("input",armAuto);ta.placeholder=SR_OK?"🎤 버튼을 누르고 말하세요":"🎤 버튼으로 마이크 창을 열고 말하세요 (영어로 바로 인식) — 또는 "+DICT_HINT}
+  if(chatMode==="voice"){ta.addEventListener("input",armAuto);ta.placeholder=SR_OK?"🎤 버튼을 누르고 말하세요":DICT_HINT}
   const micBtn_=SR_OK?micBtn(ta,{onFinal:v=>{if(v.trim().length>2){clearTimeout(vt);send()}}}):micLink();
-  ta.addEventListener("oss-stt",()=>{if(chatMode==="voice"&&ta.value.trim().length>2){clearTimeout(vt);send()}});
+
   const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn_,h("button",{class:"btn",onclick:()=>{clearTimeout(vt);send()}},"지금 보내기"),status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
   put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow",id:"chat_cnt"},sc.en+" · "+chat.n+"턴"+(chatMode==="voice"?" · 말하기 모드":"")),h("h2",{},sc.ko)),h("div",{class:"row"},h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_auto",checked:chat.auto,onchange:e=>chat.auto=e.target.checked}),"자동 읽기"),chatMode==="voice"?h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_hide",checked:chat.hide,onchange:e=>{chat.hide=e.target.checked;bub.classList.toggle("hidetext",chat.hide)}}),"상대 말 숨기기"):null,h("button",{class:"btn sm",onclick:()=>endChat()},"대화 끝내기"))),
     bub,
@@ -1205,20 +1205,14 @@ function vSettings(m){
       h("textarea",{id:"expbox",readonly:"",hidden:true,autocapitalize:"off",autocorrect:"off",spellcheck:"false",style:"min-height:60px;font-family:var(--mono);font-size:11px",onclick:e=>{e.target.select()}}),
       h("textarea",{id:"imp",autocapitalize:"off",autocorrect:"off",spellcheck:"false",style:"min-height:70px;font-family:var(--mono);font-size:11px",placeholder:"다른 곳에서 복사한 기록 코드를 붙여넣기"}),
       h("div",{class:"row"},h("button",{class:"btn",onclick:async()=>{try{const o=await parseCode($("#imp").value);mergeState(o,false);$("#imp").value="";toast("기록을 합쳤어요");render()}catch(e){toast("코드를 읽을 수 없어요")}}},"가져와서 합치기"))),
-    h("div",{class:"card"},h("h3",{},"데이터"),h("p",{class:"muted small mono",style:"font-size:10px"},"진단: "+(window.claude?.use?"claude":"web")+" · hash="+(HASH_SEEN||"-")+" · ds="+("DecompressionStream" in window)+" · clip="+!!navigator.clipboard?.readText+" · mic="+(micReady?"연결":"-")),
-      window.claude?.use?h("div",{class:"row"},h("button",{class:"btn sm ghost",onclick:async e=>{const o=h("span",{class:"muted small mono"});e.target.after(o);o.textContent="확인 중…";const t0=Date.now();try{const r=await fetch(WEB_URL+"version.json?x="+Date.now(),{cache:"no-store"});const j=await r.json();o.textContent="네트워크 OK ("+(Date.now()-t0)+"ms, build "+(j.build||"?")+")"}catch(x){o.textContent="네트워크 차단: "+(x.message||x)}}},"연결 진단")):null,h("p",{class:"muted small"},uid?h("span",{},"학습 기록은 내 Claude 계정에 저장되어 다른 기기에서도 이어집니다. ",h("b",{id:"csave"},claudeStatus())):cloud.user?"학습 기록은 OSS 계정("+cloud.user.email+")에 저장돼요.":"지금은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장됩니다."),
+    h("div",{class:"card"},h("h3",{},"데이터"),h("p",{class:"muted small mono",style:"font-size:10px"},"진단: "+(window.claude?.use?"claude":"web")+" · hash="+(HASH_SEEN||"-")+" · ds="+("DecompressionStream" in window)+" · clip="+!!navigator.clipboard?.readText),h("p",{class:"muted small"},uid?h("span",{},"학습 기록은 내 Claude 계정에 저장되어 다른 기기에서도 이어집니다. ",h("b",{id:"csave"},claudeStatus())):cloud.user?"학습 기록은 OSS 계정("+cloud.user.email+")에 저장돼요.":"지금은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장됩니다."),
       h("div",{class:"row",id:"resetrow"},Object.keys(S.samples||{}).length?h("button",{class:"btn sm ghost",onclick:()=>{S.samples={};save();toast("예시 스크립트를 지웠어요. 듣기 탭에서 다시 만들 수 있어요");render()}},"듣기용 예시 스크립트 지우기"):null,h("button",{class:"btn sm ghost",onclick:e=>{if(e.currentTarget.nextSibling)return;e.currentTarget.after(h("button",{class:"btn sm",style:"color:var(--bad)",onclick:()=>{S=structuredClone(DEF);save();deck.order=[];render();toast("초기화했어요")}},"정말 초기화할게요"))}},"기록 전체 초기화…"))));
 }
 
 /* ============ BOOT ============ */
 const WEB=!window.claude?.use&&/github\.io|localhost/.test(location.host);
 const SR_OK=WEB&&("SpeechRecognition" in window||"webkitSpeechRecognition" in window);
-const MIC_URL=WEB_URL+"mic.html";let micWin=null,micReady=false;
-window.addEventListener("message",e=>{const d=e.data;if(!d||typeof d!=="object")return;
-  if(d.type==="oss-mic-ready"){micReady=true;micWin=e.source;try{e.source.postMessage({type:"oss-ping"},"*")}catch(x){}toast("마이크 창이 연결됐어요 — 거기서 말하면 자동으로 들어와요");return}
-  if(d.type==="oss-mic-bye"){micReady=false;micWin=null;return}
-  if(d.type==="oss-stt"&&typeof d.text==="string"){const ta=$("#chat_in")||document.querySelector('textarea[id^="ans_"],textarea[id^="mock_"]');if(!ta){toast("받은 말: "+d.text.slice(0,40));return}ttsStop();ta.value=(ta.value.trim()?ta.value.trim()+" ":"")+d.text.trim();ta.dispatchEvent(new Event("input"));ta.dispatchEvent(new CustomEvent("oss-stt",{detail:d.text}))}});
-function micLink(label="🎤 말하기"){const a=h("a",{class:"btn primary",href:MIC_URL,target:"oss_mic",style:"text-decoration:none;min-width:140px;justify-content:center",onclick:e=>{ttsStop();if(micReady&&micWin){e.preventDefault();try{micWin.postMessage({type:"oss-start"},"*");toast("마이크 창에서 듣고 있어요. 말하면 여기에 들어와요")}catch(x){micReady=false;micWin=null;window.open(MIC_URL,"oss_mic")}return}setTimeout(()=>{if(!micReady)toast("마이크 창이 열렸어요. 거기서 말하면 여기에 글자가 들어와요")},800)}},label);return a}
+function micLink(label="🎤 말하기"){return h("button",{class:"btn primary",style:"min-width:140px;justify-content:center",onclick:()=>{ttsStop();const ta=$("#chat_in")||document.querySelector('textarea[id^="ans_"],textarea[id^="mock_"]');ta&&ta.focus();toast(DICT_HINT)}},label)}
 const DICT_HINT=(()=>{const ua=navigator.userAgent;if(/iPhone|iPad/.test(ua))return "키보드를 🌐 키로 영어(English)로 바꾼 뒤 🎤 키를 눌러 말하세요";if(/Android/.test(ua))return "키보드 언어를 English로 바꾼 뒤 🎤 키를 눌러 말하세요";if(/Windows/.test(ua))return "입력 언어를 ENG로 바꾸고(Win + Space) 입력칸에서 Win + H 를 누르면 영어로 받아써요";if(/Mac/.test(ua))return "입력칸을 누른 뒤 fn 키를 두 번 누르면 받아쓰기가 켜져요 (시스템 설정 → 키보드 → 받아쓰기 켜기)";return "운영체제의 음성 입력(받아쓰기)을 켜고 말하세요"})();
 let swReg=null;if(WEB&&"serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").then(r=>{swReg=r}).catch(()=>{});navigator.serviceWorker.addEventListener("message",e=>{if(e.data?.type==="prefetch-progress"){const el=$("#offl");if(el)el.textContent=e.data.done>=e.data.total?"오프라인 저장 완료 ("+e.data.total+"개)":"오프라인 저장 중 "+e.data.done+"/"+e.data.total}})}
 function offlineCard(){if(!WEB)return null;const urls=[];for(const t of Object.keys(AUD.man))for(const k of Object.keys(AUD.man[t]))urls.push("audio/"+t+"/"+k+".mp3");[1,2,3,5,10,20].forEach(n=>urls.push("audio/silence_"+n+".mp3"));
