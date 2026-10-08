@@ -363,7 +363,7 @@ function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;const key=l=>
   S.samples=S.samples||{};for(const [k,v] of Object.entries(o.samples||{}))if(!S.samples[k]||(v.date||"")>(S.samples[k].date||""))S.samples[k]=v;
   Object.assign(S.models=S.models||{},o.models||{});Object.assign(S.trans=S.trans||{},o.trans||{});Object.assign(S.cards,o.cards||{});
   for(const c of (o.custom||[]))if(!S.custom.some(x=>x.en===c.en))S.custom.push(c);for(const t of (o.texts||[]))if(!S.texts.some(x=>x.id===t.id||x.text===t.text))S.texts.push(t);
-  if((o.updatedAt||0)>(S.updatedAt||0)&&o.profile)S.profile=Object.assign(S.profile,o.profile);if(o.analysis&&(o.analysis.ts||0)>(S.analysis?.ts||0))S.analysis=o.analysis;if(o.today&&o.today.date===todayStr()){for(const k of ["cards","script","practice"])S.today[k]=Math.max(S.today[k]||0,o.today[k]||0)}if((o.updatedAt||0)>(S.updatedAt||0))S.updatedAt=o.updatedAt;if(!fromCloud)save();else{try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}
+  if(o.profile){const newer=(o.updatedAt||0)>(S.updatedAt||0);for(const [k,v] of Object.entries(o.profile)){const cur=S.profile[k];const empty=cur==null||cur===""||(Array.isArray(cur)&&!cur.length);if(newer||empty||(k==="survey"&&!fromCloud&&Array.isArray(v)&&v.length))S.profile[k]=v}}if(o.analysis&&(o.analysis.ts||0)>(S.analysis?.ts||0))S.analysis=o.analysis;if(o.today&&o.today.date===todayStr()){for(const k of ["cards","script","practice"])S.today[k]=Math.max(S.today[k]||0,o.today[k]||0)}if((o.updatedAt||0)>(S.updatedAt||0))S.updatedAt=o.updatedAt;if(!fromCloud)save();else{try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}
 function ensureToday(){if(S.today.date!==todayStr()){S.today={date:todayStr(),cards:0,script:0,practice:0}}}
 
 /* ============ CLAUDE → WEB SYNC (state carried in the web URL hash) ============ */
@@ -374,6 +374,7 @@ async function packState(){const json=JSON.stringify({log:S.log,scripts:S.script
   const bytes=new TextEncoder().encode(json);
   if("CompressionStream" in window){const cs=new CompressionStream("deflate-raw");const w=cs.writable.getWriter();w.write(bytes);w.close();const buf=await new Response(cs.readable).arrayBuffer();return "z"+b64u(buf)}
   return "r"+b64u(bytes.buffer)}
+async function parseCode(t){t=(t||"").trim().replace(/^.*#s_/,"");if(!t)throw new Error("empty");if(t.startsWith("ey"))return JSON.parse(decodeURIComponent(escape(atob(t))));return unpackState(t)}
 async function unpackState(t){const kind=t[0];const u=unb64u(t.slice(1));let bytes=u;
   if(kind==="z"){const ds=new DecompressionStream("deflate-raw");const w=ds.writable.getWriter();w.write(u);w.close();bytes=new Uint8Array(await new Response(ds.readable).arrayBuffer())}
   return JSON.parse(new TextDecoder().decode(bytes))}
@@ -385,8 +386,16 @@ function syncCard(){if(window.claude?.use===undefined)return null;const n=unsync
     h("div",{class:"row"},h("button",{class:"btn primary",onclick:syncToWeb},"웹으로 보내기"+(n?" ("+n+"건)":"")),S.syncedAt?h("span",{class:"muted small"},"마지막 전송 "+new Date(S.syncedAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})):null))}
 // web side: pick up a payload from the URL hash and merge it once signed in (or right away without an account)
 let pendingSync=null;
-(async()=>{if(window.claude?.use)return;const m=location.hash.match(/^#s_(.+)$/);if(!m)return;try{pendingSync=await unpackState(m[1]);history.replaceState(null,"",location.pathname+location.search)}catch(e){toast("가져온 기록을 읽을 수 없어요")}})();
-function applyPendingSync(){if(!pendingSync)return;const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;toast("Claude 기록 "+n+"건을 합쳤어요");render()}
+(async()=>{const m=location.hash.match(/^#s_(.+)$/);if(!m)return;try{pendingSync=await unpackState(m[1]);history.replaceState(null,"",location.pathname+location.search)}catch(e){toast("가져온 기록을 읽을 수 없어요")}})();
+function applyPendingSync(){if(!pendingSync)return;const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;toast((window.claude?.use?"웹 계정 기록":"Claude 기록")+" "+n+"건을 합쳤어요");render()}
+// web → Claude: copy a packed code (and try the URL hash), then open the artifact
+async function syncToClaude(){try{const code=await packState();let copied=false;try{await navigator.clipboard.writeText(code);copied=true}catch(e){}
+  S.syncedAt=Date.now();save();const url=ART_URL+(code.length<50000?"#s_"+code:"");const a=document.createElement("a");a.href=url;a.target="_blank";a.rel="noopener";document.body.append(a);a.click();a.remove();
+  toast(copied?"기록 코드를 복사했어요. Claude 앱이 열리면 '웹 기록 가져오기'에 붙여넣으세요":"Claude 앱이 열려요. 기록이 안 보이면 설정의 기록 코드를 쓰세요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
+function webImportCard(){if(!window.claude?.use)return null;const ta=h("textarea",{id:"wimp",style:"min-height:56px;font-family:var(--mono);font-size:11px",placeholder:"웹 앱에서 'Claude에서 열기'를 누르면 복사되는 기록 코드를 여기에 붙여넣기"});
+  const doImport=async t=>{try{const o=await parseCode(t);const n=(o.log||[]).length;mergeState(o,false);ta.value="";toast("웹 계정 기록을 합쳤어요 (기록 "+n+"건·프로필·스크립트)");render()}catch(e){toast("코드를 읽을 수 없어요. 웹 앱에서 다시 복사해 주세요")}};
+  return h("div",{class:"card"},h("h3",{},"웹 계정 기록 가져오기"),h("p",{class:"muted small"},"웹(OSS 계정)에서 입력한 프로필·스크립트·기록을 여기로 가져와요. 웹 앱에서 'Claude에서 열기'를 누르면 기록 코드가 자동 복사됩니다."),
+    ta,h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>doImport(ta.value)},"붙여넣어 합치기"),navigator.clipboard?.readText?h("button",{class:"btn",onclick:async()=>{try{const t=await navigator.clipboard.readText();if(!t.trim()){toast("클립보드가 비어 있어요");return}doImport(t)}catch(e){toast("클립보드를 읽을 수 없어요. 위 칸에 직접 붙여넣어 주세요")}}},"클립보드에서 가져오기"):null))}
 
 /* ============ CLOUD ACCOUNT (Firebase, web build only) ============ */
 const FB_CONFIG={apiKey:"AIzaSyAkIuOOuG_MUlgE3GRrqlC3THnVcZHeq8M",authDomain:"opic-self-study.firebaseapp.com",projectId:"opic-self-study",storageBucket:"opic-self-study.firebasestorage.app",messagingSenderId:"542185929571",appId:"1:542185929571:web:11560af55c5c3e928cb156"};
@@ -613,7 +622,7 @@ function render(){renderNav();ensureToday();const m=$("#main");m.replaceChildren
   if(cloud.ok&&cloud.ready&&!cloud.user&&!cloud.skip){$("#nav").hidden=true;vLogin(m);return}$("#nav").hidden=false;({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings})[view](m)}
 
 const ART_URL="https://claude.ai/artifact/HuASd2nEpXENsSugPoScyp";
-function aiNote(){if(sample)return null;return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"AI 평가·대화·스크립트는 Claude 앱에서 열었을 때 작동해요. 여기서는 듣기·카드·질문 연습을 쓸 수 있어요."),h("a",{class:"btn sm",href:ART_URL,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap"},"Claude에서 열기"))}
+function aiNote(){if(sample)return null;return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"AI 평가·대화·스크립트는 Claude 앱에서 열었을 때 작동해요. 여기서는 듣기·카드·질문 연습을 쓸 수 있어요."),h("button",{class:"btn sm",style:"white-space:nowrap",onclick:syncToClaude},"Claude에서 열기"))}
 
 /* ---- TODAY ---- */
 function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);
@@ -624,7 +633,7 @@ function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);
   put(m,
     h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},todayStr()+" · 목표 "+TARGET),h("h1",{},S.profile.name?`${S.profile.name}님, 오늘의 30분`:"오늘의 30분")),
       h("span",{class:"chip "+(done.every(Boolean)?"good":"neutral")},done.filter(Boolean).length+"/3 완료")),
-    aiNote(),
+    aiNote(),(window.claude?.use&&profileFill()<2&&!S.log.length)?webImportCard():null,
     h("div",{class:"stats"},
       h("div",{class:"stat"},h("b",{class:"mono"},streak),h("span",{},"연속 학습일")),
       h("div",{class:"stat"},h("b",{class:"mono"},Math.round(todayMin)),h("span",{},"오늘 말한 시간(분)")),
@@ -1111,11 +1120,11 @@ function vSettings(m){
     h("div",{class:"card"},h("h3",{},"서베이 선택 주제"),h("p",{class:"muted small"},"IM3 전략: 겹치는 스크립트를 재활용할 수 있는 주제로 5–6개를 고르세요. (예: 공원·조깅·걷기는 같은 장소 이야기로 묶기)"),cks),
     h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{for(const k in F)p[k]=F[k].value.trim();p.job=job.value;p.home=home.value;p.survey=survey.filter(t=>cks.querySelector("#sv_"+t.id).checked).map(t=>t.id);save();toast("저장했어요")}},"저장")),
     tts.ok?voiceCard():null,
-    syncCard(),
+    syncCard(),webImportCard(),
     h("div",{class:"card"},h("h3",{},"기록 옮기기 (웹 ↔ Claude)"),h("p",{class:"muted small"},"학습 기록·스크립트·내 표현·해석·프로필을 코드로 복사해 다른 곳에서 붙여넣으면 합쳐져요. 양쪽 기록이 모두 남습니다."),
-      h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{const code=btoa(unescape(encodeURIComponent(JSON.stringify(S))));navigator.clipboard?.writeText(code).then(()=>toast("기록 코드를 복사했어요 ("+Math.round(code.length/1024)+"KB)")).catch(()=>{$("#imp").value=code;toast("아래 칸에 코드를 넣었어요. 전체 선택해 복사하세요")})}},"기록 코드 복사")),
+      h("div",{class:"row"},h("button",{class:"btn",onclick:async()=>{const code=await packState();navigator.clipboard?.writeText(code).then(()=>toast("기록 코드를 복사했어요 ("+Math.round(code.length/1024)+"KB)")).catch(()=>{$("#imp").value=code;toast("아래 칸에 코드를 넣었어요. 전체 선택해 복사하세요")})}},"기록 코드 복사")),
       h("textarea",{id:"imp",style:"min-height:70px;font-family:var(--mono);font-size:11px",placeholder:"다른 곳에서 복사한 기록 코드를 붙여넣기"}),
-      h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{try{const o=JSON.parse(decodeURIComponent(escape(atob($("#imp").value.trim()))));mergeState(o);$("#imp").value="";toast("기록을 합쳤어요");render()}catch(e){toast("코드를 읽을 수 없어요")}}},"가져와서 합치기"))),
+      h("div",{class:"row"},h("button",{class:"btn",onclick:async()=>{try{const o=await parseCode($("#imp").value);mergeState(o,false);$("#imp").value="";toast("기록을 합쳤어요");render()}catch(e){toast("코드를 읽을 수 없어요")}}},"가져와서 합치기"))),
     h("div",{class:"card"},h("h3",{},"데이터"),h("p",{class:"muted small"},uid?"학습 기록은 내 Claude 계정에 저장되어 다른 기기에서도 이어집니다.":cloud.user?"학습 기록은 OSS 계정("+cloud.user.email+")에 저장돼요.":"지금은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장됩니다."),
       h("div",{class:"row",id:"resetrow"},Object.keys(S.samples||{}).length?h("button",{class:"btn sm ghost",onclick:()=>{S.samples={};save();toast("예시 스크립트를 지웠어요. 듣기 탭에서 다시 만들 수 있어요");render()}},"듣기용 예시 스크립트 지우기"):null,h("button",{class:"btn sm ghost",onclick:e=>{if(e.currentTarget.nextSibling)return;e.currentTarget.after(h("button",{class:"btn sm",style:"color:var(--bad)",onclick:()=>{S=structuredClone(DEF);save();deck.order=[];render();toast("초기화했어요")}},"정말 초기화할게요"))}},"기록 전체 초기화…"))));
 }
@@ -1149,6 +1158,6 @@ loadLocal();cloudInit();render();setTimeout(()=>{if(!cloud.ok||cloud.skip)applyP
   if(u&&d){try{uid=await u.id();db=d;docRef=db.doc("data/users/"+uid+"/state/main");const snap=await docRef.get();
     if(snap.exists){const remote=snap.data();if((remote.updatedAt||0)>(S.updatedAt||0)){S=Object.assign(structuredClone(DEF),remote);try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}
     else if(S.updatedAt){docRef.set(structuredClone(S)).catch(()=>{})}}catch(e){docRef=null}}
-  render();
+  render();setTimeout(applyPendingSync,300);
 })();
 </script>
