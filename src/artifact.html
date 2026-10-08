@@ -406,9 +406,10 @@ function syncToClaude(){try{const code=(syncCode&&syncCodeAt>=(S.updatedAt||0))?
   if(p&&p.then)p.then(()=>done(true),()=>done(false));else done(false);
   if(!w)toast("팝업이 차단됐어요. 브라우저에서 팝업을 허용해 주세요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
 function webImportCard(){if(!window.claude?.use)return null;const ta=h("textarea",{id:"wimp",autocapitalize:"off",autocorrect:"off",spellcheck:"false",style:"min-height:56px;font-family:var(--mono);font-size:11px",placeholder:"웹 앱에서 'Claude에서 열기'를 누르면 복사되는 기록 코드를 여기에 붙여넣기"});
-  const doImport=async t=>{try{const o=await parseCode(t);const n=(o.log||[]).length;mergeState(o,false);ta.value="";toast("웹 계정 기록을 합쳤어요 (기록 "+n+"건·프로필·스크립트)");render()}catch(e){toast("가져오기 실패: "+(e&&e.message||e))}};
+  const cnt=h("span",{class:"muted small mono"},"0자");ta.oninput=()=>{cnt.textContent=ta.value.length+"자"};
+  const doImport=async t=>{if(!(t||"").trim()){toast("칸이 비어 있어요. 칸을 길게 눌러 '붙여넣기'를 선택한 뒤 다시 누르세요");return}try{const o=await parseCode(t);const n=(o.log||[]).length;mergeState(o,false);S.webImportedAt=Date.now();save();ta.value="";cnt.textContent="0자";toast("웹 계정 기록을 합쳤어요 (기록 "+n+"건·프로필·스크립트)");render()}catch(e){toast("가져오기 실패: "+(e&&e.message||e))}};
   return h("div",{class:"card"},h("h3",{},"웹 계정 기록 가져오기"),h("p",{class:"muted small"},"웹(OSS 계정)에서 입력한 프로필·스크립트·기록을 여기로 가져와요. 웹 앱에서 'Claude에서 열기'를 누르면 기록 코드가 자동 복사됩니다."),
-    ta,h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>doImport(ta.value)},"붙여넣어 합치기"),navigator.clipboard?.readText?h("button",{class:"btn",onclick:async()=>{try{const t=await navigator.clipboard.readText();if(!t.trim()){toast("클립보드가 비어 있어요");return}doImport(t)}catch(e){toast("클립보드를 읽을 수 없어요. 위 칸에 직접 붙여넣어 주세요")}}},"클립보드에서 가져오기"):null))}
+    ta,h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>doImport(ta.value)},"붙여넣어 합치기"),cnt,navigator.clipboard?.readText?h("button",{class:"btn",onclick:async()=>{try{const t=await navigator.clipboard.readText();if(!t.trim()){toast("클립보드가 비어 있어요");return}doImport(t)}catch(e){toast("클립보드를 읽을 수 없어요. 위 칸에 직접 붙여넣어 주세요")}}},"클립보드에서 가져오기"):null))}
 
 /* ============ CLOUD ACCOUNT (Firebase, web build only) ============ */
 const FB_CONFIG={apiKey:"AIzaSyAkIuOOuG_MUlgE3GRrqlC3THnVcZHeq8M",authDomain:"opic-self-study.firebaseapp.com",projectId:"opic-self-study",storageBucket:"opic-self-study.firebasestorage.app",messagingSenderId:"542185929571",appId:"1:542185929571:web:11560af55c5c3e928cb156"};
@@ -646,7 +647,7 @@ function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);
   put(m,
     h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},todayStr()+" · 목표 "+TARGET),h("h1",{},S.profile.name?`${S.profile.name}님, 오늘의 30분`:"오늘의 30분")),
       h("span",{class:"chip "+(done.every(Boolean)?"good":"neutral")},done.filter(Boolean).length+"/3 완료")),
-    aiNote(),(window.claude?.use&&profileFill()<2&&!S.log.length)?webImportCard():null,
+    aiNote(),(window.claude?.use&&(profileFill()<2||!S.webImportedAt))?webImportCard():null,
     h("div",{class:"stats"},
       h("div",{class:"stat"},h("b",{class:"mono"},streak),h("span",{},"연속 학습일")),
       h("div",{class:"stat"},h("b",{class:"mono"},Math.round(todayMin)),h("span",{},"오늘 말한 시간(분)")),
@@ -1135,7 +1136,9 @@ function vSettings(m){
     tts.ok?voiceCard():null,
     syncCard(),webImportCard(),
     h("div",{class:"card"},h("h3",{},"기록 옮기기 (웹 ↔ Claude)"),h("p",{class:"muted small"},"학습 기록·스크립트·내 표현·해석·프로필을 코드로 복사해 다른 곳에서 붙여넣으면 합쳐져요. 양쪽 기록이 모두 남습니다."),
-      h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{const code=(syncCode&&syncCodeAt>=(S.updatedAt||0))?syncCode:packStateSync();navigator.clipboard?.writeText(code).then(()=>toast("기록 코드를 복사했어요 ("+Math.round(code.length/1024)+"KB)")).catch(()=>{$("#imp").value=code;toast("아래 칸에 코드를 넣었어요. 전체 선택해 복사하세요")})}},"기록 코드 복사")),
+      h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{const code=(syncCode&&syncCodeAt>=(S.updatedAt||0))?syncCode:packStateSync();const box=$("#expbox");box.hidden=false;box.value=code;let p=null;try{p=navigator.clipboard.writeText(code)}catch(e){}
+        const fail=()=>{box.focus();box.select();toast("자동 복사가 막혔어요. 아래 칸을 길게 눌러 전체 선택 → 복사하세요")};if(p&&p.then)p.then(()=>toast("기록 코드를 복사했어요 ("+Math.round(code.length/1024)+"KB). 안 되면 아래 칸에서 직접 복사하세요"),fail);else fail()}},"기록 코드 복사"),h("button",{class:"btn sm ghost",onclick:()=>{const b=$("#expbox");if(b.hidden||!b.value){toast("먼저 '기록 코드 복사'를 누르세요");return}b.focus();b.select();b.setSelectionRange(0,b.value.length);toast("전체 선택됨 — 복사하세요")}},"전체 선택")),
+      h("textarea",{id:"expbox",readonly:"",hidden:true,autocapitalize:"off",autocorrect:"off",spellcheck:"false",style:"min-height:60px;font-family:var(--mono);font-size:11px",onclick:e=>{e.target.select()}}),
       h("textarea",{id:"imp",autocapitalize:"off",autocorrect:"off",spellcheck:"false",style:"min-height:70px;font-family:var(--mono);font-size:11px",placeholder:"다른 곳에서 복사한 기록 코드를 붙여넣기"}),
       h("div",{class:"row"},h("button",{class:"btn",onclick:async()=>{try{const o=await parseCode($("#imp").value);mergeState(o,false);$("#imp").value="";toast("기록을 합쳤어요");render()}catch(e){toast("코드를 읽을 수 없어요")}}},"가져와서 합치기"))),
     h("div",{class:"card"},h("h3",{},"데이터"),h("p",{class:"muted small mono",style:"font-size:10px"},"진단: "+(window.claude?.use?"claude":"web")+" · hash="+(HASH_SEEN||"-")+" · ds="+("DecompressionStream" in window)+" · clip="+!!navigator.clipboard?.readText),h("p",{class:"muted small"},uid?"학습 기록은 내 Claude 계정에 저장되어 다른 기기에서도 이어집니다.":cloud.user?"학습 기록은 OSS 계정("+cloud.user.email+")에 저장돼요.":"지금은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장됩니다."),
