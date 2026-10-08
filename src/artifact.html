@@ -847,6 +847,7 @@ const SCEN=[
 ];
 let chat=null;let chatMode="text";try{chatMode=localStorage.getItem("opic30_cmode")||"text"}catch(e){}
 const saveMode=()=>{try{localStorage.setItem("opic30_cmode",chatMode)}catch(e){}};
+let chatWait=4;try{chatWait=+(localStorage.getItem("opic30_cwait")||4)}catch(e){}
 function chatRules(sc){return `${sc.persona}
 The learner is Korean, preparing for the OPIc speaking test, target level IM3. Their profile: ${profileText()}.
 Style: natural spoken American English, 1-3 sentences per turn, simple enough for an intermediate learner, and ALWAYS end with a question so the conversation keeps going. Stay in character; do not lecture.
@@ -883,13 +884,14 @@ function vChat(m){
   const prompt_ko=h("input",{type:"text",id:"chat_ko",placeholder:"뭐라고 말하지? 한국어로 쓰면 영어로 알려줘요",onkeydown:e=>{if(e.key==="Enter"){e.preventDefault();hint()}}});const hintBtn=h("button",{class:"btn sm",onclick:hint},"영어로");const hintOut=h("span",{class:"muted small"});
   // voice mode: auto-send when dictated text stops changing
   let vt=null,last="";const status=h("span",{class:"muted small mono"});
-  const armAuto=()=>{clearTimeout(vt);const now=ta.value.trim();if(now.length<3||now===last){status.textContent=now?"":"말하면 자동으로 보내요";return}
-    let left=2;status.textContent="말이 끝나면 "+left+"초 후 전송";const tick=()=>{if(ta.value.trim()!==now){armAuto();return}left--;if(left<=0){status.textContent="";last=ta.value.trim();send()}else{status.textContent="말이 끝나면 "+left+"초 후 전송";vt=setTimeout(tick,1000)}};vt=setTimeout(tick,1000)};
+  const armAuto=()=>{clearTimeout(vt);const now=ta.value.trim();if(!chatWait){status.textContent=now?"다 말했으면 '지금 보내기'":"";return}if(now.length<3||now===last){status.textContent=now?"":"말하면 자동으로 보내요";return}
+    let left=chatWait;status.textContent="말이 끝나면 "+left+"초 후 전송";const tick=()=>{if(ta.value.trim()!==now){armAuto();return}left--;if(left<=0){status.textContent="";last=ta.value.trim();send()}else{status.textContent="말이 끝나면 "+left+"초 후 전송";vt=setTimeout(tick,1000)}};vt=setTimeout(tick,1000)};
   ta.addEventListener("input",()=>{if(tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending))ttsStop()},{once:false});
   if(chatMode==="voice"){ta.addEventListener("input",armAuto);ta.placeholder=SR_OK?"🎤 버튼을 누르고 말하세요":DICT_HINT}
   const micBtn_=SR_OK?micBtn(ta,{onFinal:v=>{if(v.trim().length>2){clearTimeout(vt);send()}}}):micLink();
 
-  const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn_,h("button",{class:"btn",onclick:()=>{clearTimeout(vt);send()}},"지금 보내기"),status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
+  const waitSel=h("select",{title:"말을 멈춘 뒤 얼마나 기다렸다 보낼지",onchange:e=>{chatWait=+e.target.value;try{localStorage.setItem("opic30_cwait",chatWait)}catch(x){}armAuto()}},...[[2,"2초 후 전송"],[4,"4초 후 전송"],[6,"6초 후 전송"],[10,"10초 후 전송"],[0,"직접 보내기"]].map(([v,l])=>h("option",{value:v,selected:chatWait===v},l)));waitSel.style.width="auto";
+  const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn_,h("button",{class:"btn",onclick:()=>{clearTimeout(vt);send()}},"지금 보내기"),waitSel,status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
   put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow",id:"chat_cnt"},sc.en+" · "+chat.n+"턴"+(chatMode==="voice"?" · 말하기 모드":"")),h("h2",{},sc.ko)),h("div",{class:"row"},h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_auto",checked:chat.auto,onchange:e=>chat.auto=e.target.checked}),"자동 읽기"),chatMode==="voice"?h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_hide",checked:chat.hide,onchange:e=>{chat.hide=e.target.checked;bub.classList.toggle("hidetext",chat.hide)}}),"상대 말 숨기기"):null,h("button",{class:"btn sm",onclick:()=>endChat()},"대화 끝내기"))),
     bub,
     h("div",{class:"chatin"},h("div",{class:"card",style:"gap:8px"},ta,inputRow,h("div",{class:"row"},h("div",{class:"grow"},prompt_ko),hintBtn),hintOut)));
