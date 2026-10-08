@@ -384,21 +384,24 @@ async function parseCode(t){t=(t||"").replace(/^.*#s_/,"").replace(/[\s\u200b"'�
 async function unpackState(t){const kind=t[0];const u=unb64u(t.slice(1));let bytes=u;
   if(kind==="z"){const ds=new DecompressionStream("deflate-raw");const w=ds.writable.getWriter();w.write(u);w.close();bytes=new Uint8Array(await new Response(ds.readable).arrayBuffer())}
   return JSON.parse(new TextDecoder().decode(bytes))}
-function syncToWeb(){try{let code=(syncCode&&syncCodeAt>=(S.updatedAt||0))?syncCode:packStateSync();const LIM=180000;
-  if(code.length>LIM){const bak=S;S=Object.assign({},bak,{log:bak.log.slice(-60),analysis:null});code=packStateSync();S=bak;if(code.length>LIM){toast("기록이 너무 커서 링크로 못 보내요. 설정의 기록 코드를 사용해 주세요");return}}
-  const url=WEB_URL+"#s_"+code;
+function webUrl(){let code=(syncCode&&syncCodeAt>=(S.updatedAt||0))?syncCode:packStateSync();const LIM=180000;
+  if(code.length>LIM){const bak=S;S=Object.assign({},bak,{log:bak.log.slice(-60),analysis:null});code=packStateSync();S=bak;if(code.length>LIM)return null}
+  return WEB_URL+"#s_"+code}
+function webLink(label,cls){const url=webUrl();if(!url)return h("button",{class:cls,onclick:()=>toast("기록이 너무 커서 링크로 못 보내요. 설정의 기록 코드를 사용해 주세요")},label);
+  return h("a",{class:cls,href:url,"data-weblink":"1",target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",onclick:()=>{S.syncedAt=Date.now();save();setTimeout(()=>toast("웹 앱이 열리면 로그인 후 자동으로 합쳐져요"),200)}},label)}
+function syncToWeb(){try{const url=webUrl();if(!url){toast("기록이 너무 커서 링크로 못 보내요. 설정의 기록 코드를 사용해 주세요");return}
   const w=window.open(url,"_blank","noopener");S.syncedAt=Date.now();save();toast(w?"웹 앱이 열리면 로그인 후 자동으로 합쳐져요":"팝업이 차단됐어요. 브라우저에서 팝업을 허용해 주세요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
 function unsyncedCount(){const t=S.syncedAt||0;return S.log.filter(l=>(l.ts||0)>t||(!l.ts&&t===0)).length}
 function syncCard(){if(window.claude?.use===undefined)return null;const n=unsyncedCount();
   return h("div",{class:"card"},h("h3",{},"웹 앱으로 보내기"),h("p",{class:"muted small"},"여기(Claude)가 기본 저장소예요. 버튼을 누르면 웹 앱이 열리면서 프로필·스크립트·예시·기록이 자동으로 합쳐집니다(웹 계정에 로그인돼 있으면 그 계정에 저장). 웹 → Claude 방향은 Claude가 링크 데이터를 전달하지 않아 아래 '기록 코드'로만 가능해요."),
-    h("div",{class:"row"},h("button",{class:"btn primary",onclick:syncToWeb},"웹으로 보내기"+(n?" ("+n+"건)":"")),S.syncedAt?h("span",{class:"muted small"},"마지막 전송 "+new Date(S.syncedAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})):null))}
+    h("div",{class:"row"},webLink("웹으로 보내기"+(n?" ("+n+"건)":""),"btn primary"),S.syncedAt?h("span",{class:"muted small"},"마지막 전송 "+new Date(S.syncedAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})):null))}
 // web side: pick up a payload from the URL hash and merge it once signed in (or right away without an account)
 let pendingSync=null;
 (async()=>{const m=location.hash.match(/^#s_(.+)$/);if(!m)return;try{pendingSync=await unpackState(m[1]);history.replaceState(null,"",location.pathname+location.search)}catch(e){toast("가져온 기록을 읽을 수 없어요")}})();
 function applyPendingSync(){if(!pendingSync)return;const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;toast((window.claude?.use?"웹 계정 기록":"Claude 기록")+" "+n+"건을 합쳤어요");render()}
 // web → Claude: copy a packed code (and try the URL hash), then open the artifact
 let syncCode=null,syncCodeAt=0;
-function prepSyncCode(){if(Date.now()-syncCodeAt<1500)return;syncCodeAt=Date.now();try{packState().then(c=>{syncCode=c}).catch(()=>{})}catch(e){}}
+let prepT=null;function prepSyncCode(){clearTimeout(prepT);prepT=setTimeout(()=>{syncCodeAt=Date.now();try{packState().then(c=>{syncCode=c;const u=webUrl();if(u)document.querySelectorAll("a[data-weblink]").forEach(a=>a.href=u)}).catch(()=>{})}catch(e){}},400)}
 function syncToClaude(){try{const code=(syncCode&&syncCodeAt>=(S.updatedAt||0))?syncCode:packStateSync();
   // everything below must stay synchronous: Safari only allows clipboard + new window inside the click itself
   let p=null;try{p=navigator.clipboard.writeText(code)}catch(e){}
@@ -638,8 +641,8 @@ function render(){renderNav();ensureToday();const m=$("#main");m.replaceChildren
   if(cloud.ok&&cloud.ready&&!cloud.user&&!cloud.skip){$("#nav").hidden=true;vLogin(m);return}$("#nav").hidden=false;({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings})[view](m)}
 
 const ART_URL="https://claude.ai/artifact/HuASd2nEpXENsSugPoScyp";
-function aiNote(){if(sample||window.claude?.use)return null;prepSyncCode();return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"프로필 입력·스크립트 생성·AI 평가·대화는 Claude 앱에서 해요. Claude 앱의 '웹에서 듣기' 버튼으로 여기로 오면 최신 기록이 자동으로 합쳐집니다. 여기서는 무한 재생·마이크 연습·표현카드를 쓰세요."),h("button",{class:"btn sm",style:"white-space:nowrap",onclick:syncToClaude},"Claude에서 열기"))}
-function webNote(){if(!window.claude?.use)return null;const n=unsyncedCount();return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"백그라운드 무한 재생과 마이크 연습은 웹 앱에서 돼요. 이 버튼으로 열면 여기의 프로필·스크립트·예시·기록이 웹에 자동으로 합쳐집니다."+(n?" (새 기록 "+n+"건)":"")),h("button",{class:"btn sm primary",style:"white-space:nowrap",onclick:syncToWeb},"웹에서 듣기 →"))}
+function aiNote(){if(sample||window.claude?.use)return null;prepSyncCode();return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"프로필 입력·스크립트 생성·AI 평가·대화는 Claude 앱에서 해요. Claude 앱의 '웹에서 듣기' 버튼으로 여기로 오면 최신 기록이 자동으로 합쳐집니다. 여기서는 무한 재생·마이크 연습·표현카드를 쓰세요."),h("a",{class:"btn sm",href:ART_URL,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",onclick:()=>{try{navigator.clipboard?.writeText((syncCode&&syncCodeAt>=(S.updatedAt||0))?syncCode:packStateSync()).catch(()=>{})}catch(e){}}},"Claude에서 열기"))}
+function webNote(){if(!window.claude?.use)return null;const n=unsyncedCount();return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"백그라운드 무한 재생과 마이크 연습은 웹 앱에서 돼요. 이 버튼으로 열면 여기의 프로필·스크립트·예시·기록이 웹에 자동으로 합쳐집니다."+(n?" (새 기록 "+n+"건)":"")),webLink("웹에서 듣기 →","btn sm primary"))}
 
 /* ---- TODAY ---- */
 function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);
@@ -1137,7 +1140,7 @@ function vSettings(m){
       if(window.claude?.use)return h("div",{class:"card"},h("h3",{},"내 프로필"),h("p",{class:"muted small"},"계정별로 저장되며 AI 평가·예시 스크립트·모범답안·대화에 모두 쓰입니다."),form);
       form.hidden=true;const summary=h("p",{class:"small"},profileFill()?profileText():"아직 입력된 프로필이 없어요.");
       return h("div",{class:"card"},h("h3",{},"내 프로필"),h("p",{class:"muted small"},"프로필은 Claude 앱에서 입력하는 걸 권장해요. Claude에서 만든 스크립트·예시와 함께 '웹에서 듣기'로 여기에 자동 반영됩니다."),summary,
-        h("div",{class:"row"},h("button",{class:"btn sm",onclick:syncToClaude},"Claude에서 입력하기"),h("button",{class:"btn sm ghost",onclick:e=>{form.hidden=!form.hidden;summary.hidden=!form.hidden;e.target.textContent=form.hidden?"여기서 직접 수정":"접기"}},"여기서 직접 수정")),form)})(),
+        h("div",{class:"row"},h("a",{class:"btn sm",href:ART_URL,target:"_blank",rel:"noopener",style:"text-decoration:none"},"Claude에서 입력하기"),h("button",{class:"btn sm ghost",onclick:e=>{form.hidden=!form.hidden;summary.hidden=!form.hidden;e.target.textContent=form.hidden?"여기서 직접 수정":"접기"}},"여기서 직접 수정")),form)})(),
     h("div",{class:"card"},h("h3",{},"서베이 선택 주제"),h("p",{class:"muted small"},"IM3 전략: 겹치는 스크립트를 재활용할 수 있는 주제로 5–6개를 고르세요. (예: 공원·조깅·걷기는 같은 장소 이야기로 묶기)"),cks),
     h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{for(const k in F)p[k]=F[k].value.trim();p.job=job.value;p.home=home.value;p.survey=survey.filter(t=>cks.querySelector("#sv_"+t.id).checked).map(t=>t.id);save();toast("저장했어요")}},"저장")),
     tts.ok?voiceCard():null,
