@@ -436,7 +436,12 @@ function cloudInit(){if(!window.firebase?.initializeApp||!window.firebase?.auth)
     if(u)await cloudAttach(u);render()})}catch(e){cloud.ok=false}}
 async function cloudAttach(u){cloud.user=u;cloud.ref=firebase.firestore().collection("users").doc(u.uid);try{await cloudPull(true)}catch(e){toast("클라우드 기록을 불러오지 못했어요: "+(e.code||e.message))}
   setTimeout(applyPendingSync,300);
-  if(cloud.unsub)cloud.unsub();cloud.unsub=cloud.ref.onSnapshot(snap=>{if(!snap.exists||snap.metadata.hasPendingWrites)return;const d=snap.data();if((d.updatedAt||0)>cloud.lastPush&&(d.updatedAt||0)>(S.updatedAt||0)){try{mergeState(JSON.parse(d.state||"{}"),true);render()}catch(e){}}})}
+  if(cloud.unsub)cloud.unsub();cloud.unsub=cloud.ref.onSnapshot(snap=>{if(!snap.exists||snap.metadata.hasPendingWrites)return;cloudApply(snap.data())});}
+function cloudApply(d){if(!d)return;if((d.updatedAt||0)>cloud.lastPush&&(d.updatedAt||0)>(S.updatedAt||0)){try{mergeState(JSON.parse(d.state||"{}"),true);render();toast("계정의 새 기록을 반영했어요")}catch(e){}}}
+// foreground refresh: the realtime listener can be asleep after the app was in the background
+async function cloudRefresh(){try{if(cloud.ref){const snap=await cloud.ref.get({source:"server"});if(snap.exists)cloudApply(snap.data())}
+  if(docRef){const [m,sc,tr]=await Promise.all([docRef.main.get(),docRef.scripts.get(),docRef.trans.get()]);if(m.exists){const remote=Object.assign({},m.data(),sc.exists?sc.data():{},{trans:(tr.exists&&tr.data().t)||{}});if((remote.updatedAt||0)>(S.updatedAt||0)){mergeState(remote,true);render();toast("다른 기기의 기록을 반영했어요")}}}}catch(e){}}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")cloudRefresh()});window.addEventListener("pageshow",e=>{if(e.persisted)cloudRefresh()});
 async function cloudPull(first){if(!cloud.ref)return;const snap=await cloud.ref.get();if(snap.exists){const d=snap.data();let remote={};try{remote=JSON.parse(d.state||"{}")}catch(e){}mergeState(remote,true);if(first)toast("계정 기록을 불러왔어요")}await cloudPush(true)}
 async function cloudPush(now){if(!cloud.ref)return;clearTimeout(cloud.pushT);const doIt=async()=>{try{cloud.lastPush=S.updatedAt||Date.now();await cloud.ref.set({state:JSON.stringify(S),updatedAt:cloud.lastPush,email:cloud.user?.email||""},{merge:true});const el=$("#syncst");if(el)el.textContent="동기화됨 "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}catch(e){const el=$("#syncst");if(el)el.textContent="동기화 실패: "+(e.code||e.message)}};
   if(now)await doIt();else cloud.pushT=setTimeout(doIt,1500)}
