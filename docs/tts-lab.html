@@ -1,0 +1,22 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>OSS 음성 엔진 실험</title>
+<style>body{font-family:-apple-system,system-ui,sans-serif;max-width:640px;margin:0 auto;padding:16px;background:#f4f6f5;color:#1a2a28}h1{font-size:20px}.card{background:#fff;border-radius:12px;padding:14px;margin:12px 0;box-shadow:0 1px 3px rgba(0,0,0,.08)}textarea{width:100%;min-height:90px;font-size:15px;padding:8px;box-sizing:border-box}button{font-size:15px;padding:10px 14px;border-radius:10px;border:0;background:#0f766e;color:#fff;margin:4px 4px 4px 0}button.g{background:#e5e7eb;color:#111}select{font-size:15px;padding:8px}.bar{height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:#0f766e;width:0}.mono{font-family:ui-monospace,monospace;font-size:12px;color:#555;word-break:break-all}.log{font-size:13px;white-space:pre-wrap;color:#333}</style></head><body>
+<h1>OSS 음성 엔진 실험 (Kokoro)</h1>
+<div class="card"><p>앱 안에 내장할 신경망 음성이 이 기기에서 돌아가는지 확인하는 페이지예요. 처음 한 번 약 95MB를 내려받습니다(이후 캐시).</p>
+<div class="bar"><i id="bar"></i></div><p class="log" id="st">대기 중</p><button id="load">1. 엔진 불러오기</button></div>
+<div class="card"><textarea id="txt">Hi! Nice to meet you. So, what did you do last weekend? I went hiking with a couple of friends, and the weather was perfect.</textarea>
+<div><select id="voice"></select> <select id="speed"><option value="0.9">0.9x</option><option value="1" selected>1.0x</option><option value="1.1">1.1x</option></select></div>
+<button id="go" disabled>2. 말하기</button><button class="g" id="g2p">발음 기호만 보기</button>
+<p class="log" id="res"></p><p class="mono" id="ph"></p><audio id="au" controls style="width:100%"></audio></div>
+<div class="card"><p class="log" id="info"></p></div>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
+<script src="tts/kokoro.js"></script>
+<script>
+const $=s=>document.querySelector(s);const st=$("#st"),bar=$("#bar");
+$("#info").textContent=navigator.userAgent+"\nSIMD:"+(typeof WebAssembly!=="undefined")+" · 메모리:"+(navigator.deviceMemory||"?")+"GB · 코어:"+(navigator.hardwareConcurrency||"?");
+try{ort.env.wasm.wasmPaths="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";ort.env.wasm.numThreads=1}catch(e){st.textContent="ort 로드 실패: "+e}
+$("#load").onclick=async()=>{$("#load").disabled=true;const t0=performance.now();try{await KK.load({base:"tts/",onProgress:p=>{bar.style.width=Math.round(p.frac*100)+"%";st.textContent=p.stage+(p.loaded?" "+Math.round(p.loaded/1048576)+"/"+Math.round(p.total/1048576)+"MB":"")+(p.ms?" · "+p.ms+"ms":"")}});
+  st.textContent="준비 완료 · "+Math.round(performance.now()-t0)+"ms";const vs=$("#voice");for(const [k,l] of Object.entries(KK.manifest.voices))vs.append(new Option(l,k));$("#go").disabled=false}catch(e){st.textContent="실패: "+(e.message||e);console.error(e);$("#load").disabled=false}};
+$("#g2p").onclick=async()=>{if(!KK.lex){KK.manifest=await (await fetch("tts/manifest.json")).json();KK.lex=await (await fetch("tts/lex.json")).json()}$("#ph").textContent=KK.g2p($("#txt").value)};
+$("#go").onclick=async()=>{$("#go").disabled=true;$("#res").textContent="생성 중…";const t0=performance.now();try{const r=await KK.synth($("#txt").value,{voice:$("#voice").value,speed:+$("#speed").value});const ms=Math.round(performance.now()-t0);
+  $("#res").textContent="생성 "+ms+"ms · 오디오 "+(r.audio.length/24000).toFixed(1)+"초 · 실시간 배율 "+(r.audio.length/24000*1000/ms).toFixed(1)+"x";$("#ph").textContent=r.phonemes;const au=$("#au");au.src=KK.wavUrl(r.audio);au.play().catch(()=>{})}catch(e){$("#res").textContent="실패: "+(e.message||e);console.error(e)}$("#go").disabled=false};
+</script></body></html>
