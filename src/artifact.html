@@ -597,11 +597,12 @@ function voiceCard(){
   const fb=g=>h("button",{class:"btn sm"+(filter===g?" primary":""),onclick:e=>{filter=g;[...e.target.parentNode.children].forEach(b=>b.classList.remove("primary"));e.target.classList.add("primary");fill()}},g==="all"?"전체":g==="m"?"남성":"여성");
   const tips={win:isEdge?"Edge에서는 'Online (Natural)' 음성(★)이 가장 자연스러워요. Guy·Christopher·Eric이 남성, Aria·Jenny가 여성입니다.":"Windows에서는 Edge 브라우저로 열면 'Online (Natural)' 음성(★)을 쓸 수 있어 훨씬 자연스러워요. Chrome에서는 설정 → 시간 및 언어 → 음성에서 영어 음성 패키지를 추가하세요.",
     mac:"Mac은 시스템 설정 → 손쉬운 사용 → 콘텐츠 말하기 → 시스템 음성 → 관리에서 영어 음성의 '향상됨/프리미엄' 버전을 내려받으면 품질이 크게 올라가요. (남성: Tom, Daniel, Alex, Aaron / 여성: Samantha, Ava, Zoe)",
-    ios:"iPhone은 설정 → 손쉬운 사용 → 콘텐츠 말하기 → 음성 → 영어에서 '향상됨' 또는 '프리미엄' 음성을 내려받으세요. (남성: Tom, Daniel, Aaron, Evan / 여성: Samantha, Ava, Zoe)",
+    ios:"iPhone은 설정 → 손쉬운 사용 → 콘텐츠 말하기 → 음성 → 영어에서 '프리미엄'(가장 자연스러움) 또는 '향상됨' 음성을 내려받으세요. 추천: 여성 Ava·Zoe·Samantha, 남성 Evan·Tom·Daniel. 내려받은 뒤 Claude 앱을 완전히 닫았다 다시 열어야 목록에 나타나요.",
     android:"Android는 설정 → 일반 → 텍스트 음성 변환(TTS) → Google 음성 서비스 → 음성 데이터 설치에서 영어(미국) 고품질 음성을 추가하세요. Chrome에서 Google 음성(★)이 보여야 해요.",
     other:"브라우저가 제공하는 기기 음성을 사용합니다. ★ 표시가 자연스러운 음성이에요."};
   const recSel=h("select",{id:"aud_sel",onchange:e=>{AUD.tag=e.target.value;try{localStorage.setItem("opic30_aud",AUD.tag)}catch(x){}toast("음성을 바꿨어요")}},...Object.keys(AUD.man).map(t=>h("option",{value:t,selected:AUD.tag===t},AUD.tags[t]+" (녹음·고음질)")),h("option",{value:"off",selected:AUD.tag==="off"},"기기 내장 음성만 사용"));
-  return h("div",{class:"card"},h("h3",{},"음성 선택"),
+  const prev=h("button",{class:"btn sm",onclick:()=>speak("Hi! Nice to meet you. So, what did you do last weekend? I went hiking with a couple of friends, and the weather was perfect.",{btn:prev})},"▶ 미리듣기");
+  return h("div",{class:"card",id:"voicecard"},h("div",{class:"hdr"},h("h3",{},"음성 선택"),prev),
     h("p",{class:"muted small"},"시험 질문·표현카드와 그 한국어 해석은 Microsoft 신경망 음성(Andrew/Ava, 한국어 SunHi)으로 녹음되어 재생돼요. 녹음이 없는 모범답안·스크립트·내 자료는 아래 기기 음성을 씁니다."),
     h("label",{class:"f"},"녹음 음성 (질문·표현카드)",recSel),
     h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>speak("Hi, I'm calling to ask about the gym membership. Could you tell me what time it opens on weekends?",{key:"rp_gym_11"})},"▶ 녹음 음성 들어보기")),
@@ -838,6 +839,7 @@ Reply with ONLY a JSON object: {"reply":"your in-character reply","reply_ko":"re
 function vChat(m){
   if(!chat){put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation practice"),h("h1",{},"AI와 대화")),aiNote(),
     h("div",{class:"note"},"말하기 → 상대가 답하면서 틀린 표현은 그 자리에서 고쳐 주고 → 대화를 이어가는 연습이에요. '뭐라고 말하지?'에 한국어로 쓰면 영어 표현을 알려줍니다. 끝내면 레벨 추정과 표현 정리가 나와요."),
+    tts.ok?h("div",{class:"note",style:"align-items:center"},h("span",{class:"grow"},"상대 목소리: ",h("b",{},tts.voice?vLabel(tts.voice):"기기 기본 음성"),vQuality(tts.voice||{name:""})===2?" — 고품질 음성이에요.":" — 기계음처럼 들리면 기기에 고품질(향상됨/프리미엄) 음성을 설치하고 바꿔 보세요."),h("button",{class:"btn sm",onclick:()=>{go("settings");setTimeout(()=>$("#voicecard")?.scrollIntoView({behavior:"smooth",block:"start"}),50)}},"음성 바꾸기")):null,
     h("div",{class:"card"},h("h3",{},"모드"),h("div",{class:"cks"},h("label",{},h("input",{type:"radio",name:"cmode",value:"text",checked:chatMode==="text",onchange:()=>{chatMode="text";saveMode()}}),"텍스트 모드 — 입력하고 보내기"),h("label",{},h("input",{type:"radio",name:"cmode",value:"voice",checked:chatMode==="voice",onchange:()=>{chatMode="voice";saveMode()}}),"말하기 모드 — 말하면 자동 전송, 답은 음성으로")),
       h("p",{class:"muted small"},"말하기 모드: 마이크 버튼을 누르면 키보드 받아쓰기가 열려요. 말을 멈추고 2초가 지나면 자동으로 보내고, 상대의 답은 읽어 줍니다. 이 앱은 마이크에 직접 접근할 수 없어서 받아쓰기 엔진은 iPhone 키보드(Siri 받아쓰기)를 씁니다.")),
     h("p",{class:"eyebrow"},"상대 고르기"),
