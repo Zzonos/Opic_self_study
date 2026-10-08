@@ -90,13 +90,13 @@ async function fetchBuf(url,onProgress,label){const cache=await (self.caches?cac
   const out=new Uint8Array(loaded);let o=0;for(const c of chunks){out.set(c,o);o+=c.length}if(cache)cache.put(url,new Response(out.buffer.slice(0))).catch(()=>{});return out.buffer}
 KK.load=function({base=KK.base,onProgress=null}={}){if(KK.ready)return Promise.resolve(KK);if(KK.loading)return KK.loading;KK.base=base;
   KK.loading=(async()=>{if(!self.ort)throw new Error("onnxruntime-web(ort)가 먼저 로드돼야 해요");
-    const t0=performance.now();const prog=(stage,frac,extra)=>onProgress&&onProgress({stage,frac,...extra});
+    const t0=performance.now();try{if(self.crossOriginIsolated)ort.env.wasm.numThreads=Math.min(4,navigator.hardwareConcurrency||1)}catch(e){}const prog=(stage,frac,extra)=>onProgress&&onProgress({stage,frac,...extra});
     prog("manifest",0);KK.manifest=await (await fetch(base+"manifest.json")).json();
     prog("lex",0.02);KK.lex=await (await fetch(base+"lex.json")).json();
     const n=KK.manifest.parts;const partBufs=[];let got=0;
     for(let i=0;i<n;i++){partBufs.push(await fetchBuf(base+"model/kokoro.int8.part"+i,p=>prog("model",0.05+0.75*((got+p.loaded)/KK.manifest.size),{loaded:got+p.loaded,total:KK.manifest.size}),"model"));got+=partBufs[i].byteLength}
     const model=new Uint8Array(got);let o=0;for(const b of partBufs){model.set(new Uint8Array(b),o);o+=b.byteLength}
-    prog("session",0.85);try{ort.env.wasm.numThreads=1}catch(e){}
+    prog("session",0.85);try{if(!self.crossOriginIsolated)ort.env.wasm.numThreads=1}catch(e){}
     KK.sess=await ort.InferenceSession.create(model,{executionProviders:["wasm"],graphOptimizationLevel:"all"});
     prog("ready",1,{ms:Math.round(performance.now()-t0)});KK.ready=true;return KK})();
   KK.loading.catch(()=>{KK.loading=null});return KK.loading};
@@ -107,7 +107,7 @@ KK.synth=async function(text,{voice="af_heart",speed=1.0,onChunk=null}={}){if(!K
   const ph=KK.g2p(text);const chunks=splitChunks(ph);const audios=[];
   for(const ch of chunks){const ids=KK.tokenize(ch);if(!ids.length)continue;const n=Math.min(ids.length,509);
     const tokens=new ort.Tensor("int64",BigInt64Array.from([0n,...ids.slice(0,509).map(BigInt),0n]),[1,n+2]);
-    const style=new ort.Tensor("float32",v.subarray((n-1)*256,n*256),[1,256]);
+    const style=new ort.Tensor("float32",Float32Array.from(v.subarray((n-1)*256,n*256)),[1,256]);
     const sp=new ort.Tensor("float32",new Float32Array([speed]),[1]);
     const out=await KK.sess.run({tokens,style,speed:sp});let a=out.audio.data;
     // trim a little tail silence between chunks

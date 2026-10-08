@@ -13,10 +13,10 @@
 <script>
 const $=s=>document.querySelector(s);const st=$("#st"),bar=$("#bar");
 $("#info").textContent=navigator.userAgent+"\nSIMD:"+(typeof WebAssembly!=="undefined")+" · 메모리:"+(navigator.deviceMemory||"?")+"GB · 코어:"+(navigator.hardwareConcurrency||"?");
-try{ort.env.wasm.wasmPaths="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";ort.env.wasm.numThreads=1}catch(e){st.textContent="ort 로드 실패: "+e}
+try{ort.env.wasm.wasmPaths="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/"}catch(e){st.textContent="ort 로드 실패: "+e}
 $("#load").onclick=async()=>{$("#load").disabled=true;const t0=performance.now();try{await KK.load({base:"tts/",onProgress:p=>{bar.style.width=Math.round(p.frac*100)+"%";st.textContent=p.stage+(p.loaded?" "+Math.round(p.loaded/1048576)+"/"+Math.round(p.total/1048576)+"MB":"")+(p.ms?" · "+p.ms+"ms":"")}});
   st.textContent="준비 완료 · "+Math.round(performance.now()-t0)+"ms";const vs=$("#voice");for(const [k,l] of Object.entries(KK.manifest.voices))vs.append(new Option(l,k));$("#go").disabled=false}catch(e){st.textContent="실패: "+(e.message||e);console.error(e);$("#load").disabled=false}};
 $("#g2p").onclick=async()=>{if(!KK.lex){KK.manifest=await (await fetch("tts/manifest.json")).json();KK.lex=await (await fetch("tts/lex.json")).json()}$("#ph").textContent=KK.g2p($("#txt").value)};
 $("#go").onclick=async()=>{$("#go").disabled=true;$("#res").textContent="생성 중…";const t0=performance.now();try{const r=await KK.synth($("#txt").value,{voice:$("#voice").value,speed:+$("#speed").value});const ms=Math.round(performance.now()-t0);
-  $("#res").textContent="생성 "+ms+"ms · 오디오 "+(r.audio.length/24000).toFixed(1)+"초 · 실시간 배율 "+(r.audio.length/24000*1000/ms).toFixed(1)+"x";$("#ph").textContent=r.phonemes;const au=$("#au");au.src=KK.wavUrl(r.audio);au.play().catch(()=>{})}catch(e){$("#res").textContent="실패: "+(e.message||e);console.error(e)}$("#go").disabled=false};
+  $("#res").textContent=$("#voice").value+" · 생성 "+ms+"ms · 오디오 "+(r.audio.length/24000).toFixed(1)+"초 · 실시간 배율 "+(r.audio.length/24000*1000/ms).toFixed(1)+"x";$("#ph").textContent=r.phonemes;const au=$("#au");au.src=KK.wavUrl(r.audio);au.play().catch(()=>{})}catch(e){$("#res").textContent="실패: "+(e.message||e);console.error(e)}$("#go").disabled=false};
 </script></body></html>
