@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261008-150343-0b7f8c">
+<html lang="ko" data-build="20261008-151031-8cd52f">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -368,7 +368,7 @@ const CARDS=[
 const CAT={filler:"시간 벌기",opener:"시작",connector:"연결",past:"과거 경험",routine:"루틴",desc:"묘사",compare:"비교",roleplay:"롤플레이",opinion:"의견",closer:"마무리",emotion:"감정"};
 
 /* ============ STATE ============ */
-const DEF={profile:{name:"",job:"회사원 (직장인)",home:"아파트에서 가족과 거주",extra:"",survey:["movies","park","music","jogging","dtravel"]},
+const DEF={profile:{name:"",age:"",job:"회사원 (직장인)",jobDetail:"",city:"",home:"아파트에서 가족과 거주",family:"",hobby:"",fav:"",personality:"",memory:"",extra:"",survey:["movies","park","music","jogging","dtravel"]},
   log:[], scripts:{}, samples:{}, models:{}, texts:[], trans:{}, cards:{}, custom:[], today:{date:"",cards:0,script:0,practice:0}, updatedAt:0};
 let S=structuredClone(DEF);
 let db=null, uid=null, sample=null, docRef=null;
@@ -469,7 +469,9 @@ const lvIdx=l=>{const i=LEVELS.indexOf(String(l||"").toUpperCase().replace(/\s/g
 const lvChip=l=>{const i=lvIdx(l);return h("span",{class:"chip "+(i>=6?"good":i>=4?"warn":"bad")},LEVELS[i])};
 const pick=(a,n)=>{const c=[...a];const o=[];while(c.length&&o.length<n)o.push(c.splice(Math.floor(Math.random()*c.length),1)[0]);return o};
 const topicById=id=>TOPICS.find(t=>t.id===id);
-function profileText(){const p=S.profile;return `이름: ${p.name||"(미입력)"} / 직업: ${p.job} / 거주: ${p.home}${p.extra?" / 기타: "+p.extra:""}`}
+const PF=[["name","이름","영어 이름 또는 이름 (예: Minsu)"],["age","나이대","예: 30대 후반"],["jobDetail","하는 일","예: 전자회사 PCB 설계 엔지니어, 10년차"],["city","사는 곳","예: 용인 수지, 서울까지 지하철 40분"],["family","함께 사는 사람","예: 아내와 둘이, 반려견 코코"],["hobby","취미·주말 루틴","예: 주말 아침 탄천 조깅, 저녁엔 넷플릭스"],["fav","좋아하는 것","예: 영화는 인터스텔라, 음악은 힙합(에픽하이), 음식은 파스타"],["personality","성격·말투","예: 느긋한 편, 계획 세우는 걸 좋아함"],["memory","기억에 남는 경험","예: 작년 가을 제주 자전거 여행, 비 맞고 고생했지만 즐거웠음"],["extra","그 밖의 디테일","예: 헬스장은 집 앞 5분, 차는 소형 SUV, 자주 가는 공원 이름"]];
+function profileText(){const p=S.profile;const parts=[["이름",p.name],["나이대",p.age],["직업",p.job+(p.jobDetail?" — "+p.jobDetail:"")],["사는 곳",p.city],["거주 형태",p.home],["함께 사는 사람",p.family],["취미·주말",p.hobby],["좋아하는 것",p.fav],["성격",p.personality],["기억에 남는 경험",p.memory],["기타",p.extra]];return parts.filter(([k,v])=>v&&String(v).trim()).map(([k,v])=>k+": "+v).join(" / ")||"(프로필 미입력)"}
+function profileFill(){const p=S.profile;return PF.filter(([k])=>k!=="extra"&&(p[k]||"").trim()).length}
 
 /* ============ AI ============ */
 const ERR={not_granted:"이 페이지에서 Claude 사용이 허용되지 않았습니다. AI 평가는 꺼져 있어요.",rate_limited:"요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",session_expired:"다시 로그인이 필요해요.",invalid_json:"응답 형식 오류예요. 다시 시도해 주세요.",refused:"이 입력은 평가할 수 없어요. 내용을 바꿔 다시 시도해 주세요.",upstream_error:"연결 문제가 있었어요. 다시 시도해 주세요."};
@@ -1042,7 +1044,8 @@ function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem
     h("div",{class:"cks"},ck("withQ","질문 먼저 듣기"),ck("shuffle","섞기")),
     ...common,
     h("div",{class:"note"},"스크립트 탭에서 공부한 내 스크립트를 문장 단위로 영어 → 한국어 해석 순으로 들어요. 스크립트는 녹음이 없어 기기 음성으로 나오므로 iPhone에서는 화면이 켜져 있을 때만 재생되고, 꺼져 있으면 건너뜁니다. 해석이 없는 문장은 'AI 해석 만들기'로 채울 수 있어요(Claude에서만).")];
-  const sampleOpts=[h("p",{class:"eyebrow"},"주제 선택 · 예시 답변 "+nSamples+"개 준비됨 (✓)"),
+  const sampleOpts=[profileFill()<4?h("div",{class:"note"},h("b",{},"프로필이 거의 비어 있어요. "),"설정에서 하는 일·사는 곳·취미·좋아하는 것 등을 채우면 예시가 내 이야기로 만들어집니다. ",h("button",{class:"btn sm",onclick:()=>go("settings")},"프로필 채우기 →")):null,
+    h("p",{class:"eyebrow"},"주제 선택 · 예시 답변 "+nSamples+"개 준비됨 (✓)"),
     samplePick,
     h("div",{class:"row"},genBtn,sample?null:h("span",{class:"muted small"},"예시 생성은 Claude에서 열었을 때만 가능해요")),
     h("div",{class:"cks"},ck("withQ","질문 먼저 듣기"),ck("shuffle","섞기")),
@@ -1115,17 +1118,17 @@ function vCards(m){
 /* ---- SETTINGS ---- */
 function vSettings(m){
   const p=S.profile;const survey=TOPICS.filter(t=>t.group==="서베이");
-  const name=h("input",{type:"text",id:"p_name",value:p.name,placeholder:"영어 이름 또는 이름 (예: Minsu)"});
   const job=h("select",{id:"p_job"},...["회사원 (직장인)","학생","사업가·자영업","일 경험 없음"].map(v=>h("option",{value:v,selected:p.job===v},v)));
   const home=h("select",{id:"p_home"},...["아파트에서 가족과 거주","아파트에서 혼자 거주","개인 주택에서 가족과 거주","원룸·오피스텔에서 혼자 거주"].map(v=>h("option",{value:v,selected:p.home===v},v)));
-  const extra=h("textarea",{id:"p_extra",style:"min-height:80px",placeholder:"스크립트에 녹여 넣을 나의 디테일. 예: 용인 수지 거주, 주말마다 탄천 조깅, 좋아하는 영화는 인터스텔라, 반려견 이름 코코"},p.extra);
+  const F={};const fld=(k,l,ph,ta)=>{F[k]=ta?h("textarea",{id:"p_"+k,style:"min-height:60px",placeholder:ph},p[k]||""):h("input",{type:"text",id:"p_"+k,value:p[k]||"",placeholder:ph});return h("label",{class:"f"},l,F[k])};
+  const fields=PF.map(([k,l,ph])=>{if(k==="jobDetail")return [h("label",{class:"f"},"직업",job),fld(k,"하는 일 (한 줄)",ph)];if(k==="city")return [fld(k,l,ph),h("label",{class:"f"},"거주 형태",home)];return fld(k,l,ph,["hobby","fav","memory","extra"].includes(k))}).flat();
   const cks=h("div",{class:"cks"},...survey.map(t=>h("label",{},h("input",{type:"checkbox",id:"sv_"+t.id,checked:p.survey.includes(t.id)}),t.ko)));
   put(m,h("div",{},h("p",{class:"eyebrow"},"Profile & survey"),h("h1",{},"설정")),
     accountCard(),
-    h("div",{class:"card"},h("h3",{},"내 프로필"),h("p",{class:"muted small"},"AI 평가와 스크립트에 쓰입니다. 실제 시험 서베이와 같은 선택으로 맞춰 두세요."),
-      h("label",{class:"f"},"이름",name),h("label",{class:"f"},"직업",job),h("label",{class:"f"},"거주 형태",home),h("label",{class:"f"},"나만의 디테일 (선택)",extra)),
+    h("div",{class:"card"},h("h3",{},"내 프로필"),h("p",{class:"muted small"},"계정별로 저장되며 AI 평가·예시 스크립트·모범답안·대화에 모두 쓰입니다."),
+      h("p",{class:"muted small"},"한국어로 편하게 적으면 돼요. 많이 채울수록 예시 스크립트·모범답안이 실제 내 이야기처럼 나오고, 시험장에서 외운 내용을 그대로 쓸 수 있어요. ("+profileFill()+"/"+(PF.length-1)+" 입력)"),...fields),
     h("div",{class:"card"},h("h3",{},"서베이 선택 주제"),h("p",{class:"muted small"},"IM3 전략: 겹치는 스크립트를 재활용할 수 있는 주제로 5–6개를 고르세요. (예: 공원·조깅·걷기는 같은 장소 이야기로 묶기)"),cks),
-    h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{p.name=name.value.trim();p.job=job.value;p.home=home.value;p.extra=extra.value.trim();p.survey=survey.filter(t=>cks.querySelector("#sv_"+t.id).checked).map(t=>t.id);save();toast("저장했어요")}},"저장")),
+    h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{for(const k in F)p[k]=F[k].value.trim();p.job=job.value;p.home=home.value;p.survey=survey.filter(t=>cks.querySelector("#sv_"+t.id).checked).map(t=>t.id);save();toast("저장했어요")}},"저장")),
     tts.ok?voiceCard():null,
     syncCard(),
     h("div",{class:"card"},h("h3",{},"기록 옮기기 (웹 ↔ Claude)"),h("p",{class:"muted small"},"학습 기록·스크립트·내 표현·해석·프로필을 코드로 복사해 다른 곳에서 붙여넣으면 합쳐져요. 양쪽 기록이 모두 남습니다."),
