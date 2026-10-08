@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261008-155440-729b56">
+<html lang="ko" data-build="20261008-160118-90319b">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -374,7 +374,7 @@ let S=structuredClone(DEF);
 let db=null, uid=null, sample=null, docRef=null;
 const todayStr=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 function loadLocal(){try{const r=localStorage.getItem("opic30");if(r)S=Object.assign(structuredClone(DEF),JSON.parse(r))}catch(e){}}
-function save(){S.updatedAt=Date.now();try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}
+function save(){S.updatedAt=Date.now();setTimeout(prepSyncCode,50);try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}
   if(docRef){docRef.set(structuredClone(S)).catch(()=>{})}
   if(cloud.ref)cloudPush(false)}
 function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;const key=l=>l.date+"|"+l.kind+"|"+l.title+"|"+(l.score??"");const seen=new Set(S.log.map(key));for(const l of (o.log||[]))if(!seen.has(key(l))){S.log.push(l);seen.add(key(l))}S.log.sort((a,b)=>a.date<b.date?-1:1);
@@ -389,17 +389,22 @@ function ensureToday(){if(S.today.date!==todayStr()){S.today={date:todayStr(),ca
 const WEB_URL="https://zzonos.github.io/Opic_self_study/";
 const b64u=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 const unb64u=t=>{t=t.replace(/-/g,"+").replace(/_/g,"/");t+="=".repeat((4-t.length%4)%4);const bin=atob(t);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u};
-async function packState(){const json=JSON.stringify({log:S.log,scripts:S.scripts,samples:S.samples||{},models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,updatedAt:S.updatedAt});
+function syncPayload(){return {log:S.log,scripts:S.scripts,samples:S.samples||{},models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,updatedAt:S.updatedAt}}
+function packStateSync(){return "r"+b64u(new TextEncoder().encode(JSON.stringify(syncPayload())).buffer)}
+async function packState(){const json=JSON.stringify(syncPayload());
   const bytes=new TextEncoder().encode(json);
   if("CompressionStream" in window){const cs=new CompressionStream("deflate-raw");const w=cs.writable.getWriter();w.write(bytes);w.close();const buf=await new Response(cs.readable).arrayBuffer();return "z"+b64u(buf)}
   return "r"+b64u(bytes.buffer)}
 const HASH_SEEN=location.hash.slice(0,3);
-async function parseCode(t){t=(t||"").replace(/^.*#s_/,"").replace(/[\s\u200b"'“”‘’]/g,"");if(!t)throw new Error("empty");if(/^[ZR]/.test(t))t=t[0].toLowerCase()+t.slice(1);if(t.startsWith("ey"))return JSON.parse(decodeURIComponent(escape(atob(t))));return unpackState(t)}
+async function parseCode(t){t=(t||"").replace(/^.*#s_/,"").replace(/[\s\u200b"'“”‘’]/g,"");if(!t)throw new Error("비어 있음");if(/^[ZR]/.test(t))t=t[0].toLowerCase()+t.slice(1);
+  const head=t.slice(0,4)+"… "+t.length+"자";let o;
+  try{if(t.startsWith("ey"))o=JSON.parse(decodeURIComponent(escape(atob(t))));else if(t[0]==="z"||t[0]==="r")o=await unpackState(t);else throw new Error("형식 아님")}catch(e){throw new Error("해독 실패 ["+head+"] "+(e.message||e))}
+  if(!o||typeof o!=="object")throw new Error("내용 없음 ["+head+"]");return o}
 async function unpackState(t){const kind=t[0];const u=unb64u(t.slice(1));let bytes=u;
   if(kind==="z"){const ds=new DecompressionStream("deflate-raw");const w=ds.writable.getWriter();w.write(u);w.close();bytes=new Uint8Array(await new Response(ds.readable).arrayBuffer())}
   return JSON.parse(new TextDecoder().decode(bytes))}
-async function syncToWeb(){try{const code=await packState();const url=WEB_URL+"#s_"+code;if(url.length>60000){toast("기록이 너무 커서 링크로 못 보내요. 설정의 기록 코드를 사용해 주세요");return}
-  S.syncedAt=Date.now();save();const a=document.createElement("a");a.href=url;a.target="_blank";a.rel="noopener";document.body.append(a);a.click();a.remove();toast("웹 앱이 열리면 로그인 후 자동으로 합쳐져요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
+function syncToWeb(){try{const code=(syncCode&&syncCodeAt>=(S.updatedAt||0))?syncCode:packStateSync();const url=WEB_URL+"#s_"+code;if(url.length>60000){toast("기록이 너무 커서 링크로 못 보내요. 설정의 기록 코드를 사용해 주세요");return}
+  const w=window.open(url,"_blank","noopener");S.syncedAt=Date.now();save();toast(w?"웹 앱이 열리면 로그인 후 자동으로 합쳐져요":"팝업이 차단됐어요. 브라우저에서 팝업을 허용해 주세요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
 function unsyncedCount(){const t=S.syncedAt||0;return S.log.filter(l=>(l.ts||0)>t||(!l.ts&&t===0)).length}
 function syncCard(){if(window.claude?.use===undefined)return null;const n=unsyncedCount();
   return h("div",{class:"card"},h("h3",{},"웹 계정으로 기록 보내기"),h("p",{class:"muted small"},"여기(Claude)에서 한 AI 대화·평가 기록을 웹 버전(OSS 계정)으로 보내요. 버튼을 누르면 웹 앱이 열리고, 로그인된 계정에 자동으로 합쳐집니다."),
@@ -409,11 +414,18 @@ let pendingSync=null;
 (async()=>{const m=location.hash.match(/^#s_(.+)$/);if(!m)return;try{pendingSync=await unpackState(m[1]);history.replaceState(null,"",location.pathname+location.search)}catch(e){toast("가져온 기록을 읽을 수 없어요")}})();
 function applyPendingSync(){if(!pendingSync)return;const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;toast((window.claude?.use?"웹 계정 기록":"Claude 기록")+" "+n+"건을 합쳤어요");render()}
 // web → Claude: copy a packed code (and try the URL hash), then open the artifact
-async function syncToClaude(){try{const code=await packState();let copied=false;try{await navigator.clipboard.writeText(code);copied=true}catch(e){}
-  S.syncedAt=Date.now();save();const url=ART_URL+(code.length<50000?"#s_"+code:"");const a=document.createElement("a");a.href=url;a.target="_blank";a.rel="noopener";document.body.append(a);a.click();a.remove();
-  toast(copied?"기록 코드를 복사했어요. Claude 앱이 열리면 '웹 기록 가져오기'에 붙여넣으세요":"Claude 앱이 열려요. 기록이 안 보이면 설정의 기록 코드를 쓰세요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
+let syncCode=null,syncCodeAt=0;
+function prepSyncCode(){if(Date.now()-syncCodeAt<1500)return;syncCodeAt=Date.now();try{packState().then(c=>{syncCode=c}).catch(()=>{})}catch(e){}}
+function syncToClaude(){try{const code=(syncCode&&syncCodeAt>=(S.updatedAt||0))?syncCode:packStateSync();
+  // everything below must stay synchronous: Safari only allows clipboard + new window inside the click itself
+  let p=null;try{p=navigator.clipboard.writeText(code)}catch(e){}
+  const url=ART_URL+(code.length<50000?"#s_"+code:"");const w=window.open(url,"_blank","noopener");
+  S.syncedAt=Date.now();save();
+  const done=ok=>toast(ok?"기록 코드를 복사했어요 ("+Math.round(code.length/1024)+"KB). Claude 앱에서 '클립보드에서 가져오기'를 누르세요":"복사가 막혔어요. 설정 → '기록 코드 복사'를 눌러 수동으로 옮겨 주세요");
+  if(p&&p.then)p.then(()=>done(true),()=>done(false));else done(false);
+  if(!w)toast("팝업이 차단됐어요. 브라우저에서 팝업을 허용해 주세요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
 function webImportCard(){if(!window.claude?.use)return null;const ta=h("textarea",{id:"wimp",autocapitalize:"off",autocorrect:"off",spellcheck:"false",style:"min-height:56px;font-family:var(--mono);font-size:11px",placeholder:"웹 앱에서 'Claude에서 열기'를 누르면 복사되는 기록 코드를 여기에 붙여넣기"});
-  const doImport=async t=>{try{const o=await parseCode(t);const n=(o.log||[]).length;mergeState(o,false);ta.value="";toast("웹 계정 기록을 합쳤어요 (기록 "+n+"건·프로필·스크립트)");render()}catch(e){toast("코드를 읽을 수 없어요 ("+(e&&e.message||e)+"). 웹 앱에서 다시 복사해 주세요")}};
+  const doImport=async t=>{try{const o=await parseCode(t);const n=(o.log||[]).length;mergeState(o,false);ta.value="";toast("웹 계정 기록을 합쳤어요 (기록 "+n+"건·프로필·스크립트)");render()}catch(e){toast("가져오기 실패: "+(e&&e.message||e))}};
   return h("div",{class:"card"},h("h3",{},"웹 계정 기록 가져오기"),h("p",{class:"muted small"},"웹(OSS 계정)에서 입력한 프로필·스크립트·기록을 여기로 가져와요. 웹 앱에서 'Claude에서 열기'를 누르면 기록 코드가 자동 복사됩니다."),
     ta,h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>doImport(ta.value)},"붙여넣어 합치기"),navigator.clipboard?.readText?h("button",{class:"btn",onclick:async()=>{try{const t=await navigator.clipboard.readText();if(!t.trim()){toast("클립보드가 비어 있어요");return}doImport(t)}catch(e){toast("클립보드를 읽을 수 없어요. 위 칸에 직접 붙여넣어 주세요")}}},"클립보드에서 가져오기"):null))}
 
@@ -642,7 +654,7 @@ function render(){renderNav();ensureToday();const m=$("#main");m.replaceChildren
   if(cloud.ok&&cloud.ready&&!cloud.user&&!cloud.skip){$("#nav").hidden=true;vLogin(m);return}$("#nav").hidden=false;({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings})[view](m)}
 
 const ART_URL="https://claude.ai/artifact/HuASd2nEpXENsSugPoScyp";
-function aiNote(){if(sample)return null;return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"AI 평가·대화·스크립트는 Claude 앱에서 열었을 때 작동해요. 여기서는 듣기·카드·질문 연습을 쓸 수 있어요."),h("button",{class:"btn sm",style:"white-space:nowrap",onclick:syncToClaude},"Claude에서 열기"))}
+function aiNote(){if(sample)return null;prepSyncCode();return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"AI 평가·대화·스크립트는 Claude 앱에서 열었을 때 작동해요. 여기서는 듣기·카드·질문 연습을 쓸 수 있어요."),h("button",{class:"btn sm",style:"white-space:nowrap",onclick:syncToClaude},"Claude에서 열기"))}
 
 /* ---- TODAY ---- */
 function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);
@@ -1142,7 +1154,7 @@ function vSettings(m){
     tts.ok?voiceCard():null,
     syncCard(),webImportCard(),
     h("div",{class:"card"},h("h3",{},"기록 옮기기 (웹 ↔ Claude)"),h("p",{class:"muted small"},"학습 기록·스크립트·내 표현·해석·프로필을 코드로 복사해 다른 곳에서 붙여넣으면 합쳐져요. 양쪽 기록이 모두 남습니다."),
-      h("div",{class:"row"},h("button",{class:"btn",onclick:async()=>{const code=await packState();navigator.clipboard?.writeText(code).then(()=>toast("기록 코드를 복사했어요 ("+Math.round(code.length/1024)+"KB)")).catch(()=>{$("#imp").value=code;toast("아래 칸에 코드를 넣었어요. 전체 선택해 복사하세요")})}},"기록 코드 복사")),
+      h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{const code=(syncCode&&syncCodeAt>=(S.updatedAt||0))?syncCode:packStateSync();navigator.clipboard?.writeText(code).then(()=>toast("기록 코드를 복사했어요 ("+Math.round(code.length/1024)+"KB)")).catch(()=>{$("#imp").value=code;toast("아래 칸에 코드를 넣었어요. 전체 선택해 복사하세요")})}},"기록 코드 복사")),
       h("textarea",{id:"imp",autocapitalize:"off",autocorrect:"off",spellcheck:"false",style:"min-height:70px;font-family:var(--mono);font-size:11px",placeholder:"다른 곳에서 복사한 기록 코드를 붙여넣기"}),
       h("div",{class:"row"},h("button",{class:"btn",onclick:async()=>{try{const o=await parseCode($("#imp").value);mergeState(o,false);$("#imp").value="";toast("기록을 합쳤어요");render()}catch(e){toast("코드를 읽을 수 없어요")}}},"가져와서 합치기"))),
     h("div",{class:"card"},h("h3",{},"데이터"),h("p",{class:"muted small mono",style:"font-size:10px"},"진단: "+(window.claude?.use?"claude":"web")+" · hash="+(HASH_SEEN||"-")+" · ds="+("DecompressionStream" in window)+" · clip="+!!navigator.clipboard?.readText),h("p",{class:"muted small"},uid?"학습 기록은 내 Claude 계정에 저장되어 다른 기기에서도 이어집니다.":cloud.user?"학습 기록은 OSS 계정("+cloud.user.email+")에 저장돼요.":"지금은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장됩니다."),
@@ -1169,7 +1181,7 @@ function micBtn(ta,{onFinal=null,label="🎤 말하기"}={}){if(!SR_OK)return nu
   return b}
 // web build: auto-refresh when a newer version is deployed (home-screen apps cache the old page)
 (async()=>{if(window.claude?.use||!/github\.io|localhost/.test(location.host))return;try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)return;const v=(await r.json()).v;const cur=document.documentElement.dataset.build;if(cur&&v&&v!==cur){toast("새 버전으로 업데이트 중…");setTimeout(()=>location.reload(),800)}}catch(e){}})();
-loadLocal();cloudInit();render();setTimeout(()=>{if(!cloud.ok||cloud.skip)applyPendingSync()},800);loadManifests().then(()=>{if(view==="listen"||view==="settings")render()});
+loadLocal();cloudInit();render();setTimeout(prepSyncCode,500);setTimeout(()=>{if(!cloud.ok||cloud.skip)applyPendingSync()},800);loadManifests().then(()=>{if(view==="listen"||view==="settings")render()});
 (async()=>{
   if(!window.claude?.use)return;
   const [u,d,s]=await Promise.all([claude.use("user"),claude.use("db"),claude.use("sample")]);
