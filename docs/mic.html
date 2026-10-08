@@ -14,6 +14,7 @@ h1{font-size:17px;margin:0}p{margin:0;font-size:14px;color:#556}.big{width:150px
 const $=s=>document.querySelector(s);const R=window.SpeechRecognition||window.webkitSpeechRecognition;const linked=!!window.opener;
 const log=t=>{$("#log").textContent=t};
 if(!R){$("#st").textContent="이 브라우저는 음성 인식을 지원하지 않아요. Chrome/Edge/Safari로 열어 주세요";$("#mic").disabled=true}
+$("#log").textContent="연결 상태: "+(linked?"Claude 창과 연결됨(opener 있음)":"opener 없음 — 이 창에서 Claude로 글자를 보낼 수 없어요")+" · "+navigator.userAgent.split(") ").pop();
 if(!linked)$("#hint").textContent="이 창은 Claude 앱의 '🎤 말하기' 버튼으로 열어야 대화창에 글자가 들어갑니다. (지금은 연결 안 됨 — 인식 결과만 표시)";
 let rec=null,on=false,fin="",sentN=0,silT=null,stopping=false;
 const send=text=>{text=text.trim();if(!text)return;sentN++;try{if(window.opener)window.opener.postMessage({type:"oss-stt",text,n:sentN},"*")}catch(e){}$("#st").textContent="전송됨 ("+sentN+"): "+text.slice(0,60);
