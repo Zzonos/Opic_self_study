@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261009-154644-d891c4">
+<html lang="ko" data-build="20261010-115529-c8aaac">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -192,7 +192,13 @@ details summary{cursor:pointer;font-weight:500}
 <script>
 /* ============ DATA ============ */
 const LEVELS=["NL","NM","NH","IL","IM1","IM2","IM3","IH","AL"];
-const TARGET="IM3";
+const TARGETS=["IM3","IH","AL"];
+const tgt=()=>TARGETS.includes(S?.profile?.target)?S.profile.target:"IM3";
+const tgtIdx=()=>LEVELS.indexOf(tgt());
+const TARGET_SPEC={IM3:{words:"110-150",desc:"paragraph-length answers with a clear structure (opener restating the question → 2-3 details or a short past-tense story → one-line closer), fluent connectors and fillers, mostly accurate past tense, concrete personal details. Vocabulary: everyday, not fancy.",chat:"simple enough for an intermediate learner; ask friendly, concrete questions about everyday life",strategy:"IM3 전략: 겹치는 스크립트를 재활용할 수 있는 주제로 5–6개를 고르세요. (예: 공원·조깅·걷기는 같은 장소 이야기로 묶기)"},
+ IH:{words:"150-190",desc:"well-organized answers that handle complications and unexpected follow-ups, compare past and present, give reasons and examples, control past/present/future tenses, and use varied (but natural) vocabulary and idiomatic connectors (that said, to be fair, what really struck me…).",chat:"natural pace for an upper-intermediate learner; sometimes add a complication, a follow-up 'why', or ask for a comparison or an opinion",strategy:"IH 전략: 주제를 7–8개로 넓히고, 각 주제에서 '예전 vs 요즘' 비교와 돌발 상황(문제 해결) 이야기를 준비하세요."},
+ AL:{words:"180-230",desc:"fluent, cohesive narration across all time frames, supported opinions with reasons and counterpoints, precise and idiomatic vocabulary, hypothetical/conditional language, and natural discourse markers — the way an articulate native speaker would answer in conversation.",chat:"speak like a native friend at normal speed; challenge the learner with abstract questions, hypotheticals, and requests to justify opinions",strategy:"AL 전략: 모든 주제에서 의견 + 이유 + 반론 구조를 준비하고, 가정법·관용 표현을 스크립트에 녹이세요."}};
+const spec=()=>TARGET_SPEC[tgt()];
 
 const TOPICS=[
  {id:"intro",en:"Self-introduction",ko:"자기소개",group:"기본",qs:[
@@ -368,7 +374,7 @@ const CARDS=[
 const CAT={filler:"시간 벌기",opener:"시작",connector:"연결",past:"과거 경험",routine:"루틴",desc:"묘사",compare:"비교",roleplay:"롤플레이",opinion:"의견",closer:"마무리",emotion:"감정"};
 
 /* ============ STATE ============ */
-const DEF={profile:{name:"",age:"",job:"회사원 (직장인)",jobDetail:"",city:"",home:"아파트에서 가족과 거주",family:"",hobby:"",fav:"",personality:"",memory:"",extra:"",survey:["movies","park","music","jogging","dtravel"]},
+const DEF={profile:{target:"IM3",name:"",age:"",job:"회사원 (직장인)",jobDetail:"",city:"",home:"아파트에서 가족과 거주",family:"",hobby:"",fav:"",personality:"",memory:"",extra:"",survey:["movies","park","music","jogging","dtravel"]},
   log:[], scripts:{}, samples:{}, models:{}, texts:[], trans:{}, cards:{}, custom:[], today:{date:"",cards:0,script:0,practice:0}, updatedAt:0};
 let S=structuredClone(DEF);
 let db=null, uid=null, sample=null, docRef=null;
@@ -509,7 +515,7 @@ const put=(el,...k)=>el.append(...k.flat().filter(x=>x!=null&&x!==false));
 let toastT;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),2200)}
 const fmt=s=>String(Math.floor(s/60)).padStart(1,"0")+":"+String(s%60).padStart(2,"0");
 const lvIdx=l=>{const i=LEVELS.indexOf(String(l||"").toUpperCase().replace(/\s/g,""));return i<0?3:i};
-const lvChip=l=>{const i=lvIdx(l);return h("span",{class:"chip "+(i>=6?"good":i>=4?"warn":"bad")},LEVELS[i])};
+const lvChip=l=>{const i=lvIdx(l);return h("span",{class:"chip "+(i>=tgtIdx()?"good":i>=tgtIdx()-2?"warn":"bad")},LEVELS[i])};
 const pick=(a,n)=>{const c=[...a];const o=[];while(c.length&&o.length<n)o.push(c.splice(Math.floor(Math.random()*c.length),1)[0]);return o};
 const topicById=id=>TOPICS.find(t=>t.id===id);
 const PF=[["name","이름","영어 이름 또는 이름 (예: Minsu)"],["age","나이대","예: 30대 후반"],["jobDetail","하는 일","예: 전자회사 PCB 설계 엔지니어, 10년차"],["city","사는 곳","예: 용인 수지, 서울까지 지하철 40분"],["family","함께 사는 사람","예: 아내와 둘이, 반려견 코코"],["hobby","취미·주말 루틴","예: 주말 아침 탄천 조깅, 저녁엔 넷플릭스"],["fav","좋아하는 것","예: 영화는 인터스텔라, 음악은 힙합(에픽하이), 음식은 파스타"],["personality","성격·말투","예: 느긋한 편, 계획 세우는 걸 좋아함"],["memory","기억에 남는 경험","예: 작년 가을 제주 자전거 여행, 비 맞고 고생했지만 즐거웠음"],["extra","그 밖의 디테일","예: 헬스장은 집 앞 5분, 차는 소형 SUV, 자주 가는 공원 이름"]];
@@ -519,12 +525,13 @@ function profileFill(){const p=S.profile;return PF.filter(([k])=>k!=="extra"&&(p
 /* ============ AI ============ */
 const ERR={not_granted:"이 페이지에서 Claude 사용이 허용되지 않았습니다. AI 평가는 꺼져 있어요.",rate_limited:"요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",session_expired:"다시 로그인이 필요해요.",invalid_json:"응답 형식 오류예요. 다시 시도해 주세요.",refused:"이 입력은 평가할 수 없어요. 내용을 바꿔 다시 시도해 주세요.",upstream_error:"연결 문제가 있었어요. 다시 시도해 주세요."};
 const errMsg=e=>ERR[e?.code]||ERR.upstream_error;
-const RUBRIC=`You are an OPIc (ACTFL) rater. The learner is Korean; target level is ${TARGET}. OPIc levels in order: NL, NM, NH, IL, IM1, IM2, IM3, IH, AL.
+const RUBRIC=()=>`You are an OPIc (ACTFL) rater. The learner is Korean; target level is ${tgt()}. OPIc levels in order: NL, NM, NH, IL, IM1, IM2, IM3, IH, AL.
 Rating guide: IL = short sentences, lists; IM1-2 = full sentences, basic connectors, some past tense errors; IM3 = paragraph-length answers with a clear structure (intro-body-ending), fluent connectors, mostly accurate past tense, personal details; IH = handles complications and unexpected questions, varied vocabulary, past/present/future controlled; AL = narrates in all time frames consistently, supports opinions, native-like idioms.
 Judge primarily on: structure, amount of detail, tense control, connectors/fillers, vocabulary range, and task completion. Ignore spelling and punctuation (the answer was dictated by voice). Explanations for the learner are in Korean (존댓말, 간결하게); example sentences are in English.`;
 
 async function evaluate(question,answer,secs,onText){
-  const prompt=`${RUBRIC}
+  const T=tgt();const up=LEVELS[Math.min(8,tgtIdx()+1)];
+  const prompt=`${RUBRIC()}
 
 Question: "${question}"
 Learner profile: ${profileText()}
@@ -535,16 +542,16 @@ ${answer}
 """
 
 Reply with ONLY one JSON object:
-{"level":"IM2","score":62,"summary":"한국어 총평 2-3문장","strengths":["한국어로 잘한 점 2-3개"],"fixes":[{"original":"learner's phrase","better":"improved phrase","why":"한국어 설명 한 줄"}],"model_im3":"A model answer at IM3 level, 110-150 words, first person, natural spoken English, using the learner's own details where possible","model_ih":"The same answer upgraded to IH, 150-190 words","expressions":[{"en":"useful expression from the model answers","ko":"한국어 뜻"}]}
-Give 3-5 fixes and 4-6 expressions. "score" is 0-100 within the overall scale (IM3 starts around 65).`;
-  return sample.json(prompt,{onText,cache:false});
+{"level":"IM2","score":62,"summary":"한국어 총평 2-3문장","strengths":["한국어로 잘한 점 2-3개"],"fixes":[{"original":"learner's phrase","better":"improved phrase","why":"한국어 설명 한 줄"}],"model_target":"A model answer at ${T} level (${spec().words} words): ${spec().desc} First person, natural spoken English, using the learner's own details where possible",${T==="AL"?"":`"model_up":"The same answer upgraded to ${up} level (${TARGET_SPEC[up].words} words)",`}"expressions":[{"en":"useful expression from the model answers","ko":"한국어 뜻"}]}
+Give 3-5 fixes and 4-6 expressions. "score" is 0-100 within the overall scale (IM3 starts around 65, IH around 78, AL around 90).`;
+  const r=await sample.json(prompt,{onText,cache:false});if(r){r.model_target=r.model_target||r.model_im3;r.model_up=r.model_up||r.model_ih;r.target=T;r.up=T==="AL"?null:up}return r;
 }
 async function genScript(topic,onText){
   const qs=topic.qs.map((q,i)=>`${i+1}. [${QT[q.t]}] ${q.q}`).join("\n");
-  const prompt=`You write OPIc answer scripts for a Korean learner whose target is ${TARGET} (aim slightly above: solid IM3 bordering IH).
+  const prompt=`You write OPIc answer scripts for a Korean learner whose target level is ${tgt()} (aim for a solid ${tgt()}).
 Learner profile: ${profileText()}
 Topic: ${topic.en} (${topic.ko})
-Write one spoken-style answer for each question below. Each answer: 110-150 words, first person, natural conversational English, clear structure (opener that restates the question → 2-3 details or a short story with when/where/who/what/how I felt → one-line closer). Use fillers and connectors that sound natural (well, actually, to be honest, on top of that, anyway). Past-tense questions must be told as a story in past tense. Use the learner's profile details and invent plausible, specific details (names of places, numbers, feelings) that are easy to memorize and reuse across topics.
+Write one spoken-style answer for each question below. Each answer: ${spec().words} words, first person, natural conversational English. Level requirements for ${tgt()}: ${spec().desc} Use fillers and connectors that sound natural. Past-tense questions must be told as a story in past tense. Use the learner's profile details and invent plausible, specific details (names of places, numbers, feelings) that are easy to memorize and reuse across topics.
 Questions:
 ${qs}
 
@@ -554,10 +561,10 @@ Include 6-8 reusable expressions taken from the scripts.`;
 }
 async function genSample(topic){
   const qs=topic.qs.map((q,i)=>`${i+1}. [${QT[q.t]}] ${q.q}`).join("\n");
-  const prompt=`You write example OPIc answers for a Korean learner to listen to repeatedly (shadowing / background listening). Target level: solid ${TARGET}.
+  const prompt=`You write example OPIc answers for a Korean learner to listen to repeatedly (shadowing / background listening). Target level: solid ${tgt()}.
 Learner profile: ${profileText()}
 Topic: ${topic.en} (${topic.ko})
-Write one spoken-style answer for each question below, 90-130 words, first person, natural conversational English with clear structure (restate the question → 2-3 concrete details or a short past-tense story → one-line closer). Use the learner's profile and invent plausible, specific, memorable details. Keep sentences short enough to repeat after (max ~18 words each).
+Write one spoken-style answer for each question below, ${spec().words} words, first person, natural conversational English. Level requirements for ${tgt()}: ${spec().desc} Use the learner's profile and invent plausible, specific, memorable details. Keep sentences short enough to repeat after (max ~18 words each).
 Questions:
 ${qs}
 
@@ -566,7 +573,7 @@ Reply with ONLY one JSON object: {"scripts":[{"n":1,"answer":"..."}]}`;
 }
 async function evalMock(items,onText){
   const body=items.map((it,i)=>`Q${i+1} (${it.kind}): ${it.q}\nA${i+1} (${it.secs}s): ${it.a||"(no answer)"}`).join("\n\n");
-  const prompt=`${RUBRIC}
+  const prompt=`${RUBRIC()}
 
 This is a full 15-question OPIc mock test. Rate the overall level as a real OPIc rater would (the level is driven by the weakest consistent performance, not the best single answer). Then give short per-question feedback.
 Learner profile: ${profileText()}
@@ -702,7 +709,7 @@ function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);
   const streak=calcStreak();const todayMin=S.log.filter(l=>l.date===todayStr()).reduce((a,l)=>a+(l.secs||0),0)/60;
   const t=S.today;const done=[t.cards>=10,t.script>=1,t.practice>=3];
   put(m,
-    h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},todayStr()+" · 목표 "+TARGET),h("h1",{},S.profile.name?`${S.profile.name}님, 오늘의 30분`:"오늘의 30분")),
+    h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},todayStr()+" · 목표 "+tgt()),h("h1",{},S.profile.name?`${S.profile.name}님, 오늘의 30분`:"오늘의 30분")),
       h("span",{class:"chip "+(done.every(Boolean)?"good":"neutral")},done.filter(Boolean).length+"/3 완료")),
     aiNote(),webNote(),
     h("div",{class:"stats"},
@@ -727,7 +734,7 @@ function chart(logs){
   const W=600,H=200,L=44,R=12,T=14,B=28;const n=logs.length;const x=i=>L+(n<2?(W-L-R)/2:i*(W-L-R)/(n-1));const y=v=>T+(8-v)*(H-T-B)/8;
   const pts=logs.map((l,i)=>[x(i),y(lvIdx(l.level))]);
   const grid=LEVELS.map((l,i)=>`<line x1="${L}" x2="${W-R}" y1="${y(i)}" y2="${y(i)}" stroke="var(--line)" stroke-width="1"/><text x="${L-8}" y="${y(i)+4}" text-anchor="end" font-size="11" font-family="var(--mono)" fill="var(--mute)">${l}</text>`).join("");
-  const target=`<line x1="${L}" x2="${W-R}" y1="${y(6)}" y2="${y(6)}" stroke="var(--good)" stroke-width="1.5" stroke-dasharray="4 4"/>`;
+  const target=`<line x1="${L}" x2="${W-R}" y1="${y(tgtIdx())}" y2="${y(tgtIdx())}" stroke="var(--good)" stroke-width="1.5" stroke-dasharray="4 4"/>`;
   const area=n>1?`<path d="M${pts[0][0]},${H-B} ${pts.map(p=>`L${p[0]},${p[1]}`).join(" ")} L${pts[n-1][0]},${H-B} Z" fill="var(--accent)" opacity=".12"/>`:"";
   const line=n>1?`<polyline points="${pts.map(p=>p.join(",")).join(" ")}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>`:"";
   const dots=pts.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="${i===n-1?5:3.5}" fill="${i===n-1?"var(--accent)":"var(--panel)"}" stroke="var(--accent)" stroke-width="2"/>`).join("");
@@ -772,7 +779,7 @@ function vAnswer(m,s){
     evalBtn.disabled=true;stopBtn.hidden=false;ctl=new AbortController();
     fbBox.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"Claude가 평가 중… (10–40초)")));
     try{const r=await evaluate(q.q,a,secs||Math.round(a.split(/\s+/).length/2.3),null);
-      renderFeedback(fbBox,r,q.q,a);if(r.model_im3){S.models=S.models||{};S.models[q.q]=r.model_im3}
+      renderFeedback(fbBox,r,q.q,a);if(r.model_target){S.models=S.models||{};S.models[q.q]=r.model_target}
       S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",qt:q.t,title:topic.en+" · "+(s.kind||""),level:r.level,score:r.score,secs:secs||0,fixes:(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}))});S.today.practice++;save();
       const nextRp=s.rp&&s.step<13?h("button",{class:"btn primary",onclick:()=>{const st=s.step+1;go("practice",{topic,q:{t:"rp",q:s.rp["q"+st]},kind:"롤플레이 "+st+"번 · "+(st===12?"문제 해결":"관련 경험"),rp:s.rp,step:st})}},"다음: "+(s.step+1)+"번 →"):null;
       put(fbBox,h("div",{class:"row"},nextRp,h("button",{class:"btn",onclick:()=>{ta.value="";fbBox.replaceChildren();secs=0;tEl.textContent="0:00";bar.firstChild.style.width="0";evalBtn.disabled=false}},"같은 질문 다시"),h("button",{class:"btn",onclick:()=>go("practice")},"다른 질문")));
@@ -790,11 +797,11 @@ function vAnswer(m,s){
 }
 function renderFeedback(box,r,q,a){
   box.replaceChildren(
-    h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level||"?"),h("span",{class:"muted mono"},(r.score??"")+" / 100"),lvIdx(r.level)>=6?h("span",{class:"chip good"},"목표 달성"):h("span",{class:"chip warn"},"목표 "+TARGET+"까지 "+(6-lvIdx(r.level))+"단계")),h("p",{},r.summary||""),
+    h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level||"?"),h("span",{class:"muted mono"},(r.score??"")+" / 100"),lvIdx(r.level)>=tgtIdx()?h("span",{class:"chip good"},"목표 달성"):h("span",{class:"chip warn"},"목표 "+tgt()+"까지 "+(tgtIdx()-lvIdx(r.level))+"단계")),h("p",{},r.summary||""),
       r.strengths?.length?h("div",{},h("p",{class:"eyebrow"},"잘한 점"),h("ul",{style:"margin:4px 0 0;padding-left:18px"},...r.strengths.map(s=>h("li",{},s)))):null),
     r.fixes?.length?h("div",{class:"card"},h("h3",{},"고칠 표현"),...r.fixes.map(f=>h("div",{class:"fix"},h("span",{class:"o"},f.original),h("span",{class:"b"},f.better),h("span",{class:"w"},f.why)))):null,
-    h("div",{class:"card"},h("h3",{},"모범답안 · IM3"),h("div",{class:"model"},r.model_im3||""),h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>copy(r.model_im3)},"복사"),h("button",{class:"btn sm",onclick:()=>go("listen",{text:r.model_im3,title:"모범답안 · IM3"})},"쉐도잉"),spkBtn(r.model_im3))),
-    r.model_ih?h("details",{class:"card"},h("summary",{},"한 단계 위 · IH 버전"),h("div",{class:"model",style:"margin-top:8px"},r.model_ih),h("div",{class:"row",style:"margin-top:8px"},h("button",{class:"btn sm",onclick:()=>go("listen",{text:r.model_ih,title:"모범답안 · IH"})},"쉐도잉"),spkBtn(r.model_ih))):null,
+    (()=>{const mt=r.model_target||r.model_im3||"";const T=r.target||"IM3";return h("div",{class:"card"},h("h3",{},"모범답안 · "+T),h("div",{class:"model"},mt),h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>copy(mt)},"복사"),h("button",{class:"btn sm",onclick:()=>go("listen",{text:mt,title:"모범답안 · "+T})},"쉐도잉"),spkBtn(mt)))})(),
+    (()=>{const mu=r.model_up||r.model_ih;if(!mu)return null;const U=r.up||"IH";return h("details",{class:"card"},h("summary",{},"한 단계 위 · "+U+" 버전"),h("div",{class:"model",style:"margin-top:8px"},mu),h("div",{class:"row",style:"margin-top:8px"},h("button",{class:"btn sm",onclick:()=>go("listen",{text:mu,title:"모범답안 · "+U})},"쉐도잉"),spkBtn(mu)))})(),
     r.expressions?.length?h("div",{class:"card"},h("h3",{},"챙겨갈 표현"),h("div",{class:"kx"},...r.expressions.map(x=>h("div",{},h("span",{class:"en"},x.en),h("span",{class:"ko"},x.ko)))),h("button",{class:"btn sm",onclick:()=>{addCards(r.expressions,q);}},"표현카드에 추가")):null);
 }
 function copy(t){navigator.clipboard?.writeText(t||"").then(()=>toast("복사했어요")).catch(()=>toast("복사가 막혀 있어요. 직접 선택해 복사해 주세요"))}
@@ -808,8 +815,8 @@ function analyze(){const es=S.log.filter(l=>l.level&&l.kind!=="card").map(l=>({.
   const recent=es.slice(-20);const W=recent.reduce((a,e)=>a+w(e),0);const mean=recent.reduce((a,e)=>a+w(e)*e.i,0)/W;
   const sd=Math.sqrt(recent.reduce((a,e)=>a+w(e)*(e.i-mean)**2,0)/W);
   const lo=Math.max(0,Math.round(mean-sd)),hi=Math.min(8,Math.round(mean+sd));
-  const last10=es.slice(-10);const pIM3=last10.filter(e=>e.i>=6).length/last10.length;
-  const mocks=es.filter(e=>e.kind==="mock");const mockHit=mocks.slice(-5).filter(e=>e.i>=6).length;
+  const last10=es.slice(-10);const pIM3=last10.filter(e=>e.i>=tgtIdx()).length/last10.length;
+  const mocks=es.filter(e=>e.kind==="mock");const mockHit=mocks.slice(-5).filter(e=>e.i>=tgtIdx()).length;
   // trend: slope over last 20 entries (levels per entry)
   const xs=recent.map((e,k)=>k),ys=recent.map(e=>e.i);const mx=xs.reduce((a,b)=>a+b,0)/xs.length,my=ys.reduce((a,b)=>a+b,0)/ys.length;
   const slope=xs.reduce((a,x,k)=>a+(x-mx)*(ys[k]-my),0)/Math.max(1,xs.reduce((a,x)=>a+(x-mx)**2,0));
@@ -825,7 +832,7 @@ function analyze(){const es=S.log.filter(l=>l.level&&l.kind!=="card").map(l=>({.
   return {n,mean,sd,lo,hi,pIM3,mocks:mocks.length,mockHit,mockN:Math.min(5,mocks.length),trend,slope,weekly,byType,fixes,last:es[n-1]}}
 function barChart(rows,label){const W=600,rh=26,L=110,R=40,H=rows.length*rh+10;const x=v=>L+v*(W-L-R)/8;
   const g=rows.map((r,k)=>{const y=5+k*rh;return `<text x="${L-8}" y="${y+17}" text-anchor="end" font-size="12" fill="var(--ink)">${label(r)}</text><rect x="${L}" y="${y+5}" width="${Math.max(2,x(r.avg)-L)}" height="16" rx="4" fill="${r.avg>=6?"var(--good)":r.avg>=4?"var(--warn)":"var(--bad)"}"/><text x="${x(r.avg)+6}" y="${y+17}" font-size="11" font-family="var(--mono)" fill="var(--mute)">${LEVELS[Math.round(r.avg)]} · ${r.n}회</text>`}).join("");
-  const tgt=`<line x1="${x(6)}" x2="${x(6)}" y1="0" y2="${H}" stroke="var(--good)" stroke-dasharray="4 4"/>`;
+  const tgt=`<line x1="${x(tgtIdx())}" x2="${x(tgtIdx())}" y1="0" y2="${H}" stroke="var(--good)" stroke-dasharray="4 4"/>`;
   return h("div",{html:`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${tgt}${g}</svg>`})}
 function vAnalysis(m){const a=analyze();
   put(m,h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("today")},"← 오늘"),h("p",{class:"eyebrow",style:"margin-top:10px"},"Progress analysis"),h("h1",{},"분석")));
@@ -833,12 +840,12 @@ function vAnalysis(m){const a=analyze();
   const trendChip=h("span",{class:"chip "+(a.trend==="상승"?"good":a.trend==="하락"?"bad":"neutral")},a.trend);
   put(m,
     h("div",{class:"card"},h("p",{class:"eyebrow"},"예상 등급 · 최근 20회 가중 평균 (최근·모의시험 가중)"),h("div",{class:"lvl"},h("b",{},LEVELS[Math.round(a.mean)]),h("span",{class:"muted"},"범위 "+LEVELS[a.lo]+" ~ "+LEVELS[a.hi]),trendChip),
-      h("p",{class:"small"},"최근 10회 중 IM3 이상 "+Math.round(a.pIM3*100)+"%"+(a.mocks?" · 모의시험 최근 "+a.mockN+"회 중 IM3 이상 "+a.mockHit+"회":" · 모의시험 기록 없음")),
-      h("p",{class:"muted small"},a.pIM3>=0.7&&a.mockHit>=2?"실전에서도 IM3가 안정적으로 나오는 구간이에요. 시험 접수를 고려해도 좋아요.":a.pIM3>=0.4?"IM3가 절반쯤 나와요. 약한 유형을 집중하면 안정권에 들어갑니다.":"아직 IM2 이하가 많아요. 답변 구조(되받기 → 디테일 2–3개 → 마무리)와 과거시제부터 잡아 보세요."),
+      h("p",{class:"small"},"최근 10회 중 "+tgt()+" 이상 "+Math.round(a.pIM3*100)+"%"+(a.mocks?" · 모의시험 최근 "+a.mockN+"회 중 "+tgt()+" 이상 "+a.mockHit+"회":" · 모의시험 기록 없음")),
+      h("p",{class:"muted small"},a.pIM3>=0.7&&a.mockHit>=2?"실전에서도 "+tgt()+"가 안정적으로 나오는 구간이에요. 시험 접수를 고려해도 좋아요.":a.pIM3>=0.4?tgt()+"가 절반쯤 나와요. 약한 유형을 집중하면 안정권에 들어갑니다.":"아직 목표("+tgt()+") 아래가 많아요. "+(tgt()==="IM3"?"답변 구조(되받기 → 디테일 2–3개 → 마무리)와 과거시제부터 잡아 보세요.":tgt()==="IH"?"돌발 질문 대응과 과거·현재 비교, 시제 전환을 집중하세요.":"의견을 이유와 반론으로 뒷받침하는 연습과 가정법·관용 표현을 늘리세요.")),
       h("p",{class:"muted small"},"AI 판정은 추정치라 실제 등급과 ±1단계 차이가 날 수 있어요. 범위로 보세요.")),
     h("div",{class:"card"},h("h3",{},"주간 추세"),a.weekly.length>1?chart(a.weekly.map(w=>({date:w.k,level:LEVELS[Math.round(w.avg)]}))):h("p",{class:"muted small"},"2주 이상 기록되면 추세가 보여요."),
       h("div",{class:"list"},...a.weekly.slice(-4).reverse().map(w=>h("div",{class:"li"},h("span",{class:"d"},w.k.slice(5)+"주"),h("span",{class:"grow small"},w.n+"회 · "+Math.round(w.min)+"분"),lvChip(LEVELS[Math.round(w.avg)]))))),
-    h("div",{class:"card"},h("h3",{},"유형별 평균 레벨"),h("p",{class:"muted small"},"아래쪽일수록 약한 유형. 점선이 IM3 목표."),barChart(a.byType,r=>QTN[r.k]||r.k),
+    h("div",{class:"card"},h("h3",{},"유형별 평균 레벨"),h("p",{class:"muted small"},"아래쪽일수록 약한 유형. 점선이 "+tgt()+" 목표."),barChart(a.byType,r=>QTN[r.k]||r.k),
       a.byType.length?h("p",{class:"small"},h("b",{},"가장 약한 유형: "),QTN[a.byType[0].k]||a.byType[0].k," (",LEVELS[Math.round(a.byType[0].avg)],") → 이번 주엔 이 유형을 하루 1개 더 연습해 보세요."):null),
     h("div",{class:"card"},h("h3",{},"최근 교정 내역 ("+a.fixes.length+")"),a.fixes.length?h("div",{class:"list"},...a.fixes.slice(-12).reverse().map(f=>h("div",{class:"fix"},f.o?h("span",{class:"o"},f.o):null,f.b?h("span",{class:"b"},f.b):null,h("span",{class:"w"},f.w+" · "+f.date.slice(5))))):h("p",{class:"muted small"},"교정 내역은 이 버전부터 저장돼요. AI 평가·대화를 하면 여기에 쌓입니다."),
       coachCard(a)),
@@ -850,7 +857,7 @@ function coachCard(a){const cached=S.analysis;const fresh=cached&&(Date.now()-(c
   if(fresh)show(cached);
   const btn=h("button",{class:"btn",disabled:!sample,onclick:async()=>{btn.disabled=true;btn.textContent="분석 중…";try{
     const data={expected:LEVELS[Math.round(a.mean)],range:[LEVELS[a.lo],LEVELS[a.hi]],trend:a.trend,pIM3:a.pIM3,byType:a.byType.map(x=>({type:QTN[x.k]||x.k,avg:LEVELS[Math.round(x.avg)],n:x.n})),weekly:a.weekly.map(w=>({week:w.k,avg:LEVELS[Math.round(w.avg)],n:w.n,minutes:Math.round(w.min)})),fixes:a.fixes.slice(-30).map(f=>f.o?f.o+" → "+f.b+" ("+f.w+")":f.w)};
-    const r=await sample.json(`You are an OPIc coach for a Korean learner (target IM3). Here is their progress data (JSON):\n${JSON.stringify(data)}\n\nReply with ONLY JSON: {"categories":[{"name":"실수 유형 (한국어, 예: 과거시제, 관사, 연결어 부족)","count":3,"tip":"한 줄 교정 팁"}],"comment":"한국어 종합 코멘트 3-4문장 (현재 수준, 추세, 가장 중요한 한 가지)","plan":["다음 주 처방 3개, 각 한 줄, 구체적으로"]}\nGroup the fixes into at most 5 categories. Be concrete and encouraging but honest.`,{cache:false});
+    const r=await sample.json(`You are an OPIc coach for a Korean learner (target ${tgt()}). Here is their progress data (JSON):\n${JSON.stringify(data)}\n\nReply with ONLY JSON: {"categories":[{"name":"실수 유형 (한국어, 예: 과거시제, 관사, 연결어 부족)","count":3,"tip":"한 줄 교정 팁"}],"comment":"한국어 종합 코멘트 3-4문장 (현재 수준, 추세, 가장 중요한 한 가지)","plan":["다음 주 처방 3개, 각 한 줄, 구체적으로"]}\nGroup the fixes into at most 5 categories. Be concrete and encouraging but honest.`,{cache:false});
     r.ts=Date.now();S.analysis=r;save();show(r);btn.textContent="다시 분석"}catch(e){toast(errMsg(e));btn.textContent="AI 코치 분석"}finally{btn.disabled=false}}},fresh?"다시 분석":"AI 코치 분석 (실수 유형 + 다음 주 처방)");
   return h("div",{style:"display:flex;flex-direction:column;gap:10px;margin-top:6px"},box,h("div",{class:"row"},btn,sample?null:h("span",{class:"muted small"},"Claude에서 열면 AI 코치 분석이 가능해요")))}
 
@@ -868,8 +875,8 @@ let chat=null;let chatMode="text";try{chatMode=localStorage.getItem("opic30_cmod
 const saveMode=()=>{try{localStorage.setItem("opic30_cmode",chatMode)}catch(e){}};
 let chatWait=4;try{chatWait=+(localStorage.getItem("opic30_cwait")||4)}catch(e){}
 function chatRules(sc){return `${sc.persona}
-The learner is Korean, preparing for the OPIc speaking test, target level IM3. Their profile: ${profileText()}.
-Style: natural spoken American English, 1-3 sentences per turn, simple enough for an intermediate learner, and ALWAYS end with a question so the conversation keeps going. Stay in character; do not lecture.
+The learner is Korean, preparing for the OPIc speaking test, target level ${tgt()}. Their profile: ${profileText()}.
+Style: natural spoken American English, 1-3 sentences per turn, ${spec().chat}, and ALWAYS end with a question so the conversation keeps going. Stay in character; do not lecture.
 Correction: look at the learner's LAST message only. If it has a clear grammar mistake, wrong word, or an unnatural phrase, give "fix": {"original": their sentence(s) with the issue, "better": a corrected natural version keeping their meaning, "why": a one-line explanation in Korean}. If their message was fine, set "fix": null. Ignore spelling and punctuation (voice dictation). Never correct more than one thing per turn.
 Reply with ONLY a JSON object: {"reply":"your in-character reply","reply_ko":"reply의 한국어 뜻 (짧게)","fix":null}`}
 function vChat(m){
@@ -927,7 +934,7 @@ async function endChat(){if(!chat)return;const mine=chat.ui.filter(u=>u.who==="m
 async function vChatSummary(m){
   if(chat.summary==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"대화 평가 중…")));put(m,h("h1",{},"대화 정리"),box);
     const tr=chat.ui.filter(u=>u.who==="ai"||u.who==="me").map(u=>(u.who==="ai"?"Partner: ":"Learner: ")+u.text).join("\n");
-    try{const r=await sample.json(`${RUBRIC}\n\nThis is a transcript of a practice conversation (${chat.sc.en}). Rate ONLY the learner's turns.\n\n${tr}\n\nReply with ONLY JSON: {"level":"IM2","score":60,"summary":"한국어 총평 2-3문장","fixes":[{"original":"...","better":"...","why":"한국어"}],"expressions":[{"en":"useful natural expression the learner could have used","ko":"뜻"}],"next":"다음 대화에서 시도할 한 가지 (한국어)"}\nGive 3-5 fixes and 4-6 expressions.`,{cache:false});
+    try{const r=await sample.json(`${RUBRIC()}\n\nThis is a transcript of a practice conversation (${chat.sc.en}). Rate ONLY the learner's turns.\n\n${tr}\n\nReply with ONLY JSON: {"level":"IM2","score":60,"summary":"한국어 총평 2-3문장","fixes":[{"original":"...","better":"...","why":"한국어"}],"expressions":[{"en":"useful natural expression the learner could have used","ko":"뜻"}],"next":"다음 대화에서 시도할 한 가지 (한국어)"}\nGive 3-5 fixes and 4-6 expressions.`,{cache:false});
       chat.summary=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"chat",qt:"chat",title:"대화 · "+chat.sc.ko+" · "+chat.n+"턴",level:r.level,score:r.score,secs:chat.n*45,fixes:[...(chat.ui.filter(u=>u.who==="fix").map(u=>({o:u.fix.original,b:u.fix.better,w:u.fix.why}))),...(r.fixes||[]).map(f=>({o:f.original,b:f.better,w:f.why}))].slice(0,8)});S.today.practice++;save();render()}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("button",{class:"btn",onclick:()=>{chat=null;render()}},"닫기"))}return}
   const r=chat.summary;
@@ -974,7 +981,7 @@ async function vMockResult(m){
     return}
   const r=mock.result;
   put(m,h("div",{},h("p",{class:"eyebrow"},"Mock result"),h("h1",{},"모의시험 결과")),
-    h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level),h("span",{class:"muted mono"},(r.score??"")+" / 100"),lvIdx(r.level)>=6?h("span",{class:"chip good"},"목표 달성"):h("span",{class:"chip warn"},"목표 "+TARGET)),h("p",{},r.summary||""),
+    h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level),h("span",{class:"muted mono"},(r.score??"")+" / 100"),lvIdx(r.level)>=tgtIdx()?h("span",{class:"chip good"},"목표 달성"):h("span",{class:"chip warn"},"목표 "+tgt())),h("p",{},r.summary||""),
       r.top_fixes?.length?h("div",{},h("p",{class:"eyebrow"},"가장 먼저 고칠 것"),h("ol",{style:"margin:4px 0 0;padding-left:18px"},...r.top_fixes.map(s=>h("li",{},s)))):null),
     h("div",{class:"card"},h("h3",{},"문항별"),h("div",{class:"list"},...(r.per_question||[]).map(p=>{const it=mock.items[(p.n||1)-1]||{};return h("div",{class:"li",style:"flex-direction:column;align-items:stretch;gap:4px"},h("div",{class:"row"},h("span",{class:"mono small muted"},"Q"+p.n),h("span",{class:"grow small"},it.kind||""),lvChip(p.level)),h("span",{class:"small"},p.comment),p.better?h("span",{class:"small",style:"color:var(--accent)"},"→ "+p.better):null)}))),
     h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{mock=null;render()}},"닫기")));
@@ -1185,6 +1192,7 @@ function vCards(m){
 /* ---- SETTINGS ---- */
 function vSettings(m){
   const p=S.profile;const survey=TOPICS.filter(t=>t.group==="서베이");
+  const tsel=h("select",{id:"p_target"},...TARGETS.map(v=>h("option",{value:v,selected:tgt()===v},v+({IM3:" — 기본 목표 (문단 답변·과거시제)",IH:" — 돌발 대응·비교·시제 전환",AL:" — 의견·근거·관용 표현, 원어민급"}[v]))));
   const job=h("select",{id:"p_job"},...["회사원 (직장인)","학생","사업가·자영업","일 경험 없음"].map(v=>h("option",{value:v,selected:p.job===v},v)));
   const home=h("select",{id:"p_home"},...["아파트에서 가족과 거주","아파트에서 혼자 거주","개인 주택에서 가족과 거주","원룸·오피스텔에서 혼자 거주"].map(v=>h("option",{value:v,selected:p.home===v},v)));
   const F={};const fld=(k,l,ph,ta)=>{F[k]=ta?h("textarea",{id:"p_"+k,style:"min-height:60px",placeholder:ph},p[k]||""):h("input",{type:"text",id:"p_"+k,value:p[k]||"",placeholder:ph});return h("label",{class:"f"},l,F[k])};
@@ -1192,13 +1200,13 @@ function vSettings(m){
   const cks=h("div",{class:"cks"},...survey.map(t=>h("label",{},h("input",{type:"checkbox",id:"sv_"+t.id,checked:p.survey.includes(t.id)}),t.ko)));
   put(m,h("div",{},h("p",{class:"eyebrow"},"Profile & survey"),h("h1",{},"설정")),
     accountCard(),
-    (()=>{const form=h("div",{style:"display:contents"},h("p",{class:"muted small"},"한국어로 편하게 적으면 돼요. 많이 채울수록 예시 스크립트·모범답안이 실제 내 이야기처럼 나오고, 시험장에서 외운 내용을 그대로 쓸 수 있어요. ("+profileFill()+"/"+(PF.length-1)+" 입력)"),...fields);
+    (()=>{const form=h("div",{style:"display:contents"},h("label",{class:"f"},"목표 레벨",tsel),h("p",{class:"muted small"},"목표에 따라 모범답안·스크립트·예시의 분량과 난이도, 대화 상대의 질문 수준, 분석의 목표선이 바뀌어요. 목표를 바꾸면 이미 만든 스크립트·예시는 그대로 남고, 다시 만들면 새 목표 기준으로 나옵니다."),h("p",{class:"muted small"},"한국어로 편하게 적으면 돼요. 많이 채울수록 예시 스크립트·모범답안이 실제 내 이야기처럼 나오고, 시험장에서 외운 내용을 그대로 쓸 수 있어요. ("+profileFill()+"/"+(PF.length-1)+" 입력)"),...fields);
       if(window.claude?.use)return h("div",{class:"card"},h("h3",{},"내 프로필"),h("p",{class:"muted small"},"계정별로 저장되며 AI 평가·예시 스크립트·모범답안·대화에 모두 쓰입니다."),form);
-      form.hidden=true;const summary=h("p",{class:"small"},profileFill()?profileText():"아직 입력된 프로필이 없어요.");
+      form.hidden=true;const summary=h("p",{class:"small"},"목표 "+tgt()+(profileFill()?" · "+profileText():" · 아직 입력된 프로필이 없어요."));
       return h("div",{class:"card"},h("h3",{},"내 프로필"),h("p",{class:"muted small"},"프로필은 Claude 앱에서 입력하는 걸 권장해요. Claude에서 만든 스크립트·예시와 함께 '웹으로 통합'으로 여기에 자동 반영됩니다."),summary,
         h("div",{class:"row"},h("a",{class:"btn sm",href:ART_URL,target:"_blank",rel:"noopener",style:"text-decoration:none"},"Claude에서 입력하기"),h("button",{class:"btn sm ghost",onclick:e=>{form.hidden=!form.hidden;summary.hidden=!form.hidden;e.target.textContent=form.hidden?"여기서 직접 수정":"접기"}},"여기서 직접 수정")),form)})(),
-    h("div",{class:"card"},h("h3",{},"서베이 선택 주제"),h("p",{class:"muted small"},"IM3 전략: 겹치는 스크립트를 재활용할 수 있는 주제로 5–6개를 고르세요. (예: 공원·조깅·걷기는 같은 장소 이야기로 묶기)"),cks),
-    h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{for(const k in F)p[k]=F[k].value.trim();p.job=job.value;p.home=home.value;p.survey=survey.filter(t=>cks.querySelector("#sv_"+t.id).checked).map(t=>t.id);save();toast("저장했어요")}},"저장")),
+    h("div",{class:"card"},h("h3",{},"서베이 선택 주제"),h("p",{class:"muted small"},spec().strategy),cks),
+    h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{for(const k in F)p[k]=F[k].value.trim();const oldT=tgt();p.target=tsel.value;p.job=job.value;p.home=home.value;if(oldT!==p.target)setTimeout(()=>toast("목표를 "+p.target+"로 바꿨어요. 스크립트·예시는 다시 만들면 새 목표 기준으로 나와요"),400);p.survey=survey.filter(t=>cks.querySelector("#sv_"+t.id).checked).map(t=>t.id);save();toast("저장했어요")}},"저장")),
     tts.ok?voiceCard():null,
     syncCard(),webImportCard(),
     h("div",{class:"card"},h("h3",{},"기록 옮기기 (웹 ↔ Claude)"),h("p",{class:"muted small"},"학습 기록·스크립트·내 표현·해석·프로필을 코드로 복사해 다른 곳에서 붙여넣으면 합쳐져요. 양쪽 기록이 모두 남습니다."),
