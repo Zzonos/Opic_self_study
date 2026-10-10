@@ -1,0 +1,9 @@
+{
+  "name": "opic-self-study",
+  "private": true,
+  "scripts": {
+    "test": "node --test functions/test/*.test.js",
+    "test:browser": "node tools/test-browser.cjs"
+  },
+  "devDependencies": { "playwright": "1.62.1" }
+}

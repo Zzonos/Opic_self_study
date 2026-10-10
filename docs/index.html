@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261009-154644-d891c4">
+<html lang="ko" data-build="20261010-103812-05aa36">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -450,7 +450,7 @@ const FB_CONFIG={apiKey:"AIzaSyAkIuOOuG_MUlgE3GRrqlC3THnVcZHeq8M",authDomain:"op
 const cloud={ok:false,user:null,ref:null,unsub:null,pushT:null,lastPush:0,skip:false,ready:false};
 try{cloud.skip=localStorage.getItem("oss_skiplogin")==="1"}catch(e){}
 function cloudInit(){if(!window.firebase?.initializeApp||!window.firebase?.auth)return;try{firebase.initializeApp(FB_CONFIG);cloud.ok=true;const auth=firebase.auth();auth.useDeviceLanguage();
-  auth.onAuthStateChanged(async u=>{cloud.ready=true;if(cloud.unsub){cloud.unsub();cloud.unsub=null}cloud.user=u;cloud.ref=null;
+  auth.onAuthStateChanged(async u=>{cloud.ready=true;if(cloud.unsub){cloud.unsub();cloud.unsub=null}gptAuthChanged(u);cloud.user=u;cloud.ref=null;
     if(u&&cloud.signingUp){return} // signup writes the first document itself (with the invite code), then calls cloudAttach
     if(u)await cloudAttach(u);render()})}catch(e){cloud.ok=false}}
 async function cloudAttach(u){cloud.user=u;cloud.ref=firebase.firestore().collection("users").doc(u.uid);try{await cloudPull(true)}catch(e){toast("클라우드 기록을 불러오지 못했어요: "+(e.code||e.message))}
@@ -516,14 +516,64 @@ const PF=[["name","이름","영어 이름 또는 이름 (예: Minsu)"],["age","�
 function profileText(){const p=S.profile;const parts=[["이름",p.name],["나이대",p.age],["직업",p.job+(p.jobDetail?" — "+p.jobDetail:"")],["사는 곳",p.city],["거주 형태",p.home],["함께 사는 사람",p.family],["취미·주말",p.hobby],["좋아하는 것",p.fav],["성격",p.personality],["기억에 남는 경험",p.memory],["기타",p.extra]];return parts.filter(([k,v])=>v&&String(v).trim()).map(([k,v])=>k+": "+v).join(" / ")||"(프로필 미입력)"}
 function profileFill(){const p=S.profile;return PF.filter(([k])=>k!=="extra"&&(p[k]||"").trim()).length}
 
+/* ============ GPT PROVIDER ============ */
+const GPT_ENDPOINT="https://asia-northeast3-opic-self-study.cloudfunctions.net/gptStudy";
+const gpt={enabled:false,pending:new Set(),status:null};
+function gptBusy(){
+  if(!gpt.status){gpt.status=h("div",{id:"gpt_busy",class:"note ai",role:"status",style:"position:fixed;top:8px;left:8px;right:8px;z-index:90;box-shadow:0 2px 12px #0003"});document.body.append(gpt.status)}
+  gpt.status.hidden=!gpt.pending.size;
+  if(gpt.pending.size)gpt.status.replaceChildren(h("span",{class:"grow"},"GPT 처리 중… 입력과 기존 기록은 유지됩니다."),h("button",{class:"btn sm",onclick:()=>gptCancel()},"취소"),h("button",{class:"btn sm ghost",onclick:()=>gptDisconnect()},"GPT 연결 해제"));
+}
+function gptCancel(){for(const ctl of gpt.pending)ctl.abort()}
+function gptDisconnect(){gpt.enabled=false;gptCancel();if(sample===gptSample)sample=null;try{localStorage.removeItem("oss_ai_provider")}catch(e){}toast("GPT 연결을 해제했어요. 학습 기록은 유지됩니다.");gptRefreshControls()}
+function gptRefreshControls(){for(const el of document.querySelectorAll("[data-gpt-controls]"))el.replaceWith(aiNote())}
+function gptAuthChanged(u){if(window.claude?.use)return;gptCancel();gpt.enabled=false;sample=null;try{if(u&&localStorage.getItem("oss_ai_provider")==="gpt"){gpt.enabled=true;sample=gptSample}}catch(e){}}
+function gptAwait(p,signal){return new Promise((resolve,reject)=>{const abort=()=>{signal.removeEventListener("abort",abort);reject({code:"cancelled"})};if(signal.aborted){abort();return}signal.addEventListener("abort",abort,{once:true});Promise.resolve(p).then(v=>{signal.removeEventListener("abort",abort);resolve(v)},e=>{signal.removeEventListener("abort",abort);reject(e)})})}
+function gptConnect(){
+  if(!cloud.user){cloud.skip=false;try{localStorage.removeItem("oss_skiplogin")}catch(e){}toast("GPT를 사용하려면 OSS 계정에 로그인해 주세요.");render();return}
+  gpt.enabled=true;sample=gptSample;try{localStorage.setItem("oss_ai_provider","gpt")}catch(e){}toast("GPT를 선택했어요. 학습 기능을 실행하면 서버에서 처리합니다.");render();
+}
+const gptSample={json:async(prompt,opts={})=>{
+  const user=cloud.user;
+  if(!gpt.enabled||!user)throw{code:"session_expired"};
+  const ctl=new AbortController();let timedOut=false;
+  const abort=()=>ctl.abort();opts.signal?.addEventListener("abort",abort,{once:true});
+  if(opts.signal?.aborted)ctl.abort();
+  gpt.pending.add(ctl);gptBusy();
+  const timer=setTimeout(()=>{timedOut=true;ctl.abort()},100000);
+  try{
+    const check=()=>{if(ctl.signal.aborted||!gpt.enabled||cloud.user?.uid!==user.uid)throw{code:timedOut?"timeout":"cancelled"}};
+    let token;try{token=await gptAwait(user.getIdToken(),ctl.signal)}catch(e){throw{code:e?.code==="auth/network-request-failed"?"upstream_error":"session_expired"}}check();
+    const send=()=>fetch(GPT_ENDPOINT,{method:"POST",signal:ctl.signal,cache:"no-store",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({task:opts.task,prompt,count:opts.count})});
+    let response=await send();
+    if(response.status===401){try{token=await gptAwait(user.getIdToken(true),ctl.signal)}catch(e){throw{code:e?.code==="auth/network-request-failed"?"upstream_error":"session_expired"}}check();response=await send()}
+    let data;try{data=await response.json()}catch(e){throw{code:"upstream_error"}}check();
+    if(!response.ok)throw{code:data?.error?.code||"upstream_error"};
+    if(data.result===undefined||data.result===null)throw{code:"invalid_json"};
+    return data.result;
+  }catch(e){if(ctl.signal.aborted)throw{code:timedOut?"timeout":"cancelled"};throw e?.code?e:{code:"upstream_error"}}
+  finally{clearTimeout(timer);opts.signal?.removeEventListener("abort",abort);gpt.pending.delete(ctl);gptBusy()}
+}};
+/* ============ END GPT PROVIDER ============ */
+
+async function aiJson(prompt,opts={}){
+  if(!sample)throw{code:"not_granted"};
+  if(sample===gptSample)return gptSample.json(prompt,opts);
+  const {task,count,signal,...claudeOpts}=opts;
+  if(signal?.aborted)throw{code:"cancelled"};
+  const result=await sample.json(prompt,claudeOpts);
+  if(signal?.aborted)throw{code:"cancelled"};
+  return result;
+}
+const practiceDrafts=new Map();
 /* ============ AI ============ */
-const ERR={not_granted:"이 페이지에서 Claude 사용이 허용되지 않았습니다. AI 평가는 꺼져 있어요.",rate_limited:"요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",session_expired:"다시 로그인이 필요해요.",invalid_json:"응답 형식 오류예요. 다시 시도해 주세요.",refused:"이 입력은 평가할 수 없어요. 내용을 바꿔 다시 시도해 주세요.",upstream_error:"연결 문제가 있었어요. 다시 시도해 주세요."};
+const ERR={cancelled:"요청을 취소했어요. 입력과 기존 기록은 유지됩니다.",timeout:"응답 시간이 초과됐어요. 입력을 유지했으니 다시 시도해 주세요.",not_configured:"GPT 서버 설정이 필요해요. 관리자에게 문의해 주세요.",invalid_request:"요청 형식을 확인해 주세요.",input_too_large:"입력이 너무 길어요. 내용을 나누어 시도해 주세요.",forbidden:"이 주소에서는 GPT 서버에 연결할 수 없어요.",not_granted:"AI 사용 권한이 없어요. OSS 로그인 또는 Claude 연결을 확인해 주세요.",rate_limited:"요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",session_expired:"다시 로그인이 필요해요.",invalid_json:"응답 형식 오류예요. 다시 시도해 주세요.",refused:"이 입력은 평가할 수 없어요. 내용을 바꿔 다시 시도해 주세요.",upstream_error:"연결 문제가 있었어요. 다시 시도해 주세요."};
 const errMsg=e=>ERR[e?.code]||ERR.upstream_error;
 const RUBRIC=`You are an OPIc (ACTFL) rater. The learner is Korean; target level is ${TARGET}. OPIc levels in order: NL, NM, NH, IL, IM1, IM2, IM3, IH, AL.
 Rating guide: IL = short sentences, lists; IM1-2 = full sentences, basic connectors, some past tense errors; IM3 = paragraph-length answers with a clear structure (intro-body-ending), fluent connectors, mostly accurate past tense, personal details; IH = handles complications and unexpected questions, varied vocabulary, past/present/future controlled; AL = narrates in all time frames consistently, supports opinions, native-like idioms.
 Judge primarily on: structure, amount of detail, tense control, connectors/fillers, vocabulary range, and task completion. Ignore spelling and punctuation (the answer was dictated by voice). Explanations for the learner are in Korean (존댓말, 간결하게); example sentences are in English.`;
 
-async function evaluate(question,answer,secs,onText){
+async function evaluate(question,answer,secs,onText,signal){
   const prompt=`${RUBRIC}
 
 Question: "${question}"
@@ -537,9 +587,9 @@ ${answer}
 Reply with ONLY one JSON object:
 {"level":"IM2","score":62,"summary":"한국어 총평 2-3문장","strengths":["한국어로 잘한 점 2-3개"],"fixes":[{"original":"learner's phrase","better":"improved phrase","why":"한국어 설명 한 줄"}],"model_im3":"A model answer at IM3 level, 110-150 words, first person, natural spoken English, using the learner's own details where possible","model_ih":"The same answer upgraded to IH, 150-190 words","expressions":[{"en":"useful expression from the model answers","ko":"한국어 뜻"}]}
 Give 3-5 fixes and 4-6 expressions. "score" is 0-100 within the overall scale (IM3 starts around 65).`;
-  return sample.json(prompt,{onText,cache:false});
+  return aiJson(prompt,{onText,cache:false,task:"evaluate",signal});
 }
-async function genScript(topic,onText){
+async function genScript(topic,onText,signal){
   const qs=topic.qs.map((q,i)=>`${i+1}. [${QT[q.t]}] ${q.q}`).join("\n");
   const prompt=`You write OPIc answer scripts for a Korean learner whose target is ${TARGET} (aim slightly above: solid IM3 bordering IH).
 Learner profile: ${profileText()}
@@ -550,7 +600,7 @@ ${qs}
 
 Reply with ONLY one JSON object: {"scripts":[{"n":1,"answer":"..."}],"expressions":[{"en":"...","ko":"한국어 뜻"}]}
 Include 6-8 reusable expressions taken from the scripts.`;
-  return sample.json(prompt,{onText,cache:false});
+  return aiJson(prompt,{onText,cache:false,task:"script",signal,count:topic.qs.length});
 }
 async function genSample(topic){
   const qs=topic.qs.map((q,i)=>`${i+1}. [${QT[q.t]}] ${q.q}`).join("\n");
@@ -562,7 +612,7 @@ Questions:
 ${qs}
 
 Reply with ONLY one JSON object: {"scripts":[{"n":1,"answer":"..."}]}`;
-  return sample.json(prompt,{cache:false});
+  return aiJson(prompt,{cache:false,task:"sample",count:topic.qs.length});
 }
 async function evalMock(items,onText){
   const body=items.map((it,i)=>`Q${i+1} (${it.kind}): ${it.q}\nA${i+1} (${it.secs}s): ${it.a||"(no answer)"}`).join("\n\n");
@@ -575,7 +625,7 @@ ${body}
 
 Reply with ONLY one JSON object:
 {"level":"IM2","score":60,"summary":"한국어 총평 3-4문장 (레벨 판정 근거, 다음 목표)","top_fixes":["가장 시급한 개선점 3개, 한국어"],"per_question":[{"n":1,"level":"IM2","comment":"한국어 한 줄 코멘트","better":"One improved English sentence the learner could have said"}]}`;
-  return sample.json(prompt,{onText,cache:false});
+  return aiJson(prompt,{onText,cache:false,task:"mock",count:items.length});
 }
 
 /* ============ RECORDED AUDIO (Kokoro neural voices, pre-rendered) ============ */
@@ -689,10 +739,10 @@ function renderNav(){const n=$("#nav");n.replaceChildren(...VIEWS.map(v=>h("butt
 function go(v,s=null){view=v;sub=s;timerStop();if(!player.on)ttsStop();render();window.scrollTo({top:0})}
 function render(){renderNav();ensureToday();const m=$("#main");m.replaceChildren();
   if(gated){$("#nav").hidden=true;put(m,h("div",{class:"login"},h("div",{},h("p",{class:"eyebrow"},"Opic Self Study"),h("div",{class:"brand"},"OSS"),h("p",{class:"muted",style:"margin-top:6px"},"이 앱은 Claude 계정으로 로그인한 사람만 쓸 수 있어요.")),h("div",{class:"card"},h("h3",{},"로그인이 필요해요"),h("p",{class:"small"},"Claude에 로그인한 뒤 이 링크를 다시 열어 주세요. 초대받은 계정으로 로그인하면 AI 대화·평가와 기록 저장이 본인 계정으로 동작합니다."),h("p",{class:"muted small"},"Claude 계정이 없다면 claude.ai에서 무료로 만들 수 있어요."))));return}
-  if(cloud.ok&&cloud.ready&&!cloud.user&&!cloud.skip){$("#nav").hidden=true;vLogin(m);return}$("#nav").hidden=false;({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings})[view](m)}
+  if(cloud.ok&&cloud.ready&&!cloud.user&&!cloud.skip){$("#nav").hidden=true;vLogin(m);return}$("#nav").hidden=false;put(m,aiNote());({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings})[view](m)}
 
 const ART_URL="https://claude.ai/artifact/HuASd2nEpXENsSugPoScyp";
-function aiNote(){if(sample||window.claude?.use)return null;prepSyncCode();return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"프로필 입력·스크립트 생성·AI 평가·대화는 Claude 앱에서 해요. Claude 앱의 '웹으로 통합' 버튼으로 여기로 오면 최신 기록이 자동으로 합쳐집니다. 여기서는 무한 재생·마이크 연습·표현카드를 쓰세요."),h("a",{class:"btn sm",href:ART_URL,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",onclick:()=>{try{navigator.clipboard?.writeText((syncCode&&syncCodeAt>=(S.updatedAt||0))?syncCode:packStateSync()).catch(()=>{})}catch(e){}}},"Claude에서 열기"))}
+function aiNote(){if(window.claude?.use)return null;prepSyncCode();return h("div",{"data-gpt-controls":"1",class:"note ai",style:"align-items:center"},h("span",{class:"grow"},gpt.enabled?"GPT 사용 중 · 평가·스크립트·대화·해석은 앱 안에서 처리하고 OSS 계정에 저장합니다.":"OSS 계정으로 로그인하면 GPT로 평가·스크립트·대화·해석을 앱 안에서 사용할 수 있어요."),h("button",{class:"btn sm primary",onclick:()=>gpt.enabled?gptDisconnect():gptConnect()},gpt.enabled?"GPT 연결 해제":"GPT로 실행"),h("a",{class:"btn sm",href:ART_URL,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",onclick:()=>{try{navigator.clipboard?.writeText((syncCode&&syncCodeAt>=(S.updatedAt||0))?syncCode:packStateSync()).catch(()=>{})}catch(e){}}},"Claude에서 열기"))}
 function webNote(){if(!window.claude?.use)return null;const n=unsyncedCount();return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"여기(Claude)의 프로필·스크립트·예시·기록을 웹 계정에 보내요. '웹으로 통합'은 저장만 하고 완료 화면을 띄우니, 그 뒤 홈 화면의 OSS 앱을 열면 반영돼 있어요."+(n?" (새 기록 "+n+"건)":"")),h("div",{class:"row",style:"gap:6px"},webLink("웹으로 통합","btn sm primary","x"),webLink("열기 →","btn sm","s")))}
 
 /* ---- TODAY ---- */
@@ -704,7 +754,7 @@ function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);
   put(m,
     h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},todayStr()+" · 목표 "+TARGET),h("h1",{},S.profile.name?`${S.profile.name}님, 오늘의 30분`:"오늘의 30분")),
       h("span",{class:"chip "+(done.every(Boolean)?"good":"neutral")},done.filter(Boolean).length+"/3 완료")),
-    aiNote(),webNote(),
+    webNote(),
     h("div",{class:"stats"},
       h("div",{class:"stat"},h("b",{class:"mono"},streak),h("span",{},"연속 학습일")),
       h("div",{class:"stat"},h("b",{class:"mono"},Math.round(todayMin)),h("span",{},"오늘 말한 시간(분)")),
@@ -749,7 +799,6 @@ function vPractice(m){
     h("div",{class:"row"},h("button",{class:"btn",onclick:()=>go("scripts",{topic:t})},"이 주제 스크립트 보기")));return}
   put(m,
     h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},"Question bank · "+TOPICS.reduce((a,t)=>a+t.qs.length,0)+"문항"),h("h1",{},"질문 연습")),h("button",{class:"btn primary",onclick:randomQ},"랜덤 질문 1개")),
-    aiNote(),
     h("div",{class:"note"},"질문을 고르고 타이머를 켠 뒤 소리 내어 말하세요. 말한 내용은 키보드의 받아쓰기(마이크 키)로 입력하면 AI가 레벨을 평가하고 IM3·IH 모범답안을 만들어 줍니다."),
     ...section("내 서베이 주제",mine),
     h("details",{},h("summary",{},"다른 서베이 주제 ("+other.length+")"),h("div",{class:"grid2",style:"margin-top:10px"},...other.map(t=>h("button",{class:"topic",onclick:()=>go("practice",{topic:t,q:null})},h("span",{class:"en"},t.en),h("span",{class:"ko"},t.ko))))),
@@ -764,18 +813,20 @@ function qKey(topic,q,s){if(s&&s.rp)return s.rp.id+"_"+s.step;if(topic.id==="adv
 function vAnswer(m,s){
   const {topic,q}=s;let secs=0;let fbBox=h("div",{class:"fb"});let ctl=null;
   const tEl=h("div",{class:"timer"},"0:00");const bar=h("div",{class:"bar"},h("i"));
-  const ta=h("textarea",{id:"ans_"+topic.id,placeholder:"여기에 말한 내용을 받아쓰기로 입력하세요. (휴대폰: 키보드의 마이크 키 / Windows: Win+H / Mac: 🎤 키 또는 Fn 두 번)"});
+  const draftKey=topic.id+":"+q.q;
+  const ta=h("textarea",{oninput:e=>practiceDrafts.set(draftKey,e.target.value),id:"ans_"+topic.id,placeholder:"여기에 말한 내용을 받아쓰기로 입력하세요. (휴대폰: 키보드의 마이크 키 / Windows: Win+H / Mac: 🎤 키 또는 Fn 두 번)"});
+  ta.value=practiceDrafts.get(draftKey)||"";
   const startBtn=h("button",{class:"btn primary",onclick:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작";}else{timerStart(tEl,bar.firstChild);startBtn.textContent="답변 끝";ta.focus()}}},"말하기 시작");
   const evalBtn=h("button",{class:"btn primary",disabled:!sample,onclick:async()=>{
     const a=ta.value.trim();if(a.length<20){toast("답변을 좀 더 입력해 주세요 (20자 이상)");return}
     if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}
     evalBtn.disabled=true;stopBtn.hidden=false;ctl=new AbortController();
-    fbBox.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"Claude가 평가 중… (10–40초)")));
-    try{const r=await evaluate(q.q,a,secs||Math.round(a.split(/\s+/).length/2.3),null);
+    fbBox.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},(sample===gptSample?"GPT":"Claude")+"가 평가 중… (10–40초)")));
+    try{const r=await evaluate(q.q,a,secs||Math.round(a.split(/\s+/).length/2.3),null,ctl.signal);
       renderFeedback(fbBox,r,q.q,a);if(r.model_im3){S.models=S.models||{};S.models[q.q]=r.model_im3}
       S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",qt:q.t,title:topic.en+" · "+(s.kind||""),level:r.level,score:r.score,secs:secs||0,fixes:(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}))});S.today.practice++;save();
       const nextRp=s.rp&&s.step<13?h("button",{class:"btn primary",onclick:()=>{const st=s.step+1;go("practice",{topic,q:{t:"rp",q:s.rp["q"+st]},kind:"롤플레이 "+st+"번 · "+(st===12?"문제 해결":"관련 경험"),rp:s.rp,step:st})}},"다음: "+(s.step+1)+"번 →"):null;
-      put(fbBox,h("div",{class:"row"},nextRp,h("button",{class:"btn",onclick:()=>{ta.value="";fbBox.replaceChildren();secs=0;tEl.textContent="0:00";bar.firstChild.style.width="0";evalBtn.disabled=false}},"같은 질문 다시"),h("button",{class:"btn",onclick:()=>go("practice")},"다른 질문")));
+      put(fbBox,h("div",{class:"row"},nextRp,h("button",{class:"btn",onclick:()=>{ta.value="";practiceDrafts.delete(draftKey);fbBox.replaceChildren();secs=0;tEl.textContent="0:00";bar.firstChild.style.width="0";evalBtn.disabled=false}},"같은 질문 다시"),h("button",{class:"btn",onclick:()=>go("practice")},"다른 질문")));
     }catch(e){fbBox.replaceChildren(h("p",{class:"small",style:"color:var(--bad)"},errMsg(e)));if(e.code!=="not_granted"&&e.code!=="sampling_disabled")evalBtn.disabled=false}
     finally{stopBtn.hidden=true}
   }},"AI 평가 받기");
@@ -850,9 +901,9 @@ function coachCard(a){const cached=S.analysis;const fresh=cached&&(Date.now()-(c
   if(fresh)show(cached);
   const btn=h("button",{class:"btn",disabled:!sample,onclick:async()=>{btn.disabled=true;btn.textContent="분석 중…";try{
     const data={expected:LEVELS[Math.round(a.mean)],range:[LEVELS[a.lo],LEVELS[a.hi]],trend:a.trend,pIM3:a.pIM3,byType:a.byType.map(x=>({type:QTN[x.k]||x.k,avg:LEVELS[Math.round(x.avg)],n:x.n})),weekly:a.weekly.map(w=>({week:w.k,avg:LEVELS[Math.round(w.avg)],n:w.n,minutes:Math.round(w.min)})),fixes:a.fixes.slice(-30).map(f=>f.o?f.o+" → "+f.b+" ("+f.w+")":f.w)};
-    const r=await sample.json(`You are an OPIc coach for a Korean learner (target IM3). Here is their progress data (JSON):\n${JSON.stringify(data)}\n\nReply with ONLY JSON: {"categories":[{"name":"실수 유형 (한국어, 예: 과거시제, 관사, 연결어 부족)","count":3,"tip":"한 줄 교정 팁"}],"comment":"한국어 종합 코멘트 3-4문장 (현재 수준, 추세, 가장 중요한 한 가지)","plan":["다음 주 처방 3개, 각 한 줄, 구체적으로"]}\nGroup the fixes into at most 5 categories. Be concrete and encouraging but honest.`,{cache:false});
+    const r=await aiJson(`You are an OPIc coach for a Korean learner (target IM3). Here is their progress data (JSON):\n${JSON.stringify(data)}\n\nReply with ONLY JSON: {"categories":[{"name":"실수 유형 (한국어, 예: 과거시제, 관사, 연결어 부족)","count":3,"tip":"한 줄 교정 팁"}],"comment":"한국어 종합 코멘트 3-4문장 (현재 수준, 추세, 가장 중요한 한 가지)","plan":["다음 주 처방 3개, 각 한 줄, 구체적으로"]}\nGroup the fixes into at most 5 categories. Be concrete and encouraging but honest.`,{task:"analysis",cache:false});
     r.ts=Date.now();S.analysis=r;save();show(r);btn.textContent="다시 분석"}catch(e){toast(errMsg(e));btn.textContent="AI 코치 분석"}finally{btn.disabled=false}}},fresh?"다시 분석":"AI 코치 분석 (실수 유형 + 다음 주 처방)");
-  return h("div",{style:"display:flex;flex-direction:column;gap:10px;margin-top:6px"},box,h("div",{class:"row"},btn,sample?null:h("span",{class:"muted small"},"Claude에서 열면 AI 코치 분석이 가능해요")))}
+  return h("div",{style:"display:flex;flex-direction:column;gap:10px;margin-top:6px"},box,h("div",{class:"row"},btn,sample?null:h("span",{class:"muted small"},"GPT로 실행하거나 Claude에서 열면 AI 코치 분석이 가능해요")))}
 
 /* ---- CHAT (AI 회화) ---- */
 const SCEN=[
@@ -873,7 +924,7 @@ Style: natural spoken American English, 1-3 sentences per turn, simple enough fo
 Correction: look at the learner's LAST message only. If it has a clear grammar mistake, wrong word, or an unnatural phrase, give "fix": {"original": their sentence(s) with the issue, "better": a corrected natural version keeping their meaning, "why": a one-line explanation in Korean}. If their message was fine, set "fix": null. Ignore spelling and punctuation (voice dictation). Never correct more than one thing per turn.
 Reply with ONLY a JSON object: {"reply":"your in-character reply","reply_ko":"reply의 한국어 뜻 (짧게)","fix":null}`}
 function vChat(m){
-  if(!chat){put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation practice"),h("h1",{},"AI와 대화")),aiNote(),
+  if(!chat){put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation practice"),h("h1",{},"AI와 대화")),
     h("div",{class:"note"},"말하기 → 상대가 답하면서 틀린 표현은 그 자리에서 고쳐 주고 → 대화를 이어가는 연습이에요. '뭐라고 말하지?'에 한국어로 쓰면 영어 표현을 알려줍니다. 끝내면 레벨 추정과 표현 정리가 나와요."),
     SR_OK?null:h("div",{class:"note"},h("b",{},"말하기 입력 (영어로 인식되게): "),DICT_HINT+". Claude 안에서는 마이크를 직접 쓸 수 없어 기기 받아쓰기를 사용해요. "+(/Windows/.test(navigator.userAgent)?"영어 음성 팩이 없으면 한글로 적히니 설정 → 시간 및 언어 → 언어에서 English (United States)와 음성 인식을 설치해 두세요.":"한국어 키보드 상태에서 말하면 한글로 적히니 영어 키보드로 바꾼 뒤 🎤를 누르세요.")),
     tts.ok?h("div",{class:"note",style:"align-items:center"},h("span",{class:"grow"},"상대 목소리: ",h("b",{},tts.voice?vLabel(tts.voice):"기기 기본 음성"),vQuality(tts.voice||{name:""})===2?" — 고품질 음성이에요.":" — 기계음처럼 들리면 기기에 고품질(향상됨/프리미엄) 음성을 설치하고 바꿔 보세요."),h("button",{class:"btn sm",onclick:()=>{go("settings");setTimeout(()=>$("#voicecard")?.scrollIntoView({behavior:"smooth",block:"start"}),50)}},"음성 바꾸기")):null,
@@ -889,21 +940,22 @@ function vChat(m){
     if(u.who==="fix")return h("div",{class:"fixc"},h("span",{class:"eyebrow"},"이렇게 말하면 더 자연스러워요"),h("span",{class:"o"},u.fix.original),h("span",{class:"b"},u.fix.better),h("span",{class:"w"},u.fix.why),h("button",{class:"btn sm",style:"align-self:flex-start;margin-top:4px",onclick:()=>{addCards([{en:u.fix.better,ko:u.fix.why}],sc.ko)}},"표현카드에 추가"));
     if(u.who==="wait")return h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")))};
   chat.ui.forEach(u=>bub.append(render1(u)));
-  const ta=h("textarea",{id:"chat_in",style:"min-height:64px",placeholder:"입력하거나 받아쓰기로 말하세요 — "+DICT_HINT});
-  const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ttsStop();ta.value="";chat.busy=true;
+  const ta=h("textarea",{oninput:e=>{chat.draft=e.target.value;chat.autoPaused=false},id:"chat_in",style:"min-height:64px",placeholder:"입력하거나 받아쓰기로 말하세요 — "+DICT_HINT});
+  ta.value=chat.draft||"";
+  const send=async()=>{const t=ta.value.trim();if(!t||chat.busy||!sample)return;chat.autoPaused=false;chat.draft="";ttsStop();ta.value="";chat.busy=true;
     chat.ui.push({who:"me",text:t});chat.turns.push({role:"user",content:t});bub.append(render1({who:"me",text:t}));const w=render1({who:"wait"});bub.append(w);w.scrollIntoView({block:"end"});
-    try{const r=await sample.json([{role:"user",content:chatRules(sc)},...chat.turns],{cache:false,modelTier:"quick"});
+    try{const r=await aiJson([{role:"user",content:chatRules(sc)},...chat.turns],{task:"chat",cache:false,modelTier:"quick"});
       w.remove();if(r?.fix?.better&&r.fix.original){chat.ui.push({who:"fix",fix:r.fix});bub.append(render1({who:"fix",fix:r.fix}))}
       const reply=String(r?.reply||"").trim()||"Sorry, could you say that again?";chat.turns.push({role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});bub.append(render1({who:"ai",text:reply,ko:r?.reply_ko||""}));
       if(chat.auto)speak(reply);bub.lastChild.scrollIntoView({block:"end"});chat.n++;const cnt=$("#chat_cnt");if(cnt)cnt.textContent=sc.en+" · "+chat.n+"턴";
       if(chat.turns.length>24)chat.turns.splice(0,2);
-    }catch(e){w.remove();bub.append(h("div",{class:"note"},errMsg(e)));chat.turns.pop();chat.ui.pop()}
+    }catch(e){w.remove();bub.append(h("div",{class:"note"},errMsg(e)));chat.turns.pop();chat.ui.pop();ta.value=t;chat.draft=t;chat.autoPaused=true}
     finally{chat.busy=false;last="";if(chatMode!=="voice")ta.focus()}};
-  const hint=async()=>{const k=prompt_ko.value.trim();if(!k)return;hintBtn.disabled=true;try{const r=await sample.json(`Korean learner wants to say this in a casual English conversation: "${k}"\nReply with ONLY JSON: {"en":"natural spoken English, 1-2 sentences, intermediate level","note":"한 줄 한국어 메모 (핵심 표현)"}`,{modelTier:"quick"});ta.value=(ta.value?ta.value+" ":"")+(r?.en||"");hintOut.textContent=r?.note||"";prompt_ko.value=""}catch(e){toast(errMsg(e))}finally{hintBtn.disabled=false}};
+  const hint=async()=>{const k=prompt_ko.value.trim();if(!k)return;hintBtn.disabled=true;try{const r=await aiJson(`Korean learner wants to say this in a casual English conversation: "${k}"\nReply with ONLY JSON: {"en":"natural spoken English, 1-2 sentences, intermediate level","note":"한 줄 한국어 메모 (핵심 표현)"}`,{task:"hint",modelTier:"quick"});ta.value=(ta.value?ta.value+" ":"")+(r?.en||"");hintOut.textContent=r?.note||"";prompt_ko.value=""}catch(e){toast(errMsg(e))}finally{hintBtn.disabled=false}};
   const prompt_ko=h("input",{type:"text",id:"chat_ko",placeholder:"뭐라고 말하지? 한국어로 쓰면 영어로 알려줘요",onkeydown:e=>{if(e.key==="Enter"){e.preventDefault();hint()}}});const hintBtn=h("button",{class:"btn sm",onclick:hint},"영어로");const hintOut=h("span",{class:"muted small"});
   // voice mode: auto-send when dictated text stops changing
   let vt=null,last="";const status=h("span",{class:"muted small mono"});
-  const armAuto=()=>{clearTimeout(vt);const now=ta.value.trim();if(!chatWait){status.textContent=now?"다 말했으면 '지금 보내기'":"";return}if(now.length<3||now===last){status.textContent=now?"":"말하면 자동으로 보내요";return}
+  const armAuto=()=>{clearTimeout(vt);if(chat.autoPaused||!sample)return;const now=ta.value.trim();if(!chatWait){status.textContent=now?"다 말했으면 '지금 보내기'":"";return}if(now.length<3||now===last){status.textContent=now?"":"말하면 자동으로 보내요";return}
     let left=chatWait;status.textContent="말이 끝나면 "+left+"초 후 전송";const tick=()=>{if(ta.value.trim()!==now){armAuto();return}left--;if(left<=0){status.textContent="";last=ta.value.trim();send()}else{status.textContent="말이 끝나면 "+left+"초 후 전송";vt=setTimeout(tick,1000)}};vt=setTimeout(tick,1000)};
   ta.addEventListener("input",()=>{if(tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending))ttsStop()},{once:false});
   if(chatMode==="voice"){ta.addEventListener("input",armAuto);ta.placeholder=SR_OK?"🎤 버튼을 누르고 말하세요":DICT_HINT}
@@ -919,17 +971,17 @@ function vChat(m){
 }
 async function startChat(sc){chat={sc,turns:[],ui:[],n:0,busy:false,auto:true,hide:false,summary:null};render();
   const bub=$("#bubbles");const w=h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")));bub.append(w);
-  try{const r=await sample.json([{role:"user",content:chatRules(sc)+"\n\nStart the conversation now with a natural greeting and your first question. Reply with ONLY the JSON object (fix: null)."}],{cache:false,modelTier:"quick"});
+  try{const r=await aiJson([{role:"user",content:chatRules(sc)+"\n\nStart the conversation now with a natural greeting and your first question. Reply with ONLY the JSON object (fix: null)."}],{task:"chat",cache:false,modelTier:"quick"});
     w.remove();const reply=String(r?.reply||"Hi! How's it going?");chat.turns.push({role:"user",content:"(start)"},{role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});render();if(chat.auto)speak(reply)}
   catch(e){w.remove();bub.append(h("div",{class:"note"},errMsg(e)))}}
-async function endChat(){if(!chat)return;const mine=chat.ui.filter(u=>u.who==="me");if(mine.length<2){chat=null;render();return}
+async function endChat(){if(!chat)return;if(chat.busy||gpt.pending.size){toast("처리 중인 요청을 먼저 취소하거나 기다려 주세요.");return}const mine=chat.ui.filter(u=>u.who==="me");if(mine.length<2){chat=null;render();return}
   chat.summary="pending";render()}
 async function vChatSummary(m){
-  if(chat.summary==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"대화 평가 중…")));put(m,h("h1",{},"대화 정리"),box);
+  if(chat.summary==="pending"||chat.summary==="error"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"대화 평가 중…")));put(m,h("h1",{},"대화 정리"),box);if(chat.scoring)return;if(chat.summary==="error"){box.replaceChildren(h("p",{},chat.summaryError),h("button",{class:"btn",onclick:()=>{chat.summary="pending";render()}},"다시 시도"),h("button",{class:"btn",onclick:()=>{chat.summary=null;render()}},"대화로 돌아가기"));return}chat.scoring=true;
     const tr=chat.ui.filter(u=>u.who==="ai"||u.who==="me").map(u=>(u.who==="ai"?"Partner: ":"Learner: ")+u.text).join("\n");
-    try{const r=await sample.json(`${RUBRIC}\n\nThis is a transcript of a practice conversation (${chat.sc.en}). Rate ONLY the learner's turns.\n\n${tr}\n\nReply with ONLY JSON: {"level":"IM2","score":60,"summary":"한국어 총평 2-3문장","fixes":[{"original":"...","better":"...","why":"한국어"}],"expressions":[{"en":"useful natural expression the learner could have used","ko":"뜻"}],"next":"다음 대화에서 시도할 한 가지 (한국어)"}\nGive 3-5 fixes and 4-6 expressions.`,{cache:false});
+    try{const r=await aiJson(`${RUBRIC}\n\nThis is a transcript of a practice conversation (${chat.sc.en}). Rate ONLY the learner's turns.\n\n${tr}\n\nReply with ONLY JSON: {"level":"IM2","score":60,"summary":"한국어 총평 2-3문장","fixes":[{"original":"...","better":"...","why":"한국어"}],"expressions":[{"en":"useful natural expression the learner could have used","ko":"뜻"}],"next":"다음 대화에서 시도할 한 가지 (한국어)"}\nGive 3-5 fixes and 4-6 expressions.`,{task:"summary",cache:false});
       chat.summary=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"chat",qt:"chat",title:"대화 · "+chat.sc.ko+" · "+chat.n+"턴",level:r.level,score:r.score,secs:chat.n*45,fixes:[...(chat.ui.filter(u=>u.who==="fix").map(u=>({o:u.fix.original,b:u.fix.better,w:u.fix.why}))),...(r.fixes||[]).map(f=>({o:f.original,b:f.better,w:f.why}))].slice(0,8)});S.today.practice++;save();render()}
-    catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("button",{class:"btn",onclick:()=>{chat=null;render()}},"닫기"))}return}
+    catch(e){chat.scoring=false;chat.summary="error";chat.summaryError=errMsg(e);box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("button",{class:"btn",onclick:()=>{chat.summary="pending";render()}},"다시 시도"),h("button",{class:"btn",onclick:()=>{chat.summary=null;render()}},"대화로 돌아가기"))}return}
   const r=chat.summary;
   put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation review · "+chat.sc.ko),h("h1",{},"대화 정리")),
     h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level||"?"),h("span",{class:"muted mono"},(r.score??"")+" / 100")),h("p",{},r.summary||""),r.next?h("p",{class:"small"},h("b",{},"다음엔: "),r.next):null),
@@ -947,7 +999,7 @@ function buildMock(){const mine=TOPICS.filter(t=>t.group==="서베이"&&S.profil
   pick(ADVANCED,2).forEach(q=>items.push({kind:"14–15 · 고난도",q,key:"adv_"+ADVANCED.indexOf(q)}));
   return items.slice(0,15).map(it=>({...it,a:"",secs:0}))}
 function vMock(m){
-  if(!mock){put(m,h("div",{},h("p",{class:"eyebrow"},"Mock test · 15 questions"),h("h1",{},"모의시험")),aiNote(),
+  if(!mock){put(m,h("div",{},h("p",{class:"eyebrow"},"Mock test · 15 questions"),h("h1",{},"모의시험")),
     h("div",{class:"card"},h("p",{},"실제 시험과 같은 구성으로 15문항을 연속으로 풉니다: 자기소개 1 → 콤보 3세트(9) → 롤플레이 3 → 고난도 2. 문항당 최대 2분, 전체 약 30분."),h("p",{class:"muted small"},"끝나면 Claude가 전체를 한 번에 채점해 종합 레벨과 문항별 피드백을 줍니다. 중간에 나가면 진행 내용은 사라져요."),
       h("label",{class:"row",style:"cursor:pointer"},h("input",{type:"checkbox",id:"mock_listen",checked:tts.ok}),"실전 듣기 모드 — 질문을 음성으로만 듣고 답하기 (텍스트 숨김, 2회 재생)"),h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{mock={items:buildMock(),i:0,result:null,listen:$("#mock_listen").checked&&tts.ok};render()}},"시험 시작"))),
     S.log.filter(l=>l.kind==="mock").length?h("div",{class:"card"},h("h3",{},"지난 모의시험"),h("div",{class:"list"},...S.log.filter(l=>l.kind==="mock").slice(-5).reverse().map(l=>h("div",{class:"li"},h("span",{class:"d"},l.date),h("span",{class:"grow"},l.title),lvChip(l.level))))):null);return}
@@ -966,11 +1018,11 @@ function vMock(m){
       h("div",{class:"row"},h("button",{class:"btn primary",onclick:next},mock.i<n-1?"다음 문항 →":"제출하고 채점"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"시험 중단"))));
 }
 async function vMockResult(m){
-  if(mock.result==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"15문항 채점 중… (30–90초)")));
-    put(m,h("h1",{},"채점 중"),box);
-    if(!sample){box.replaceChildren(h("p",{},ERR.not_granted),h("button",{class:"btn",onclick:()=>{mock=null;render()}},"닫기"));return}
+  if(mock.result==="pending"||mock.result==="error"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"15문항 채점 중… (30–90초)")));
+    put(m,h("h1",{},"채점 중"),box);if(mock.scoring)return;if(mock.result==="error"){box.replaceChildren(h("p",{},mock.resultError),h("button",{class:"btn",onclick:()=>{mock.result="pending";render()}},"다시 시도"));return}mock.scoring=true;
+    if(!sample){mock.scoring=false;box.replaceChildren(h("p",{},ERR.not_granted),h("button",{class:"btn",onclick:()=>{mock=null;render()}},"닫기"));return}
     try{const r=await evalMock(mock.items,null);mock.result=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"mock",qt:"mock",title:"모의시험 15문항",level:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0),fixes:(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)})),perq:(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}))});save();render()}
-    catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{render()}},"다시 시도"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"닫기")))}
+    catch(e){mock.scoring=false;mock.result="error";mock.resultError=errMsg(e);box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{mock.result="pending";render()}},"다시 시도"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"닫기")))}
     return}
   const r=mock.result;
   put(m,h("div",{},h("p",{class:"eyebrow"},"Mock result"),h("h1",{},"모의시험 결과")),
@@ -984,7 +1036,7 @@ async function vMockResult(m){
 function vScripts(m){
   if(sub&&sub.topic)return vScriptTopic(m,sub.topic);
   const mine=TOPICS.filter(t=>t.id!=="intro"&&(S.profile.survey.includes(t.id)||t.group==="돌발"));
-  put(m,h("div",{},h("p",{class:"eyebrow"},"My scripts"),h("h1",{},"주제별 스크립트")),aiNote(),
+  put(m,h("div",{},h("p",{class:"eyebrow"},"My scripts"),h("h1",{},"주제별 스크립트")),
     h("div",{class:"note"},"내 프로필(직업·거주지)을 바탕으로 주제당 질문별 110–150단어 스크립트를 만들어요. 하루 1개씩 소리 내어 3번 읽고, 키워드만 보고 말해 보는 게 목표입니다."),
     h("p",{class:"eyebrow"},"자기소개"),h("div",{class:"grid2"},scriptTile(TOPICS[0])),
     h("p",{class:"eyebrow"},"내 서베이 주제"),h("div",{class:"grid2"},...mine.filter(t=>t.group==="서베이").map(scriptTile)),
@@ -995,7 +1047,7 @@ function vScriptTopic(m,t){
   const box=h("div",{style:"display:flex;flex-direction:column;gap:14px"});let ctl=null;
   const gen=async(btn)=>{if(!sample){toast(ERR.not_granted);return}btn.disabled=true;ctl=new AbortController();const stop=h("button",{class:"btn sm",onclick:()=>ctl.abort()},"중지");
     box.replaceChildren(h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"스크립트 작성 중… (20–60초)")),stop));
-    try{const r=await genScript(t,null);S.scripts[t.id]={...r,date:todayStr()};save();show()}catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)))}finally{btn.disabled=false}};
+    try{const r=await genScript(t,null,ctl.signal);S.scripts[t.id]={...r,date:todayStr()};save();show()}catch(e){show();box.prepend(h("p",{style:"color:var(--bad)"},errMsg(e)))}finally{btn.disabled=false}};
   const show=()=>{const sc=S.scripts[t.id];if(!sc){box.replaceChildren(h("div",{class:"card"},h("p",{class:"muted"},"아직 스크립트가 없어요. 프로필을 설정에서 채운 뒤 생성하면 더 나다운 답변이 나옵니다."),h("div",{class:"row"},h("button",{class:"btn primary",onclick:e=>gen(e.target)},"AI로 스크립트 만들기"))));return}
     box.replaceChildren(h("div",{class:"row"},h("span",{class:"chip neutral"},sc.date+" 생성"),h("button",{class:"btn sm",onclick:()=>{S.today.script++;save();toast("오늘 스크립트 학습 체크!")}},"오늘 학습 완료 체크"),h("button",{class:"btn sm ghost",onclick:e=>gen(e.target)},"다시 생성")),
       ...t.qs.map((q,i)=>{const s=sc.scripts?.[i];return h("div",{class:"card"},h("span",{class:"chip neutral",style:"align-self:flex-start"},QT[q.t]),h("p",{class:"q",style:"font-size:16px"},q.q),h("div",{class:"model"},s?.answer||"—"),h("div",{class:"row"},spkBtn(s?.answer||""),h("button",{class:"btn sm",onclick:()=>go("listen",{text:s?.answer,title:t.en+" · "+QT[q.t]})},"쉐도잉"),h("button",{class:"btn sm",onclick:()=>copy(s?.answer)},"복사"),h("button",{class:"btn sm",onclick:()=>go("practice",{topic:t,q,kind:QT[q.t]})},"말하기 연습")))}),
@@ -1008,7 +1060,7 @@ function vScriptTopic(m,t){
 function needTrans(text){return splitSent(text).filter(x=>!S.trans[x])}
 async function translateSents(sents,onProgress){if(!sample)throw{code:"not_granted"};const todo=[...new Set(sents.filter(x=>!S.trans[x]))];let done=0;
   for(let i=0;i<todo.length;i+=40){const chunk=todo.slice(i,i+40);
-    const r=await sample.json(`Translate each English sentence into natural, concise Korean (존댓말 아닌 평서체 해석, OPIc 학습자용). Keep the same order and count.\nReply with ONLY a JSON array of strings, one per input sentence.\n\n`+JSON.stringify(chunk),{modelTier:"quick",cache:false});
+    const r=await aiJson(`Translate each English sentence into natural, concise Korean (존댓말 아닌 평서체 해석, OPIc 학습자용). Keep the same order and count.\nReply with ONLY a JSON array of strings, one per input sentence.\n\n`+JSON.stringify(chunk),{task:"translate",count:chunk.length,modelTier:"quick",cache:false});
     if(Array.isArray(r))chunk.forEach((en,k)=>{if(typeof r[k]==="string"&&r[k].trim())S.trans[en]=r[k].trim()});done+=chunk.length;onProgress&&onProgress(done,todo.length);save()}}
 function transOf(sent){return S.trans[sent]||""}
 
@@ -1109,11 +1161,11 @@ function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem
     sts.length?topicPick:h("p",{class:"muted small"},"저장된 스크립트가 아직 없어요. 스크립트 탭에서 주제별로 만들면 여기에 나타납니다."),
     h("div",{class:"cks"},ck("withQ","질문 먼저 듣기"),ck("shuffle","섞기")),
     ...common,
-    h("div",{class:"note"},"스크립트 탭에서 공부한 내 스크립트를 문장 단위로 영어 → 한국어 해석 순으로 들어요. 스크립트는 녹음이 없어 기기 음성으로 나오므로 iPhone에서는 화면이 켜져 있을 때만 재생되고, 꺼져 있으면 건너뜁니다. 해석이 없는 문장은 'AI 해석 만들기'로 채울 수 있어요(Claude에서만).")];
+    h("div",{class:"note"},"스크립트 탭에서 공부한 내 스크립트를 문장 단위로 영어 → 한국어 해석 순으로 들어요. 스크립트는 녹음이 없어 기기 음성으로 나오므로 iPhone에서는 화면이 켜져 있을 때만 재생되고, 꺼져 있으면 건너뜁니다. GPT 또는 Claude를 연결하면 'AI 해석 만들기'로 해석을 채울 수 있어요.")];
   const sampleOpts=[profileFill()<4?h("div",{class:"note"},h("b",{},"프로필이 거의 비어 있어요. "),"설정에서 하는 일·사는 곳·취미·좋아하는 것 등을 채우면 예시가 내 이야기로 만들어집니다. ",h("button",{class:"btn sm",onclick:()=>go("settings")},"프로필 채우기 →")):null,
     h("p",{class:"eyebrow"},"주제 선택 · 예시 답변 "+nSamples+"개 준비됨 (✓)"),
     samplePick,
-    h("div",{class:"row"},genBtn,sample?null:h("span",{class:"muted small"},"예시 생성은 Claude에서 열었을 때만 가능해요")),
+    h("div",{class:"row"},genBtn,sample?null:h("span",{class:"muted small"},"GPT로 실행하거나 Claude에서 열면 예시를 생성할 수 있어요")),
     h("div",{class:"cks"},ck("withQ","질문 먼저 듣기"),ck("shuffle","섞기")),
     ...common,
     h("div",{class:"note"},"설정의 프로필(직업·거주지 등)을 바탕으로 AI가 주제별 예시 답변을 만들어 두고 무한재생해요. 한 번 만들면 저장되어 웹에서도 들을 수 있고, 다시 만들고 싶으면 설정 → 초기화에서 예시만 지울 수 있어요. 예시는 녹음이 없어 기기 음성으로 나오므로 iPhone에서는 화면이 켜져 있을 때만 재생됩니다.")];
@@ -1193,7 +1245,7 @@ function vSettings(m){
   put(m,h("div",{},h("p",{class:"eyebrow"},"Profile & survey"),h("h1",{},"설정")),
     accountCard(),
     (()=>{const form=h("div",{style:"display:contents"},h("p",{class:"muted small"},"한국어로 편하게 적으면 돼요. 많이 채울수록 예시 스크립트·모범답안이 실제 내 이야기처럼 나오고, 시험장에서 외운 내용을 그대로 쓸 수 있어요. ("+profileFill()+"/"+(PF.length-1)+" 입력)"),...fields);
-      if(window.claude?.use)return h("div",{class:"card"},h("h3",{},"내 프로필"),h("p",{class:"muted small"},"계정별로 저장되며 AI 평가·예시 스크립트·모범답안·대화에 모두 쓰입니다."),form);
+      if(window.claude?.use||gpt.enabled)return h("div",{class:"card"},h("h3",{},"내 프로필"),h("p",{class:"muted small"},"계정별로 저장되며 AI 평가·예시 스크립트·모범답안·대화에 모두 쓰입니다."),form);
       form.hidden=true;const summary=h("p",{class:"small"},profileFill()?profileText():"아직 입력된 프로필이 없어요.");
       return h("div",{class:"card"},h("h3",{},"내 프로필"),h("p",{class:"muted small"},"프로필은 Claude 앱에서 입력하는 걸 권장해요. Claude에서 만든 스크립트·예시와 함께 '웹으로 통합'으로 여기에 자동 반영됩니다."),summary,
         h("div",{class:"row"},h("a",{class:"btn sm",href:ART_URL,target:"_blank",rel:"noopener",style:"text-decoration:none"},"Claude에서 입력하기"),h("button",{class:"btn sm ghost",onclick:e=>{form.hidden=!form.hidden;summary.hidden=!form.hidden;e.target.textContent=form.hidden?"여기서 직접 수정":"접기"}},"여기서 직접 수정")),form)})(),

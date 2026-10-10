@@ -1,6 +1,6 @@
 # OSS — Opic Self Study (하루 30분 오픽 IM3 학습 앱)
 
-개인 학습용 웹앱. 컴퓨터·휴대폰 브라우저에서 바로 실행되며, Claude 아티팩트 안에서 열면 AI 기능(평가·스크립트·대화·해석)이 켜집니다.
+개인 학습용 웹앱. 컴퓨터·휴대폰 브라우저에서 바로 실행되며, 웹에서는 OSS 로그인 후 **GPT로 실행**, Claude 아티팩트에서는 기존 Claude 연결로 AI 기능(평가·스크립트·대화·해석)을 사용합니다. GPT 서버 배포·키 설정은 [GPT_SETUP.md](GPT_SETUP.md)를 따르세요.
 
 ## 기능
 - **오늘** — 30분 루틴(표현카드 10장 → 스크립트 1개 → 질문 3개/AI 대화), 연속 학습일, 레벨 추이(IM3 목표선)
@@ -18,12 +18,15 @@ src/artifact.html   # 앱 본문 (Claude 아티팩트에 게시하는 원본, <t
 docs/index.html     # GitHub Pages용 (tools/build.py가 src에서 생성)
 docs/audio/         # 미리 렌더링한 음성 클립 (영어 남/여, 한국어 해석, 무음)
 tools/build.py      # src → docs 빌드
+functions/          # Firebase 로그인 검증·사용량 제한·OpenAI 서버 호출
+GPT_SETUP.md        # GPT 서버 배포·API 키·모델 설정
+TEST_RESULTS.md     # 모의 검증과 실제 API 미검증 범위
 tools/tts/          # 음성 클립 생성 스크립트 (Kokoro / Mimic3, 오프라인)
 ```
 
 ## 실행
 - **Claude 아티팩트 (AI 기능 포함)**: `src/artifact.html` 본문과 `docs/audio/*`를 아티팩트로 게시. 런타임 capability `sample`, `db`, `user` 필요.
-- **GitHub Pages (AI 기능 없음)**: Settings → Pages → Branch `main` / folder `/docs`. 듣기·카드·질문 연습은 그대로 동작하며 기록은 브라우저에 저장됩니다. iPhone에서는 Safari 공유 → "홈 화면에 추가".
+- **GitHub Pages**: Settings → Pages → Branch `main` / folder `/docs`. Firebase GPT 서버 설정 후 OSS 로그인 → **GPT로 실행**으로 웹에서 AI 기능을 사용합니다. 듣기·카드·질문 연습은 서버 연결 없이도 동작합니다. 로그인하면 기록을 기존 Firebase 계정으로 동기화합니다. iPhone에서는 Safari 공유 → "홈 화면에 추가".
 - **로컬**: `python3 -m http.server -d docs 8765` → http://localhost:8765
 
 ## 제약과 설계 메모
@@ -45,6 +48,6 @@ tools/tts/          # 음성 클립 생성 스크립트 (Kokoro / Mimic3, 오프
 - Claude 아티팩트 안에서는 외부 네트워크가 막혀 Firebase를 쓰지 않음(Claude 계정 db 사용). 웹 ↔ Claude는 설정의 "기록 코드"로 옮김
 
 ## 로드맵
-- [ ] API 키 직접 연결 옵션 (웹에서도 AI 평가·대화)
+- [x] 서버에 API 키를 보관하는 GPT 연결 (웹에서도 AI 평가·대화)
 - [ ] 생성된 스크립트도 녹음 클립으로 변환하는 파이프라인
 - [ ] 서비스워커(오프라인 캐시)

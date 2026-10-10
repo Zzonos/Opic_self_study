@@ -2,3 +2,9 @@ __pycache__/
 *.wav
 .DS_Store
 tools/tts/models/
+
+node_modules/
+.env*
+.secret.local
+firebase-debug.log*
+firestore-debug.log*
