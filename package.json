@@ -1,0 +1,9 @@
+{
+  "name": "opic-self-study",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "test:browser": "node tools/test-chatgpt-browser.cjs"
+  },
+  "devDependencies": { "playwright": "1.62.1" }
+}
