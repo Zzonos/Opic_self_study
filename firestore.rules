@@ -9,9 +9,5 @@ service cloud.firestore {
       allow update: if request.auth != null && request.auth.uid == uid;
       allow delete: if false;
     }
-    // Only Admin SDK in gptStudy can reserve/release API budget.
-    match /gptUsage/{uid} {
-      allow read, write: if false;
-    }
   }
 }

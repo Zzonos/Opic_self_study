@@ -1,0 +1,684 @@
+{
+  "target": "IM3",
+  "levels": [
+    "NL",
+    "NM",
+    "NH",
+    "IL",
+    "IM1",
+    "IM2",
+    "IM3",
+    "IH",
+    "AL"
+  ],
+  "topics": [
+    {
+      "id": "intro",
+      "en": "Self-introduction",
+      "ko": "자기소개",
+      "group": "기본",
+      "qs": [
+        {
+          "t": "intro",
+          "q": "Let's start the interview now. Tell me a little bit about yourself.",
+          "k": "인터뷰를 시작하겠습니다. 자기소개를 간단히 해 주세요."
+        }
+      ]
+    },
+    {
+      "id": "home",
+      "en": "Home",
+      "ko": "거주지 (아파트/주택)",
+      "group": "서베이",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "I would like to know where you live. Can you describe your home to me? What does it look like?",
+          "k": "어디에 사는지 알고 싶어요. 집을 묘사해 주세요. 어떻게 생겼나요?"
+        },
+        {
+          "t": "routine",
+          "q": "What do you usually do at home on weekends? Tell me about a typical weekend at home.",
+          "k": "주말에 집에서 보통 무엇을 하나요? 전형적인 집에서의 주말을 말해 주세요."
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about a problem you had at home recently. What was it, and how did you solve it?",
+          "k": "최근 집에서 겪은 문제를 말해 주세요. 어떤 문제였고 어떻게 해결했나요?"
+        },
+        {
+          "t": "compare",
+          "q": "How is your current home different from the one you lived in before?",
+          "k": "지금 사는 집은 예전에 살던 집과 어떻게 다른가요?"
+        }
+      ]
+    },
+    {
+      "id": "movies",
+      "en": "Movies",
+      "ko": "영화 보기",
+      "group": "서베이",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "You indicated that you like watching movies. What kind of movies do you like, and why?",
+          "k": "영화 보는 것을 좋아한다고 했죠. 어떤 영화를 좋아하고, 왜 좋아하나요?"
+        },
+        {
+          "t": "routine",
+          "q": "When and where do you usually watch movies? Who do you go with? Tell me about your typical movie routine.",
+          "k": "보통 언제, 어디서 영화를 보나요? 누구와 가나요? 영화 보는 전형적인 루틴을 말해 주세요."
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about the most memorable movie you have ever seen. What was it about, and why was it memorable?",
+          "k": "지금까지 본 가장 기억에 남는 영화를 말해 주세요. 어떤 내용이었고 왜 기억에 남나요?"
+        },
+        {
+          "t": "compare",
+          "q": "How have movies or movie theaters changed since you were young?",
+          "k": "어릴 때와 비교해 영화나 영화관이 어떻게 바뀌었나요?"
+        }
+      ]
+    },
+    {
+      "id": "park",
+      "en": "Parks",
+      "ko": "공원 가기",
+      "group": "서베이",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "You said you like going to parks. Describe your favorite park. What does it look like?",
+          "k": "공원에 가는 것을 좋아한다고 했죠. 가장 좋아하는 공원을 묘사해 주세요. 어떻게 생겼나요?"
+        },
+        {
+          "t": "routine",
+          "q": "What do you usually do when you go to the park? Who do you go with?",
+          "k": "공원에 가면 보통 무엇을 하나요? 누구와 가나요?"
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about a memorable experience you had at a park.",
+          "k": "공원에서 있었던 기억에 남는 경험을 말해 주세요."
+        }
+      ]
+    },
+    {
+      "id": "concert",
+      "en": "Concerts",
+      "ko": "콘서트 보기",
+      "group": "서베이",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "You indicated that you go to concerts. What kind of concerts do you like to go to?",
+          "k": "콘서트에 간다고 했죠. 어떤 콘서트에 가는 것을 좋아하나요?"
+        },
+        {
+          "t": "routine",
+          "q": "What do you usually do before, during, and after a concert? Describe the whole process.",
+          "k": "콘서트 전, 중, 후에 보통 무엇을 하나요? 전체 과정을 설명해 주세요."
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about the most memorable concert you have been to.",
+          "k": "가장 기억에 남는 콘서트를 말해 주세요."
+        }
+      ]
+    },
+    {
+      "id": "beach",
+      "en": "Beach",
+      "ko": "해변 가기",
+      "group": "서베이",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "You indicated that you go to the beach. Describe a beach you like to visit. What does it look like?",
+          "k": "해변에 간다고 했죠. 즐겨 가는 해변을 묘사해 주세요. 어떻게 생겼나요?"
+        },
+        {
+          "t": "routine",
+          "q": "What do you usually do at the beach? Describe a typical day there.",
+          "k": "해변에서 보통 무엇을 하나요? 그곳에서의 전형적인 하루를 설명해 주세요."
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about a memorable or unexpected experience you had at the beach.",
+          "k": "해변에서 있었던 기억에 남거나 예상치 못한 경험을 말해 주세요."
+        }
+      ]
+    },
+    {
+      "id": "music",
+      "en": "Music",
+      "ko": "음악 감상",
+      "group": "서베이",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "You indicated that you like listening to music. What kind of music do you like, and who are your favorite musicians?",
+          "k": "음악 듣는 것을 좋아한다고 했죠. 어떤 음악을 좋아하고, 좋아하는 음악가는 누구인가요?"
+        },
+        {
+          "t": "routine",
+          "q": "When and where do you usually listen to music? How do you listen to it?",
+          "k": "보통 언제, 어디서 음악을 듣나요? 어떤 방법으로 듣나요?"
+        },
+        {
+          "t": "exp",
+          "q": "How did you first become interested in music? Tell me how your taste in music has changed.",
+          "k": "음악에 처음 관심을 갖게 된 계기는요? 음악 취향이 어떻게 변해 왔는지 말해 주세요."
+        }
+      ]
+    },
+    {
+      "id": "cooking",
+      "en": "Cooking",
+      "ko": "요리하기",
+      "group": "서베이",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "You said you like cooking. What kind of food do you usually cook? Describe one of your favorite dishes.",
+          "k": "요리를 좋아한다고 했죠. 보통 어떤 음식을 만드나요? 좋아하는 요리 하나를 설명해 주세요."
+        },
+        {
+          "t": "routine",
+          "q": "How do you usually cook? Walk me through the steps from shopping to eating.",
+          "k": "보통 어떻게 요리하나요? 장보기부터 먹기까지 단계를 설명해 주세요."
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about a time something went wrong while you were cooking.",
+          "k": "요리하다가 뭔가 잘못됐던 경험을 말해 주세요."
+        }
+      ]
+    },
+    {
+      "id": "reading",
+      "en": "Reading",
+      "ko": "독서",
+      "group": "서베이",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "You indicated that you like reading. What kind of books do you like to read?",
+          "k": "독서를 좋아한다고 했죠. 어떤 책을 즐겨 읽나요?"
+        },
+        {
+          "t": "routine",
+          "q": "When and where do you usually read? Tell me about your reading habits.",
+          "k": "보통 언제, 어디서 책을 읽나요? 독서 습관을 말해 주세요."
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about a book that left a strong impression on you.",
+          "k": "강한 인상을 남긴 책에 대해 말해 주세요."
+        }
+      ]
+    },
+    {
+      "id": "jogging",
+      "en": "Jogging / Walking",
+      "ko": "조깅·걷기",
+      "group": "서베이",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "You said you go jogging. Where do you usually jog? Describe the place.",
+          "k": "조깅을 한다고 했죠. 보통 어디서 조깅하나요? 그 장소를 묘사해 주세요."
+        },
+        {
+          "t": "routine",
+          "q": "Tell me about your jogging routine. How often do you jog, and what do you do before and after?",
+          "k": "조깅 루틴을 말해 주세요. 얼마나 자주 하고, 전후에 무엇을 하나요?"
+        },
+        {
+          "t": "exp",
+          "q": "How did you start jogging? Tell me about the first time you went jogging.",
+          "k": "조깅을 어떻게 시작했나요? 처음 조깅했던 때를 말해 주세요."
+        }
+      ]
+    },
+    {
+      "id": "gym",
+      "en": "Gym",
+      "ko": "헬스",
+      "group": "서베이",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "You indicated that you go to the gym. Describe the gym you go to. What does it look like?",
+          "k": "헬스장에 다닌다고 했죠. 다니는 헬스장을 묘사해 주세요. 어떻게 생겼나요?"
+        },
+        {
+          "t": "routine",
+          "q": "What do you usually do at the gym? Describe your typical workout.",
+          "k": "헬스장에서 보통 무엇을 하나요? 전형적인 운동 루틴을 설명해 주세요."
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about a memorable experience you had at the gym.",
+          "k": "헬스장에서 있었던 기억에 남는 경험을 말해 주세요."
+        }
+      ]
+    },
+    {
+      "id": "bike",
+      "en": "Cycling",
+      "ko": "자전거",
+      "group": "서베이",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "You said you ride a bike. Where do you usually ride, and what does your bike look like?",
+          "k": "자전거를 탄다고 했죠. 보통 어디서 타고, 자전거는 어떻게 생겼나요?"
+        },
+        {
+          "t": "routine",
+          "q": "When do you usually ride your bike? Describe your typical ride.",
+          "k": "보통 언제 자전거를 타나요? 전형적인 라이딩을 설명해 주세요."
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about a memorable or difficult experience you had while riding your bike.",
+          "k": "자전거를 타다 겪은 기억에 남거나 힘들었던 경험을 말해 주세요."
+        }
+      ]
+    },
+    {
+      "id": "dtravel",
+      "en": "Domestic travel",
+      "ko": "국내 여행",
+      "group": "서베이",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "You indicated that you like to travel domestically. Where do you like to go in your country, and why?",
+          "k": "국내 여행을 좋아한다고 했죠. 국내에서 어디에 가는 것을 좋아하고, 왜 그런가요?"
+        },
+        {
+          "t": "routine",
+          "q": "What do you usually do to prepare for a trip? Tell me about your typical travel routine.",
+          "k": "여행을 준비할 때 보통 무엇을 하나요? 전형적인 여행 루틴을 말해 주세요."
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about a memorable trip you took in your country. Where did you go, and what happened?",
+          "k": "국내에서 떠난 기억에 남는 여행을 말해 주세요. 어디에 갔고 무슨 일이 있었나요?"
+        }
+      ]
+    },
+    {
+      "id": "otravel",
+      "en": "Overseas travel",
+      "ko": "해외 여행",
+      "group": "서베이",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "You said you travel abroad. Which countries have you visited, and which did you like the most?",
+          "k": "해외 여행을 한다고 했죠. 어느 나라들을 가 봤고, 어디가 가장 좋았나요?"
+        },
+        {
+          "t": "routine",
+          "q": "What do you usually do before an overseas trip? How do you plan it?",
+          "k": "해외 여행 전에 보통 무엇을 하나요? 어떻게 계획하나요?"
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about a problem you had while traveling abroad and how you handled it.",
+          "k": "해외 여행 중 겪은 문제와 그것을 어떻게 처리했는지 말해 주세요."
+        }
+      ]
+    },
+    {
+      "id": "vacation",
+      "en": "Vacation at home",
+      "ko": "집에서 보내는 휴가",
+      "group": "서베이",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "You said you spend your vacations at home. What do you usually do during a vacation at home?",
+          "k": "휴가를 집에서 보낸다고 했죠. 집에서 휴가를 보낼 때 보통 무엇을 하나요?"
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about your most recent vacation at home. What did you do, day by day?",
+          "k": "가장 최근에 집에서 보낸 휴가를 말해 주세요. 날마다 무엇을 했나요?"
+        }
+      ]
+    },
+    {
+      "id": "housework",
+      "en": "Housework",
+      "ko": "집안일",
+      "group": "돌발",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "What kind of housework do you usually do? Who does the housework at your home?",
+          "k": "보통 어떤 집안일을 하나요? 집에서 집안일은 누가 하나요?"
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about a time you had to do a lot of housework. What did you do?",
+          "k": "집안일을 많이 해야 했던 때를 말해 주세요. 무엇을 했나요?"
+        }
+      ]
+    },
+    {
+      "id": "weather",
+      "en": "Weather",
+      "ko": "날씨·계절",
+      "group": "돌발",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "Tell me about the weather in your country. What are the seasons like?",
+          "k": "당신 나라의 날씨를 말해 주세요. 계절은 어떤가요?"
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about a time the weather caused a problem for you.",
+          "k": "날씨 때문에 문제가 생겼던 때를 말해 주세요."
+        }
+      ]
+    },
+    {
+      "id": "bank",
+      "en": "Banks",
+      "ko": "은행",
+      "group": "돌발",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "Describe a bank in your country. What does it look like, and what do people do there?",
+          "k": "당신 나라의 은행을 묘사해 주세요. 어떻게 생겼고, 사람들은 그곳에서 무엇을 하나요?"
+        },
+        {
+          "t": "compare",
+          "q": "How has banking changed over the past 10 years?",
+          "k": "지난 10년 동안 은행 업무가 어떻게 바뀌었나요?"
+        }
+      ]
+    },
+    {
+      "id": "recycling",
+      "en": "Recycling",
+      "ko": "재활용",
+      "group": "돌발",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "How is recycling done in your country? What do people usually recycle?",
+          "k": "당신 나라에서는 재활용을 어떻게 하나요? 사람들은 보통 무엇을 재활용하나요?"
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about a time you had trouble with recycling.",
+          "k": "재활용 때문에 곤란했던 때를 말해 주세요."
+        }
+      ]
+    },
+    {
+      "id": "internet",
+      "en": "Internet",
+      "ko": "인터넷",
+      "group": "돌발",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "What do you usually do on the internet? Which websites or apps do you use the most?",
+          "k": "인터넷으로 보통 무엇을 하나요? 가장 많이 쓰는 웹사이트나 앱은요?"
+        },
+        {
+          "t": "compare",
+          "q": "How has the internet changed people's lives compared to the past?",
+          "k": "인터넷은 과거와 비교해 사람들의 삶을 어떻게 바꿨나요?"
+        }
+      ]
+    },
+    {
+      "id": "transport",
+      "en": "Transportation",
+      "ko": "교통",
+      "group": "돌발",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "What kind of transportation do people use in your country? How do you usually get around?",
+          "k": "당신 나라 사람들은 어떤 교통수단을 이용하나요? 당신은 보통 어떻게 이동하나요?"
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about a problem you experienced with public transportation.",
+          "k": "대중교통에서 겪은 문제를 말해 주세요."
+        }
+      ]
+    },
+    {
+      "id": "holiday",
+      "en": "Holidays",
+      "ko": "명절",
+      "group": "돌발",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "Tell me about a major holiday in your country. What do people do on that day?",
+          "k": "당신 나라의 큰 명절에 대해 말해 주세요. 그날 사람들은 무엇을 하나요?"
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about a memorable holiday from your childhood.",
+          "k": "어린 시절의 기억에 남는 명절을 말해 주세요."
+        }
+      ]
+    },
+    {
+      "id": "health",
+      "en": "Health",
+      "ko": "건강",
+      "group": "돌발",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "What do you do to stay healthy? Tell me about your healthy habits.",
+          "k": "건강을 위해 무엇을 하나요? 건강한 습관을 말해 주세요."
+        },
+        {
+          "t": "compare",
+          "q": "How are people's ideas about health today different from the past?",
+          "k": "오늘날 사람들의 건강에 대한 생각은 과거와 어떻게 다른가요?"
+        }
+      ]
+    },
+    {
+      "id": "fashion",
+      "en": "Fashion",
+      "ko": "패션",
+      "group": "돌발",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "What kind of clothes do you usually wear? Describe your style.",
+          "k": "보통 어떤 옷을 입나요? 스타일을 묘사해 주세요."
+        },
+        {
+          "t": "compare",
+          "q": "How has fashion in your country changed over the years?",
+          "k": "당신 나라의 패션은 세월이 지나며 어떻게 바뀌었나요?"
+        }
+      ]
+    },
+    {
+      "id": "tech",
+      "en": "Technology",
+      "ko": "기술·산업",
+      "group": "돌발",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "What kind of technology do you use every day? Which device is most important to you?",
+          "k": "매일 어떤 기술을 사용하나요? 가장 중요한 기기는 무엇인가요?"
+        },
+        {
+          "t": "compare",
+          "q": "Tell me about a technology that has changed a lot since you were young.",
+          "k": "어릴 때 이후로 많이 바뀐 기술 하나를 말해 주세요."
+        }
+      ]
+    },
+    {
+      "id": "food",
+      "en": "Food",
+      "ko": "음식",
+      "group": "돌발",
+      "qs": [
+        {
+          "t": "desc",
+          "q": "Tell me about a popular food in your country. What does it taste like?",
+          "k": "당신 나라에서 인기 있는 음식을 말해 주세요. 맛은 어떤가요?"
+        },
+        {
+          "t": "exp",
+          "q": "Tell me about a memorable meal you had recently.",
+          "k": "최근에 먹은 기억에 남는 식사를 말해 주세요."
+        }
+      ]
+    }
+  ],
+  "roleplays": [
+    {
+      "id": "rp_movie",
+      "k11": "상황을 드릴게요. 친구와 영화를 보고 싶습니다. 영화관에 전화해 영화와 상영 시간에 대해 서너 가지 질문하세요.",
+      "k12": "문제가 생겼어요. 영화관에 도착하니 표가 매진됐습니다. 친구에게 상황을 설명하고 대안을 두세 가지 제안하세요.",
+      "k13": "매진이나 취소로 계획이 틀어진 적이 있나요? 무슨 일이 있었는지 말해 주세요.",
+      "ko": "영화 티켓",
+      "q11": "I'd like to give you a situation and ask you to act it out. You want to see a movie with a friend. Call the theater and ask three or four questions about the movie and the showtimes.",
+      "q12": "I'm sorry, but there is a problem. When you get to the theater, you find that the tickets are sold out. Explain the situation to your friend and suggest two or three alternatives.",
+      "q13": "That's the end of the situation. Have you ever had a plan fall through because of a sold-out event or a cancellation? Tell me what happened."
+    },
+    {
+      "id": "rp_travel",
+      "k11": "여행을 가고 싶습니다. 여행사에 전화해 여행 패키지에 대해 서너 가지 질문하세요.",
+      "k12": "여행을 예약했는데 급한 일이 생겨 갈 수 없습니다. 여행사에 전화해 상황을 설명하고 해결책을 두세 가지 제안하세요.",
+      "k13": "여행을 취소하거나 변경해야 했던 적이 있나요? 말해 주세요.",
+      "ko": "여행사",
+      "q11": "I'd like to give you a situation and ask you to act it out. You want to go on a trip. Call a travel agency and ask three or four questions about a travel package.",
+      "q12": "I'm sorry, but there is a problem. You booked the trip, but something urgent came up and you cannot go. Call the agency, explain the situation, and suggest two or three solutions.",
+      "q13": "That's the end of the situation. Have you ever had to cancel or change a trip? Tell me about it."
+    },
+    {
+      "id": "rp_gym",
+      "k11": "헬스장에 등록하고 싶습니다. 헬스장에 전화해 회원권에 대해 서너 가지 질문하세요.",
+      "k12": "등록했는데 항상 너무 붐벼서 기구를 쓸 수 없습니다. 매니저에게 문제를 설명하고 해결책을 두세 가지 제안하세요.",
+      "k13": "돈을 낸 서비스에 불만족했던 적이 있나요? 무슨 일이 있었고 어떻게 대처했나요?",
+      "ko": "헬스장 등록",
+      "q11": "I'd like to give you a situation and ask you to act it out. You want to join a gym. Call the gym and ask three or four questions about membership.",
+      "q12": "I'm sorry, but there is a problem. You joined the gym, but it is always too crowded and you can't use the machines. Talk to the manager, explain the problem, and suggest two or three solutions.",
+      "q13": "That's the end of the situation. Have you ever been unhappy with a service you paid for? What happened, and how did you deal with it?"
+    },
+    {
+      "id": "rp_restaurant",
+      "k11": "가족과 식당에서 저녁을 먹고 싶습니다. 식당에 전화해 예약을 위해 서너 가지 질문하세요.",
+      "k12": "도착하니 예약 기록이 없다고 합니다. 직원에게 상황을 설명하고 해결 방법을 두세 가지 제안하세요.",
+      "k13": "식당에서 뭔가 잘못됐던 때를 말해 주세요. 무슨 일이 있었나요?",
+      "ko": "식당 예약",
+      "q11": "I'd like to give you a situation and ask you to act it out. You want to have dinner with your family at a restaurant. Call the restaurant and ask three or four questions to make a reservation.",
+      "q12": "I'm sorry, but there is a problem. When you arrive, the restaurant has no record of your reservation. Explain the situation to the staff and suggest two or three ways to solve it.",
+      "q13": "That's the end of the situation. Tell me about a time something went wrong at a restaurant. What happened?"
+    },
+    {
+      "id": "rp_phone",
+      "k11": "새 휴대폰을 사고 싶습니다. 매장에 가서 점원에게 원하는 휴대폰에 대해 서너 가지 질문하세요.",
+      "k12": "구매 후 화면에 흠집이 있는 것을 발견했습니다. 매장에 전화해 문제를 설명하고 해결책을 두세 가지 제안하세요.",
+      "k13": "산 물건이 고장 났거나 실망스러웠던 적이 있나요? 무슨 일이 있었는지 말해 주세요.",
+      "ko": "휴대폰 구매",
+      "q11": "I'd like to give you a situation and ask you to act it out. You want to buy a new phone. Go to a store and ask the clerk three or four questions about the phone you want.",
+      "q12": "I'm sorry, but there is a problem. After buying the phone, you find that the screen is scratched. Call the store, explain the problem, and suggest two or three solutions.",
+      "q13": "That's the end of the situation. Have you ever bought something that turned out to be broken or disappointing? Tell me what happened."
+    },
+    {
+      "id": "rp_friend",
+      "k11": "친구가 파티에 초대했습니다. 친구에게 전화해 파티에 대해 서너 가지 질문하세요.",
+      "k12": "파티 당일 아파서 갈 수 없습니다. 친구에게 전화해 상황을 설명하고 대안을 두세 가지 제안하세요.",
+      "k13": "친구와의 약속을 취소해야 했던 때를 말해 주세요. 무슨 일이 있었고 친구는 어떻게 반응했나요?",
+      "ko": "친구와 약속",
+      "q11": "I'd like to give you a situation and ask you to act it out. A friend invited you to a party. Call your friend and ask three or four questions about the party.",
+      "q12": "I'm sorry, but there is a problem. On the day of the party, you are sick and cannot go. Call your friend, explain the situation, and suggest two or three alternatives.",
+      "q13": "That's the end of the situation. Tell me about a time you had to cancel plans with a friend. What happened, and how did your friend react?"
+    }
+  ],
+  "advanced": [
+    "Some people say that it is better to live in a big city, while others prefer the countryside. Which do you prefer, and why?",
+    "Compare the way people spend their free time today with the way they did 20 years ago. What has changed?",
+    "What do you think is the biggest challenge facing young people in your country today? Why?",
+    "Many people say technology makes life more convenient but also more stressful. What is your opinion?",
+    "What are some issues or concerns people in your country have about the environment? What is being done about them?",
+    "Compare two kinds of transportation that are popular in your country. What are the advantages and disadvantages of each?"
+  ],
+  "advanced_ko": [
+    "대도시에 사는 게 낫다는 사람도 있고 시골을 선호하는 사람도 있습니다. 어느 쪽을 선호하고 왜 그런가요?",
+    "오늘날 사람들이 여가를 보내는 방식을 20년 전과 비교해 보세요. 무엇이 달라졌나요?",
+    "당신 나라의 젊은이들이 오늘날 직면한 가장 큰 어려움은 무엇이라고 생각하나요? 왜요?",
+    "기술이 삶을 편리하게 하지만 더 스트레스를 준다는 말이 있습니다. 어떻게 생각하나요?",
+    "당신 나라 사람들이 환경에 대해 갖는 우려는 무엇인가요? 그에 대해 어떤 조치가 취해지고 있나요?",
+    "당신 나라에서 인기 있는 두 가지 교통수단을 비교해 보세요. 각각의 장단점은 무엇인가요?"
+  ],
+  "scenarios": [
+    {
+      "id": "interview",
+      "ko": "오픽 인터뷰어 (Ava)",
+      "en": "OPIc interviewer",
+      "desc": "실제 시험처럼 질문하고, 답하면 꼬리 질문으로 이어가요",
+      "persona": "You are Ava, a friendly OPIc interviewer. Ask one question at a time about the learner's survey topics, following the real OPIc pattern: describe → routine → past experience → comparison, then move to the next topic. React briefly and naturally to what they said (one short sentence) before the next question. Never answer for them."
+    },
+    {
+      "id": "free",
+      "ko": "자유 대화",
+      "en": "Small talk",
+      "desc": "일상 주제로 편하게 수다. 끊기지 않게 질문을 이어줘요",
+      "persona": "You are Sam, a warm, curious American friend making small talk. Talk about everyday topics (weekend, work, food, hobbies, travel). Share a little about yourself too, so it feels like a real two-way chat, then ask a follow-up question."
+    },
+    {
+      "id": "gym",
+      "ko": "헬스장 직원",
+      "en": "Gym front desk",
+      "desc": "회원권 문의 → 문제 상황까지 롤플레이",
+      "persona": "You are the front-desk staff at a gym. The learner is calling to ask about membership. Answer their questions with realistic details (prices, hours, trial). After 4-5 exchanges, introduce a small problem (e.g. the class they want is full) so they must negotiate a solution."
+    },
+    {
+      "id": "travel",
+      "ko": "여행사 직원",
+      "en": "Travel agent",
+      "desc": "패키지 문의 → 일정 변경 협상",
+      "persona": "You are a travel agent. The learner wants to book a trip. Ask what they want, suggest a package with concrete details, answer questions. After a few turns, bring up a complication (dates unavailable, price change) so they must propose alternatives."
+    },
+    {
+      "id": "restaurant",
+      "ko": "식당 예약",
+      "en": "Restaurant host",
+      "desc": "예약 전화 → 예약 누락 문제 해결",
+      "persona": "You are the host at a popular restaurant. The learner calls to make a reservation. Ask for details (date, party size, requests). Later, tell them there is a problem (no record of the booking, or only a late slot available) and let them handle it."
+    },
+    {
+      "id": "store",
+      "ko": "휴대폰 매장",
+      "en": "Phone store clerk",
+      "desc": "구매 상담 → 불량 교환 요청",
+      "persona": "You are a clerk at a phone store. Help the learner choose a phone, then later they call back because the screen is scratched; handle their complaint politely but make them explain and propose a solution."
+    },
+    {
+      "id": "friend",
+      "ko": "친구와 약속",
+      "en": "Friend on the phone",
+      "desc": "파티·약속 잡기 → 취소 상황",
+      "persona": "You are Jake, the learner's friend, on the phone. You invited them to a party this weekend. Chat about the plan, then they may need to cancel or change plans; respond like a real friend would."
+    }
+  ],
+  "rubric": "You are an OPIc (ACTFL) rater. The learner is Korean; target level is IM3. OPIc levels in order: NL, NM, NH, IL, IM1, IM2, IM3, IH, AL.\nRating guide: IL = short sentences, lists; IM1-2 = full sentences, basic connectors, some past tense errors; IM3 = paragraph-length answers with a clear structure (intro-body-ending), fluent connectors, mostly accurate past tense, personal details; IH = handles complications and unexpected questions, varied vocabulary, past/present/future controlled; AL = narrates in all time frames consistently, supports opinions, native-like idioms.\nJudge primarily on: structure, amount of detail, tense control, connectors/fillers, vocabulary range, and task completion. Ignore spelling and punctuation (the answer was dictated by voice). Explanations for the learner are in Korean (존댓말, 간결하게); example sentences are in English."
+}

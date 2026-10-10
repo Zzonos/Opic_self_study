@@ -1,70 +1,46 @@
-# GPT 학습 기능 설정
+# API 키 없는 ChatGPT 학습 연결
 
-GPT는 ChatGPT 사이트를 여는 방식이 아니라 OSS 앱 → Firebase HTTPS Function → OpenAI Responses API로 동작합니다. 기존 Claude 아티팩트의 `sample`, `db`, `user` 경로는 유지됩니다. GPT는 기존 Firebase 이메일 로그인과 `users/{uid}` 기록 저장·동기화를 사용합니다.
+현재 구현은 기존 Claude 이동 방식을 참고한 **웹 요청 복사 → ChatGPT에서 학습 → 결과 가져오기** 방식입니다. OpenAI API 키 등록, Firebase Functions 배포, 별도 OpenAI API 결제가 필요 없습니다. 기존 Firebase 로그인·Firestore 저장·동기화는 그대로 사용하며 새로운 서버를 추가하지 않습니다. ChatGPT의 사용 가능 기능과 한도는 해당 계정에 따릅니다.
 
-## 관리자 설정 및 배포
+## 사용
 
-이 변경은 서버 배포나 키 등록을 자동 실행하지 않습니다. Firebase 프로젝트 `opic-self-study`의 관리자 계정으로 아래 작업을 진행하세요. Node.js 22와 Python 3이 필요합니다.
+1. OSS 웹에서 **GPT로 실행**을 선택합니다. 안내창에서 프로필·주제·최근 20건의 기록을 확인한 뒤 학습 자료를 복사합니다.
+2. **ChatGPT에서 열기**로 이동하고 대화창에 붙여넣습니다. 로그인, ChatGPT 사용 한도, 네트워크 문제는 ChatGPT 화면에서 해결합니다. OSS가 ChatGPT 인증 상태를 읽거나 로그인을 대신하지 않습니다.
+3. 웹에서 평가·스크립트·예시·번역·모의시험·분석 기능을 실행하면 해당 요청을 복사하는 창이 열립니다. 프로필·질문·답변·실수 기록과 기존 Claude 평가 기준 중 그 작업에 필요한 내용만 포함합니다. 로그인 토큰과 비밀번호는 포함하지 않습니다.
+4. ChatGPT에 요청을 붙여넣어 수행한 뒤 **JSON 코드 블록 전체**를 복사합니다. 웹의 **결과 가져오기**에 붙여넣고 **확인하고 기록에 반영**을 선택합니다. 결과 내용은 기존 저장·동기화 경로로 들어갑니다. OSS에 로그인하지 않았으면 이 브라우저에만 저장됩니다.
+5. 영어 대화는 웹에서 상대를 선택하고 요청을 ChatGPT에 붙여넣은 뒤 **ChatGPT 안에서 계속**합니다. ‘뭐라고 말하지?’는 힌트, ‘해석’은 번역, ‘종료’ 또는 ‘웹으로 통합’은 대화 요약을 반환합니다. 반환 요약을 웹에 가져오면 대화 평가가 저장됩니다. 측정하지 않은 대화 시간/턴 수를 임의로 기록하지 않습니다.
 
-1. Firebase 콘솔에서 프로젝트의 결제(Blaze), Authentication 이메일/비밀번호, 기존 Firestore 데이터베이스를 확인합니다. 승인된 로그인 도메인에 `zzonos.github.io`와 로컬 확인용 `localhost`를 등록합니다. 기존 초대 계정과 학습 문서를 유지하세요.
-2. 저장소의 작업 브랜치를 체크아웃하고 서버 의존성과 CLI를 설치합니다.
+단순 사이트 열기와 달리 작업별 프롬프트·결과 계약·검증·저장 경로가 연결되어 있습니다. 다만 Claude 아티팩트와 동일한 UI가 ChatGPT에서 실행되거나 결과가 자동으로 전송되지는 않습니다. 사용자가 직접 복사·붙여넣기 합니다.
 
-   ```sh
-   git switch feat/gpt-study-integration
-   npm install -g firebase-tools
-   firebase login
-   cd functions
-   npm ci
-   npm test
-   cd ..
-   ```
+## 전용 학습 GPT (선택)
 
-3. OpenAI API 프로젝트에서 API 사용 권한·결제와 예산 알림을 설정하고 프로젝트 전용 API 키를 발급합니다. 키는 다음 명령이 표시하는 비밀 입력에만 붙여넣습니다. 키를 HTML, GitHub, 커밋, 브라우저 설정이나 일반 `.env`에 넣지 마세요.
+일반 ChatGPT 대화로 바로 사용할 수 있습니다. 반복 사용하는 전용 GPT를 만들려면 [chatgpt/README.md](chatgpt/README.md)의 이름·설명·Instructions·Knowledge를 사용합니다. **API Actions는 설정하지 않습니다.** 실제 계정에서 생성한 공유 링크를 OSS 설정의 ‘ChatGPT 학습 링크’에 저장합니다. 기본 링크는 `https://chatgpt.com/`이며 존재하지 않는 GPT 주소를 코드에 넣지 않았습니다.
 
-   ```sh
-   firebase functions:secrets:set OPENAI_API_KEY --project opic-self-study
-   ```
+학습 지침과 질문은행은 Pages 빌드 후 `docs/chatgpt/`에도 있습니다. GPT/플러그인 생성 기능은 계정·워크스페이스에 따라 다를 수 있으며 이 작업에서 사용자 계정의 GPT를 생성·게시하지 않았습니다.
 
-4. 배포 전 콘솔의 기존 Firestore 규칙과 `firestore.rules`가 일치하는지 확인합니다. `users/{uid}`의 기존 초대 가입·소유자 권한을 유지하고, `gptUsage/{uid}`는 클라이언트 읽기·쓰기를 모두 금지합니다. 기존 규칙이 다르면 기존 권한을 보존한 채 이 차단 규칙만 반영하세요. Admin SDK는 이 규칙을 우회하여 호출량을 관리합니다.
+## 기록과 실패 처리
 
-   ```sh
-   firebase deploy --only firestore:rules --project opic-self-study
-   firebase deploy --only functions:gptStudy --project opic-self-study
-   ```
+- 웹 요청 ID·학습 종류·결과 항목·개수·레벨·점수를 검사합니다. 다른 요청의 응답, 잘못된 JSON, 취소/반영한 요청, 다른 OSS 계정의 결과는 거부합니다. 결과 텍스트를 코드로 실행하지 않습니다.
+- 취소·연결 해제·로그아웃·잘못된 결과·ChatGPT 사용 한도 안내만 받은 경우 성적을 생성하거나 기존 기록을 지우지 않습니다. 연습 입력과 기존 스크립트를 유지합니다.
+- **나중에 가져오기**로 창을 닫아도 대기 요청은 이 브라우저에 저장됩니다. 새로고침 뒤 동일 계정으로 로그인해 **요청·결과 열기**에서 가져올 수 있습니다. 대기 중인 요청은 한 개만 실행하며 먼저 반영하거나 취소합니다.
+- 대기 요청은 계정 동기화 대상이 아니므로 같은 브라우저에서 결과를 가져와야 합니다. 가져온 학습 기록·스크립트·해석·분석은 기존 Firebase 동기화 대상입니다. 개인 기기를 사용하세요.
+- 여러 주제의 예시나 40문장씩 번역하는 도중 취소하면 완료한 묶음은 유지하고 이후 묶음을 저장하지 않습니다. 재접속 후 이미 만든 결과는 가져올 수 있지만 중단한 전체 반복 작업이 자동 재개되지는 않습니다.
+- 웹에서 취소해도 ChatGPT에서 이미 시작한 생성은 별도이므로 ChatGPT 화면에서도 중지할 수 있습니다. OSS가 외부 서비스의 생성 중단·사용 한도를 제어하지 않습니다.
+- 프로필과 답변은 사용자가 복사해 ChatGPT로 전달합니다. URL 쿼리나 링크에 기록·토큰을 넣지 않습니다. 자동 클립보드가 막히면 요청 칸을 전체 선택해 직접 복사할 수 있습니다.
+- 기존 웹↔Claude 압축 기록 코드 이전은 그대로 유지됩니다. ChatGPT에는 이 압축 코드를 해독시키지 않고 읽을 수 있는 학습 요청을 전달합니다.
 
-   Function은 `asia-northeast3`에 배포됩니다. Cloud Run 호출 자체는 공개이며, 함수 내부에서 **모든 AI 요청의 Firebase ID 토큰(폐기 여부 포함)**과 초대 가입으로 생성된 `users/{uid}` 문서 존재를 검사합니다. 조직 정책이 공개 Cloud Run 호출을 금지하면 관리자가 정책을 조정해야 합니다. API 키와 모델 설정은 서버에서만 읽습니다.
+## 게시 및 검증
 
-5. 기본 모델은 `gpt-4.1-mini`입니다. 변경하려면 비밀이 아닌 서버 파라미터 `OPENAI_MODEL`을 `functions/.env.opic-self-study`에 설정하고 함수를 다시 배포합니다. 예: `OPENAI_MODEL=gpt-4.1-mini`. 이 파일은 Git에서 제외됩니다. 모델은 Responses API 및 `max_output_tokens`를 지원해야 합니다.
-6. 실제 배포 URL이 `https://asia-northeast3-opic-self-study.cloudfunctions.net/gptStudy`인지 확인합니다. 다른 프로젝트/지역을 사용하면 `src/artifact.html`의 `GPT_ENDPOINT`와 `functions/index.js`의 지역·허용 Origin을 함께 수정한 후 `python tools/build.py`로 다시 빌드합니다. 허용 Origin은 현재 GitHub Pages와 로컬 8765 포트뿐입니다.
-7. GitHub Pages가 `main /docs`를 게시한다면 이 PR은 검토·병합 후에만 운영 웹앱에 반영됩니다. 이 작업에서 main에 푸시하거나 PR을 병합하지 않습니다. 브랜치 상태에서 먼저 확인하려면 다음 명령으로 로컬 페이지를 열고 기존 OSS 계정으로 로그인합니다.
+```sh
+node tools/build-chatgpt.cjs
+python tools/build.py
+npm ci
+npm test
+npx playwright install chromium
+npm run test:browser
+python -m http.server -d docs 8765
+```
 
-   ```sh
-   python tools/build.py
-   python -m http.server -d docs 8765
-   ```
+GitHub Pages가 main /docs를 게시한다면 PR 검토·병합 후 운영 페이지에 반영됩니다. 이 작업에서는 작업 브랜치만 푸시하고 main에 직접 커밋·푸시하거나 병합하지 않습니다.
 
-   [로컬 OSS](http://localhost:8765)에서 **GPT로 실행**을 선택한 뒤 학습 기능을 실행합니다. 선택 자체에는 API 비용이 없고, 평가·생성·대화 등 요청부터 비용이 발생합니다. 서버를 설정하지 않은 상태에서 버튼만으로 GPT가 작동하지는 않습니다.
-
-## 비용·제한·취소
-
-- 사용자별 분당 12회, UTC 하루 150회(한국시간 오전 9시 초기화), 동시 2회. `gptUsage/{uid}`에서 Firestore 트랜잭션으로 예약하므로 인스턴스가 여러 개여도 공유됩니다. 제한 변경은 `functions/core.js`의 `reserveUsage` 기본값을 수정 후 서버 재배포합니다.
-- 입력은 최대 60KB/30 메시지, 출력은 최대 8,000 토큰. 모의시험·스크립트가 너무 길어 출력이 잘리면 저장하지 않고 오류를 표시합니다. 긴 입력은 나누어 주세요.
-- 최대 인스턴스 5개, 서버 OpenAI 요청 90초, 클라이언트 100초 제한. 사용자 한도는 전체 프로젝트의 지출 상한을 보장하지 않으므로 OpenAI와 Google Cloud 예산·알림을 별도로 설정하세요.
-- 실패·취소 요청도 사용량에 포함합니다. 이미 처리된 토큰에는 비용이 발생할 수 있습니다. 브라우저 취소 시 서버는 연결 종료를 감지하면 OpenAI 요청을 중단하지만, 네트워크 프록시가 종료를 늦게 전달할 수 있어 비용 중단을 보장하지 않습니다.
-- 응답은 OpenAI에 `store:false`로 요청하고 학습 결과만 기존 OSS 저장 경로로 보냅니다. 이는 OpenAI의 모든 보존 정책을 해제한다는 의미가 아닙니다. 키·토큰·답변 원문을 서버 로그에 출력하지 않습니다.
-
-## 사용 흐름 및 오류
-
-- 웹의 **GPT로 실행**과 **Claude에서 열기**는 별도 버튼입니다. Claude 버튼은 기존 아티팩트를 열고 기록 코드를 복사합니다. Claude 내부는 기존 capability를 사용합니다.
-- GPT에는 OSS 로그인이 필요합니다. 로그인 상태에서 선택한 GPT 제공자는 해당 브라우저에 기억됩니다. API 키는 사용자에게 요구하지 않습니다.
-- 401이면 로그인 토큰을 한 번 강제 갱신하며, 다시 실패하면 재로그인을 안내합니다. 자동으로 생성 요청을 재시도하지 않습니다.
-- 처리 중 상단에서 **취소** 또는 **GPT 연결 해제**를 선택할 수 있습니다. 평가·스크립트의 기존 중지 버튼도 동작합니다. 로그아웃은 진행 중 요청을 취소합니다.
-- 연결 오류·한도·취소 시 실패한 평가를 학습 기록에 추가하지 않습니다. 연습 입력, 대화의 미전송 입력, 기존 스크립트·기록은 유지합니다. 듣기 예시/번역을 여러 묶음으로 처리하다 실패하면 이미 완료해 저장한 묶음은 보존합니다. 모의시험 답변과 요약 전 대화는 현재 페이지 메모리에 남아 재시도할 수 있습니다. 페이지 새로고침 후 미완료 시험·대화 복구는 기존 앱과 마찬가지로 지원하지 않습니다.
-
-## 실제 배포 후 확인
-
-별도 시험용 초대 계정을 사용해 평가 → 새로고침/다른 기기에서 기록 확인, 스크립트·듣기 예시·번역, 대화·힌트·요약, 15문항 모의시험, 5건 이상 기록의 학습 분석을 확인하세요. Claude 아티팩트에서도 평가·기록 코드 이전을 확인하세요. 로그아웃/토큰 폐기, 한도 초과, 네트워크 차단, 처리 중 취소/연결 해제 후 기록 보존을 확인합니다.
-
-실제 테스트는 OpenAI 비용과 Firebase 쓰기가 발생합니다. 현재 작업에서 실행한 모의 검증 범위는 [TEST_RESULTS.md](TEST_RESULTS.md)에 구분되어 있습니다.
-
-공식 문서: [OpenAI 서버 API 시작](https://developers.openai.com/api/docs/quickstart), [GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini), [Firebase Secret 설정](https://firebase.google.com/docs/functions/config-env), [Firebase ID 토큰 검증](https://firebase.google.com/docs/auth/admin/verify-id-tokens).
+실제 ChatGPT에서 웹 요청을 붙여넣어 평가·스크립트·대화를 진행한 뒤 코드 블록을 가져오는 최종 확인은 필요합니다. 현재 모의 검증 범위는 [TEST_RESULTS.md](TEST_RESULTS.md)를 참고하세요. 공식 안내: [ChatGPT 프롬프트 사용](https://learn.chatgpt.com/docs/prompting), [GPT 지침·Knowledge와 Actions](https://developers.openai.com/api/docs/actions/introduction).

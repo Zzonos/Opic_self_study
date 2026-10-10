@@ -1,40 +1,20 @@
-# GPT 통합 검증 결과
+# ChatGPT 이동 방식 검증 결과
 
-검증일: 2026-10-10 (한국시간). 기준 main: `4ab48cdf003872942152616f4fa046c3b5295b77`. 작업 브랜치: `feat/gpt-study-integration`.
+검증일: 2026-10-10 (한국시간). 기준 main: `4ab48cdf003872942152616f4fa046c3b5295b77`. 브랜치: `feat/gpt-study-integration`.
 
-## 모의 테스트 — 통과
+최종 구현은 사용자 요청에 따라 API 서버 방식을 **API 키 없는 ChatGPT 요청/결과 전달 방식으로 교체**했습니다. 이전 서버 테스트 결과는 이 최종 구현의 검증 결과로 계산하지 않습니다.
 
-- 서버 Node 테스트 **15개**: 평가, 스크립트, 듣기 예시, 모의시험, 분석, 대화, 힌트, 요약, 번역의 JSON 계약; 입력·메시지·번역 개수 제한; 응답 개수/레벨/점수 검증; 사용자별 분/일/동시 호출 한도 및 lease 만료 복구; 토큰 실패·폐기·초대 미가입 거부; Origin/메서드/사전 요청; OpenAI 거부·잘림·잘못된 JSON·429/500·연결 종료; 실패 시 lease 해제 및 비밀 오류 메시지 차단. 번역 40문장 응답도 검증.
-- Chrome/Playwright 브라우저 모의 시나리오 **16개**: 별도 GPT/Claude 버튼·로그인 필요, 평가 결과 localStorage와 기존 `cloudPush` 동기화에 저장, 429/로그인 만료/네트워크 실패/취소의 입력·기록 보존, 401 토큰 갱신 1회, 스크립트·예시·번역·분석, 대화·힌트·요약 저장, 대화 실패 시 미전송 문장 복원, 모의시험 15문항 저장과 재렌더 중 중복 호출 방지, 로그아웃 취소, 처리 중 연결 해제, Firebase 토큰 요청 중 취소, 번역 후속 묶음 실패 시 앞선 40문장 저장 보존, Claude 원래 옵션 전달과 기록 저장.
-- `python tools/build.py`로 Pages 생성 파일 갱신. 앱 JavaScript 및 서버 JavaScript 구문 검사, `git diff --check` 통과.
-- 설치된 Firebase Admin/Functions SDK로 함수 등록 확인. 서버 의존성 `npm audit`: 알려진 취약점 0개.
-- 로컬 검증 Node.js 24.19.0, 배포 대상 Node.js 22. 테스트 브라우저는 설치된 Chrome을 Playwright 1.62.1로 실행.
+## 통과한 모의 검증
 
-브라우저 테스트는 실제 앱 HTML과 UI 이벤트를 실행합니다. Firebase SDK 로그인·Firestore 저장·Claude capability·GPT 서버 응답은 모두 가짜로 대체합니다. 서버 테스트의 토큰 검증·멤버 확인·사용량 저장도 의존성 주입으로 대체합니다. 실제 Firebase 트랜잭션/규칙 에뮬레이터 검증을 실행했다는 의미는 아닙니다.
+- 결과 계약 단위 테스트 12개: 9개 작업(evaluate/script/sample/mock/analysis/chat/hint/summary/translate), 요청 ID·종류·버전, 코드 블록, 잘못된 JSON과 사용 한도 메시지, 레벨·점수·순서·개수, 40문장 번역, prototype 필드, 원래 학습 프롬프트와 반환 계약.
+- Chrome/Playwright 브라우저 시나리오 13개: 별도 Claude/ChatGPT 링크와 비로그인 전달; 평가 요청에 프로필·기준·답변 포함 및 기존 저장/동기화; 잘못된 ID·종류·한도 메시지의 기록 보존; 취소/연결 해제; 페이지 재접속 후 가져오기와 중복 방지; 클립보드 거부 시 직접 복사; 스크립트·리스닝 예문; 40문장 완료 뒤 후속 취소; ChatGPT 안에서 대화·힌트·해석·요약하는 요청과 결과 저장; 15문항 모의시험·분석; 로그아웃; 전용 GPT URL 검사; 기존 Claude 옵션·저장 경로 유지.
+- 브라우저 시나리오마다 OpenAI/Firebase Functions AI 요청이 없는지 확인했습니다. Firebase 로그인·Firestore 저장은 가짜 SDK이며, ChatGPT 목적지는 가짜 페이지, AI 결과는 계약에 맞춘 모의 데이터입니다.
+- 기존 질문은행·시나리오·평가 기준을 실제 소스에서 내보내고 Pages로 빌드합니다. 앱 JS 구문과 git diff --check를 검사합니다.
 
-## 실제 API / 서비스 테스트 — 미실행
+로컬 실행: Node.js 24.19.0, Playwright 1.62.1, 설치된 Chrome. 재현: `npm ci`, `npm test`, `npx playwright install chromium`, `npm run test:browser`. 이미 설치된 Chrome을 쓰려면 BROWSER_EXECUTABLE 환경 변수에 실행 파일 경로를 지정합니다.
 
-OpenAI API 키와 Firebase 관리자 배포 인증이 제공되지 않아 **실제 OpenAI 호출, 서버 배포, 실제 Firebase 로그인·Firestore 동기화, 실제 Claude 아티팩트 capability, 실제 청구 비용/응답 품질은 검증하지 않았습니다**. 모바일 마이크·음성 재생은 기존 기능으로, 실기기 테스트는 실행하지 않았습니다.
+## 실제 서비스 확인 — 미실행
 
-운영 반영 전 [GPT_SETUP.md](GPT_SETUP.md)의 설정·배포 및 실제 계정 검증을 진행해야 합니다. 이 변경은 기존 서버나 main의 운영 페이지를 자동 배포하지 않습니다.
+실제 ChatGPT 계정에 로그인해 프롬프트를 수행시키거나 전용 GPT를 생성·게시하지 않았습니다. 따라서 실제 AI의 반환 형식 준수율·등급 품질·계정 한도는 미검증입니다. 실제 Claude capability와 Firebase 로그인/Firestore 동기화도 모의 대체했습니다. API 호출과 서버 배포는 최종 구조에서 사용하지 않습니다.
 
-## 재현
-
-```sh
-python tools/build.py
-npm ci
-npm test
-npx playwright install chromium
-npm run test:browser
-cd functions
-npm ci
-npm test
-npm audit
-```
-
-브라우저가 이미 설치돼 있으면 `BROWSER_EXECUTABLE` 환경 변수에 Chrome/Chromium 실행 파일 경로를 지정할 수 있습니다. Windows PowerShell 예:
-
-```powershell
-$env:BROWSER_EXECUTABLE = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
-npm run test:browser
-```
+운영 반영 전에 실제 웹 요청 → ChatGPT 학습 → 결과 코드 블록 가져오기 → 다른 기기 기록 확인과 기존 Claude 기록 이전을 확인하세요. 오류가 나면 요청 ID를 유지한 채 지정된 JSON 형식으로 다시 출력하도록 ChatGPT에 요청합니다. 자세한 흐름은 GPT_SETUP.md에 있습니다.
