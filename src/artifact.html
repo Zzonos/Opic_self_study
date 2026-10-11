@@ -1125,10 +1125,11 @@ function buildPlaylist(){const o=player.opts;const items=[];
   if(o.q)ADVANCED.forEach((q,i)=>items.push({kind:"Q",key:"adv_"+i,label:"Advanced",en:q,ko:ADVANCED_KO[i]||"",think:o.think}));
   if(o.cards)for(const c of [...CARDS,...S.custom])items.push({kind:"C",key:c.c==="custom"?null:c.id,label:CAT[c.c]||"내 표현",en:c.en.replace(/___/g,"something"),ko:c.ko,ex:c.ex||""});
   return o.shuffle?pick(items,items.length):items}
-function playerStart(){if(!tts.ok&&!Object.keys(AUD.man).length){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
-  player.items=buildPlaylist();if(!player.items.length){toast("재생할 항목이 없어요. 아래에서 내용을 선택하세요");return}
-  player.on=true;player.paused=false;player.i=0;player.segs=[];player.si=0;ttsStop();wakeLock(true);keepAlive(true);playerStep();mediaSession();renderMini();if(view==="listen")render()}
-function playerStop(){player.on=false;player.paused=false;clearTimeout(player.t);player.t=null;ttsStop();wakeLock(false);keepAlive(false);try{navigator.mediaSession.playbackState="none"}catch(e){}renderMini();if(view==="listen")render()}
+function savedPos(){try{const p=JSON.parse(localStorage.getItem("opic30_pos")||"null");if(p&&p.mode===player.opts.mode&&Array.isArray(p.items)&&p.items.length&&Date.now()-p.ts<6*3600e3&&p.i<p.items.length)return p}catch(e){}return null}
+function playerStart(resume){if(!tts.ok&&!Object.keys(AUD.man).length){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
+  const pos=resume===true?savedPos():null;player.items=pos?pos.items:buildPlaylist();if(!player.items.length){toast("재생할 항목이 없어요. 아래에서 내용을 선택하세요");return}
+  player.busy=false;player.on=true;player.paused=false;player.i=pos?pos.i:0;player.segs=pos?buildSegs(player.items[pos.i]):[];player.si=pos?Math.min(pos.si,Math.max(0,player.segs.length-1)):0;ttsStop();wakeLock(true);keepAlive(true);playerStep();mediaSession();renderMini();if(view==="listen")render()}
+function playerStop(){try{localStorage.removeItem("opic30_pos")}catch(e){}player.on=false;player.paused=false;clearTimeout(player.t);player.t=null;ttsStop();wakeLock(false);keepAlive(false);try{navigator.mediaSession.playbackState="none"}catch(e){}renderMini();if(view==="listen")render()}
 function playerPause(){if(!player.on)return;player.paused=!player.paused;clearTimeout(player.t);player.t=null;if(player.paused){audStop();if(tts.ok)speechSynthesis.cancel();keepAlive(false)}else{keepAlive(true);playerStep()}mediaSession();renderMini();if(view==="listen")render()}
 function playerNext(){if(!player.on)return;clearTimeout(player.t);player.t=null;audStop();if(tts.ok)speechSynthesis.cancel();player.i=(player.i+1)%player.items.length;player.segs=[];player.si=0;player.paused=false;playerStep()}
 function silenceSegs(sec){const out=[];let left=Math.floor(sec+0.001);for(const d of [20,10,5,3,2,1]){while(left>=d){out.push({t:"file",src:"audio/silence_"+d+".mp3",rate:1});left-=d}}const frac=Math.round((sec-Math.floor(sec+0.001))*1000);if(frac>=100)out.push({t:"wait",ms:frac});return out}
@@ -1154,12 +1155,13 @@ function buildSegs(it){const o=player.opts;const segs=[];const src=audSrc(it.key
 function playerStep(){if(!player.on||player.paused)return;const it=player.items[player.i];if(!it){playerStop();return}
   if(!player.segs.length){player.segs=buildSegs(it);player.si=0;renderMini();mediaSession();if(view==="listen")updateNow()}
   if(player.si>=player.segs.length){player.i=(player.i+1)%player.items.length;player.segs=[];player.si=0;if(player.i===0)player.items=buildPlaylist();playerStep();return}
+  try{localStorage.setItem("opic30_pos",JSON.stringify({ts:Date.now(),mode:player.opts.mode,i:player.i,si:player.si,items:player.items}))}catch(e){}
   const seg=player.segs[player.si];const tok=player.tok=(player.tok||0)+1;
   const after=()=>{if(!player.on||player.paused||tok!==player.tok)return;player.tok++;player.si++;if(view==="listen")updateNow();playerStep()};
   player.cur=seg;if(view==="listen")updateNow();
   if(seg.t==="file"&&/^fs:/.test(seg.src)){const [tag,h]=seg.src.slice(3).split("/");clearTimeout(player.t);player.t=setTimeout(()=>{player.t=null},20000);
     const fallback=()=>{seg.noUp=true;seg.t=(tag==="ko")?"ko":"en";if(tag==="ko")seg.text=seg.ko;delete seg.src;playerStep()};
-    clipUrl(tag,h).then(u=>{clearTimeout(player.t);player.t=null;if(!player.on||player.paused||tok!==player.tok)return;if(!u){fallback();return}
+    player.busy=true;clipUrl(tag,h).then(u=>{player.busy=false;clearTimeout(player.t);player.t=null;if(!player.on||player.paused||tok!==player.tok)return;if(!u){fallback();return}
       audPlay(u,{rate:seg.rate||1,onend:after,onerror:()=>{audLog.push("clip "+tag+"/"+h+" 재생 실패 → 기기 음성");CLIPS.bad=CLIPS.bad||new Set();CLIPS.bad.add(h);if(!player.on||tok!==player.tok)return;fallback()}})});
     // prefetch the next few account clips so playback does not stall
     player.segs.slice(player.si+1,player.si+6).forEach(x=>{if(x.t==="file"&&/^fs:/.test(x.src)){const [t2,h2]=x.src.slice(3).split("/");clipUrl(t2,h2)}});return}
@@ -1169,10 +1171,10 @@ function playerStep(){if(!player.on||player.paused)return;const it=player.items[
   // speech synthesis segments (fallback / Korean): cannot run while the page is in the background on iPhone → skip
   {const up=seg.noUp?null:seg.t==="en"&&seg.text?txtSrc(seg.text):seg.t==="ko"&&seg.en?txtSrc(seg.en,"ko"):null;if(up){const isKo=seg.t==="ko";if(isKo){seg.ko=seg.text;seg.text=""}seg.t="file";seg.src=up;seg.rate=isKo?koR():tts.rate;playerStep();return}}
   // English without a recording: synthesize it on demand with the natural voice (web), device voice only as a last resort
-  if(seg.t==="en"&&!seg.noUp&&WEB&&TTS_URL&&navigator.onLine&&AUD.tag!=="off"&&/[a-z]/i.test(seg.text||"")){natUrl(seg.text).then(u=>{if(!player.on||player.paused||tok!==player.tok)return;if(!u){seg.noUp=true;playerStep();return}
+  if(seg.t==="en"&&!seg.noUp&&WEB&&TTS_URL&&navigator.onLine&&AUD.tag!=="off"&&/[a-z]/i.test(seg.text||"")){player.busy=true;natUrl(seg.text).then(u=>{player.busy=false;if(!player.on||player.paused||tok!==player.tok)return;if(!u){seg.noUp=true;playerStep();return}
       audPlay(u,{rate:seg.rate||tts.rate,onend:after,onerror:()=>{if(!player.on||tok!==player.tok)return;seg.noUp=true;playerStep()}})});
     {const nx=player.segs[player.si+1];if(nx&&nx.t==="en"&&nx.text&&!nx.noUp)natUrl(nx.text)}return}
-  if(seg.t==="ko"&&!seg.noUp&&WEB&&TTS_URL&&navigator.onLine&&seg.text){natFetch(seg.text,"ko").then(u=>{if(!player.on||player.paused||tok!==player.tok)return;if(!u){seg.noUp=true;playerStep();return}
+  if(seg.t==="ko"&&!seg.noUp&&WEB&&TTS_URL&&navigator.onLine&&seg.text){player.busy=true;natFetch(seg.text,"ko").then(u=>{player.busy=false;if(!player.on||player.paused||tok!==player.tok)return;if(!u){seg.noUp=true;playerStep();return}
       audPlay(u,{rate:koR(),onend:after,onerror:()=>{if(!player.on||tok!==player.tok)return;seg.noUp=true;playerStep()}})});return}
   if(!tts.ok||document.hidden){after();return}
   const u=new SpeechSynthesisUtterance(seg.t==="ko"?seg.text:ttsText(seg.text));
@@ -1186,9 +1188,11 @@ function playerStep(){if(!player.on||player.paused)return;const it=player.items[
   if(speechSynthesis.speaking||speechSynthesis.pending){speechSynthesis.cancel();player.t=setTimeout(()=>{player.t=null;go()},120)}else go();
   clearInterval(player.ka);player.ka=setInterval(()=>{if(player.on&&!player.paused&&speechSynthesis.speaking)speechSynthesis.resume()},10000)}
 async function wakeLock(on){try{if(on){player.lock=await navigator.wakeLock?.request("screen")}else{await player.lock?.release();player.lock=null}}catch(e){}}
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState!=="visible"||!player.on||player.paused)return;if(player.lock===null)wakeLock(true);setTimeout(()=>{const a=AUD.el;const filePlaying=a&&!a.paused&&!a.ended&&a.src;if(player.on&&!player.paused&&!filePlaying&&!(tts.ok&&speechSynthesis.speaking)){clearTimeout(player.t);player.t=null;playerStep()}},800)});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState!=="visible"||!player.on||player.paused)return;if(player.lock===null)wakeLock(true);setTimeout(()=>{if(!player.on||player.paused)return;const a=AUD.el;const filePlaying=a&&!a.paused&&!a.ended&&a.src;if(filePlaying||(tts.ok&&speechSynthesis.speaking)||player.t||player.busy)return;
+    if(a&&a.src&&a.paused&&!a.ended&&a.currentTime>0.2){audLog.push("복귀: 멈춘 지점부터 이어서");a.play().catch(()=>{playerStep()});return}
+    audLog.push("복귀: 현재 문장 다시");playerStep()},800)});
 // watchdog: if speech silently died (common after screen lock), restart the current sentence
-setInterval(()=>{if(!player.on||player.paused||player.t)return;const a=AUD.el;const filePlaying=a&&!a.paused&&!a.ended&&a.src;const ttsBusy=tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending);if(!filePlaying&&!ttsBusy){playerStep()}},4000);
+setInterval(()=>{if(!player.on||player.paused||player.t||player.busy||document.hidden)return;const a=AUD.el;const filePlaying=a&&!a.paused&&!a.ended&&a.src;if(a&&a.src&&a.paused&&!a.ended&&a.currentTime>0.2){a.play().catch(()=>{});return}const ttsBusy=tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending);if(!filePlaying&&!ttsBusy){playerStep()}},4000);
 function renderMini(){const m=$("#mini");if(!player.on){m.hidden=true;return}m.hidden=false;const it=player.items[player.i]||{};
   m.replaceChildren(h("span",{class:"now"},(player.paused?"⏸ ":"▶ ")+(it.label||"")+" — "+(it.en||"")),h("button",{onclick:playerPause},player.paused?"재생":"일시정지"),h("button",{onclick:playerNext},"다음"),h("button",{onclick:playerStop},"끄기"))}
 function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[player.i]||{};const seg=player.cur||{};
@@ -1250,7 +1254,7 @@ function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem
     h("div",{class:"note"},"설정의 프로필(직업·거주지 등)을 바탕으로 AI가 주제별 예시 답변을 만들어 두고 무한재생해요. 한 번 만들면 저장되어 웹에서도 들을 수 있고, 다시 만들고 싶으면 설정 → 초기화에서 예시만 지울 수 있어요. 예시는 녹음이 없어 기기 음성으로 나오므로 iPhone에서는 화면이 켜져 있을 때만 재생됩니다.")];
   const box=h("div",{class:"card"},h("div",{class:"hdr"},h("div",{},h("h3",{},"무한 재생"),h("p",{class:"muted small"},"업무 중 배경으로 계속 듣기. 끝나면 처음부터 다시 반복합니다.")),rateCtl()),
     tabs,clipLine,now,
-    h("div",{class:"row"},player.on?h("button",{class:"btn primary",onclick:playerPause},player.paused?"▶ 이어서":"⏸ 일시정지"):h("button",{class:"btn primary",onclick:playerStart},"▶ 무한 재생 시작"),player.on?h("button",{class:"btn",onclick:playerNext},"다음 ▶▶"):null,player.on?h("button",{class:"btn ghost",onclick:playerStop},"■ 끄기"):null),
+    h("div",{class:"row"},player.on?h("button",{class:"btn primary",onclick:playerPause},player.paused?"▶ 이어서":"⏸ 일시정지"):(()=>{const p=savedPos();return p?h("span",{class:"row"},h("button",{class:"btn primary",onclick:()=>playerStart(true)},"▶ 이어서 재생 ("+(p.i+1)+"/"+p.items.length+")"),h("button",{class:"btn",onclick:()=>playerStart(false)},"처음부터")):h("button",{class:"btn primary",onclick:()=>playerStart(false)},"▶ 무한 재생 시작")})(),player.on?h("button",{class:"btn",onclick:playerNext},"다음 ▶▶"):null,player.on?h("button",{class:"btn ghost",onclick:playerStop},"■ 끄기"):null),
     ...(o.mode==="script"?scriptOpts:o.mode==="sample"?sampleOpts:sentOpts));
   if(player.on)setTimeout(updateNow,0);return box}
 
