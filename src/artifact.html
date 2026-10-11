@@ -440,7 +440,7 @@ function cloudInit(){if(!window.firebase?.initializeApp||!window.firebase?.auth)
   auth.onAuthStateChanged(async u=>{cloud.ready=true;if(cloud.unsub){cloud.unsub();cloud.unsub=null}cloud.user=u;cloud.ref=null;
     if(u&&cloud.signingUp){return} // signup writes the first document itself (with the invite code), then calls cloudAttach
     if(u)await cloudAttach(u);render()})}catch(e){cloud.ok=false}}
-async function cloudAttach(u){cloud.user=u;cloud.ref=firebase.firestore().collection("users").doc(u.uid);try{await cloudPull(true)}catch(e){toast("클라우드 기록을 불러오지 못했어요: "+(e.code||e.message))}
+async function cloudAttach(u){cloud.user=u;cloud.ref=firebase.firestore().collection("users").doc(u.uid);try{await cloudPull(true)}catch(e){toast("클라우드 기록을 불러오지 못했어요: "+(e.code||e.message))}clipIdxLoad();
   setTimeout(applyPendingSync,300);
   if(cloud.unsub)cloud.unsub();cloud.unsub=cloud.ref.onSnapshot(snap=>{if(!snap.exists||snap.metadata.hasPendingWrites)return;cloudApply(snap.data())});}
 function cloudApply(d){if(!d)return;if((d.updatedAt||0)>cloud.lastPush&&(d.updatedAt||0)>(S.updatedAt||0)){try{mergeState(JSON.parse(d.state||"{}"),true);render();toast("계정의 새 기록을 반영했어요")}catch(e){}}}
@@ -576,7 +576,18 @@ const koSrc=key=>(key&&AUD.man.ko&&AUD.man.ko[key])?"audio/ko/"+key+".mp3":null;
 const txtHash=t=>{let h=5381;const x=(t||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();for(let i=0;i<x.length;i++)h=((h*33)^x.charCodeAt(i))>>>0;return h.toString(36)};
 AUD.txt={};// {m:{hash:1}, f:{...}, ko:{...}}
 async function loadTextManifests(){for(const t of ["m","f","ko"]){try{const r=await fetch("audio/s/"+t+"/manifest.json");if(r.ok)AUD.txt[t]=await r.json()}catch(e){}}}
-const txtSrc=(text,lang="en")=>{const t=lang==="ko"?"ko":AUD.tag;if(t==="off"||!AUD.txt[t])return null;const h=txtHash(text);return AUD.txt[t][h]?"audio/s/"+t+"/"+h+".mp3":null};
+// account clips (web): index of hashes lives in users/<uid>/meta/clipidx, audio bytes in users/<uid>/clips/<hash>
+const CLIPS={idx:new Set(),urls:{},busy:{}};
+async function clipIdxLoad(){if(!cloud.ref)return;try{const d=await cloud.ref.collection("meta").doc("clipidx").get();CLIPS.idx=new Set(d.exists?(d.data().hashes||[]):[])}catch(e){}}
+async function clipUrl(tag,h){const k=tag+"/"+h;if(CLIPS.urls[k])return CLIPS.urls[k];if(CLIPS.busy[k])return CLIPS.busy[k];
+  CLIPS.busy[k]=(async()=>{try{const cache=await (self.caches?caches.open("oss-clips").catch(()=>null):null);const ck="/clip/"+k;
+    if(cache){const hit=await cache.match(ck);if(hit){const u=URL.createObjectURL(await hit.blob());CLIPS.urls[k]=u;return u}}
+    if(!cloud.ref)return null;const d=await cloud.ref.collection("clips").doc(h).get();if(!d.exists)return null;const v=d.data()[tag];if(!v)return null;
+    const bytes=v.toUint8Array?v.toUint8Array():v;const blob=new Blob([bytes],{type:"audio/mpeg"});if(cache)cache.put(ck,new Response(blob)).catch(()=>{});
+    const u=URL.createObjectURL(blob);CLIPS.urls[k]=u;return u}catch(e){return null}finally{delete CLIPS.busy[k]}})();return CLIPS.busy[k]}
+const txtSrc=(text,lang="en")=>{const t=lang==="ko"?"ko":AUD.tag;if(t==="off")return null;const h=txtHash(text);
+  if(AUD.txt[t]&&AUD.txt[t][h])return "audio/s/"+t+"/"+h+".mp3";
+  if(CLIPS.idx.has(h)&&(lang==="ko"?true:true))return "fs:"+t+"/"+h;return null};
 let audCb=null;
 const audLog=[];
 function audPlay(src,{rate=1,onend=null}={}){const a=audEl();audCb=onend;const t0=Date.now();a.onended=()=>{audLog.push(src.split("/").pop()+" ok "+((Date.now()-t0)/1000).toFixed(1)+"s");if(audLog.length>30)audLog.shift();const cb=audCb;audCb=null;cb&&cb()};
@@ -1066,6 +1077,11 @@ function playerStep(){if(!player.on||player.paused)return;const it=player.items[
   const seg=player.segs[player.si];const tok=player.tok=(player.tok||0)+1;
   const after=()=>{if(!player.on||player.paused||tok!==player.tok)return;player.tok++;player.si++;if(view==="listen")updateNow();playerStep()};
   player.cur=seg;if(view==="listen")updateNow();
+  if(seg.t==="file"&&/^fs:/.test(seg.src)){const [tag,h]=seg.src.slice(3).split("/");clearTimeout(player.t);player.t=setTimeout(()=>{player.t=null},20000);
+    clipUrl(tag,h).then(u=>{clearTimeout(player.t);player.t=null;if(!player.on||player.paused||tok!==player.tok)return;if(u){seg.src=u;playerStep()}else{// no clip for this sentence (e.g. no translation yet): fall back to device voice
+        seg.t=(tag==="ko")?"ko":"en";if(tag==="ko")seg.text=seg.ko;playerStep()}});
+    // prefetch the next few account clips so playback does not stall
+    player.segs.slice(player.si+1,player.si+6).forEach(x=>{if(x.t==="file"&&/^fs:/.test(x.src)){const [t2,h2]=x.src.slice(3).split("/");clipUrl(t2,h2)}});return}
   if(seg.t==="file"){const m=/silence_(\d+)/.exec(seg.src||"");if(m){const want=+m[1]*1000;const t0=Date.now();audPlay(seg.src,{rate:1,onend:()=>{const left=want-(Date.now()-t0);if(left>150){audLog.push("silence short by "+(left/1000).toFixed(1)+"s → 타이머 보정");player.t=setTimeout(()=>{player.t=null;after()},left)}else after()}});return}
     audPlay(seg.src,{rate:seg.rate,onend:after});return}
   if(seg.t==="wait"){player.t=setTimeout(()=>{player.t=null;after()},seg.ms);return}

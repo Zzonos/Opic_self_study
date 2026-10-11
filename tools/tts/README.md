@@ -27,3 +27,9 @@ python3 gen.py af_heart f        # 영어 여성
 python3 gen_ko.py                # 한국어 해석
 ```
 `items.json` / `items_ko.json`은 `src/artifact.html`의 질문·카드 데이터에서 추출합니다 (키: `q_<topic>_<n>`, `rp_<id>_<11|12|13>`, `adv_<n>`, `c<n>`).
+
+## 스크립트 문장 녹음 → 계정 업로드 (render_upload.py)
+- `pip install edge-tts requests`, 옆에 `config.json` `{"email":"...","password":"..."}` 생성 후 `python render_upload.py`
+- 계정(Firestore)의 예시·내 스크립트·모범답안 문장 중 녹음이 없는 것만 Andrew/Ava(영어)·SunHi(해석)로 녹음해 `users/<uid>/clips/<hash>`에 저장, `users/<uid>/meta/clipidx`에 해시 목록 갱신
+- `out/s/{m,f,ko}/<hash>.mp3` + manifest.json 도 남김 → Claude 앱 아티팩트에 `audio/s/...`로 올리면 Claude에서도 같은 음성 사용
+- 문장 분리·해시는 앱의 `splitSent`/`txtHash`와 동일해야 함 (변경 시 양쪽 같이)

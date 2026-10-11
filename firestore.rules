@@ -8,6 +8,9 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == uid && inviteOk();
       allow update: if request.auth != null && request.auth.uid == uid;
       allow delete: if false;
+      // 녹음 클립(문장별 mp3)과 색인: 본인만
+      match /clips/{clip} { allow read, write: if request.auth != null && request.auth.uid == uid; }
     }
+    match /users/{uid}/meta/{doc} { allow read, write: if request.auth != null && request.auth.uid == uid; }
   }
 }
