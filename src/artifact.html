@@ -452,7 +452,11 @@ async function cloudRefresh(){try{if(cloud.ref){const snap=await cloud.ref.get({
   if(docRef){const [m,sc,tr]=await Promise.all([docRef.main.get(),docRef.scripts.get(),docRef.trans.get()]);if(m.exists){const remote=JSON.parse(JSON.stringify(Object.assign({},m.data(),sc.exists?sc.data():{},{trans:(tr.exists&&tr.data().t)||{}})));/* db data is frozen: work on a copy */if((remote.updatedAt||0)>(S.updatedAt||0)){mergeState(remote,true);render();toast("다른 기기의 기록을 반영했어요")}}}}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")cloudRefresh()});window.addEventListener("pageshow",e=>{if(e.persisted)cloudRefresh()});
 async function cloudPull(first){if(!cloud.ref)return;const snap=await cloud.ref.get();if(snap.exists){const d=snap.data();let remote={};try{remote=JSON.parse(d.state||"{}")}catch(e){}mergeState(remote,true);if(first)toast("계정 기록을 불러왔어요")}await cloudPush(true)}
-async function cloudPush(now){if(!cloud.ref)return;clearTimeout(cloud.pushT);const doIt=async()=>{try{cloud.lastPush=S.updatedAt||Date.now();await cloud.ref.set({state:JSON.stringify(S),updatedAt:cloud.lastPush,email:cloud.user?.email||""},{merge:true});const el=$("#syncst");if(el)el.textContent="동기화됨 "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}catch(e){const el=$("#syncst");if(el)el.textContent="동기화 실패: "+(e.code||e.message)}};
+const HIST={};const hasDet=l=>!!(l&&(l.a||l.model||(l.pq&&l.pq.length)));
+async function histArchive(){if(!cloud.ref)return;for(const l of S.log){if(!l.ts||l.ar||!hasDet(l))continue;try{await cloud.ref.collection("meta").doc("h_"+l.ts).set({l:JSON.stringify(l),t:l.ts});l.ar=true;HIST[l.ts]=l}catch(e){break}}}
+function histLoad(ts){if(HIST[ts]||!cloud.ref)return Promise.resolve(HIST[ts]||null);return cloud.ref.collection("meta").doc("h_"+ts).get().then(d=>{if(!d.exists)return null;const l=JSON.parse(d.data().l||"null");HIST[ts]=l;return l}).catch(()=>null)}
+function cloudState(){const o=Object.assign({},S);const keep=S.log.length-40;o.log=S.log.map((l,i)=>i<keep&&l.ar&&hasDet(l)?(()=>{const c=Object.assign({},l);delete c.a;delete c.model;delete c.pq;delete c.str;return c})():l);return JSON.stringify(o)}
+async function cloudPush(now){if(!cloud.ref)return;clearTimeout(cloud.pushT);const doIt=async()=>{try{cloud.lastPush=S.updatedAt||Date.now();await histArchive();await cloud.ref.set({state:cloudState(),updatedAt:cloud.lastPush,email:cloud.user?.email||""},{merge:true});const el=$("#syncst");if(el)el.textContent="동기화됨 "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}catch(e){const el=$("#syncst");if(el)el.textContent="동기화 실패: "+(e.code||e.message)}};
   if(now)await doIt();else cloud.pushT=setTimeout(doIt,1500)}
 function cloudErr(e){const m={"auth/invalid-email":"이메일 형식을 확인해 주세요","auth/user-not-found":"가입되지 않은 이메일이에요","auth/wrong-password":"비밀번호가 틀렸어요","auth/invalid-credential":"이메일 또는 비밀번호가 틀렸어요","auth/email-already-in-use":"이미 가입된 이메일이에요. 로그인해 주세요","auth/weak-password":"비밀번호는 6자 이상이어야 해요","auth/too-many-requests":"시도가 너무 많아요. 잠시 후 다시","auth/network-request-failed":"인터넷 연결을 확인해 주세요","permission-denied":"초대 코드가 틀렸어요"};return m[e?.code]||(e?.message||"오류가 났어요")}
 let loginMode="login";
@@ -789,22 +793,26 @@ function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);if(sub&&sub.history)
 function vHistory(m){const KIND={practice:"연습",mock:"모의시험",chat:"대화"};const f=sub.f||"all";const id=l=>l.ts||l.date+l.title;
   const all=S.log.filter(l=>l.kind!=="card"&&(f==="all"||l.kind===f)).slice().reverse();
   const tabs=h("div",{class:"segs"},...[["all","전체"],["practice","연습"],["mock","모의시험"],["chat","대화"]].map(([k,l])=>h("button",{class:"seg"+(f===k?" on":""),onclick:()=>{sub=Object.assign({},sub,{f:k,open:null});render()}},l)));
-  const row=l=>{const open=sub.open!=null&&String(sub.open)===String(id(l));const t=TOPICS.find(x=>x.id===l.tid);const q=l.q&&t?t.qs.find(x=>x.q===l.q):null;
-    const head=h("div",{class:"li",role:"button",style:"cursor:pointer",onclick:()=>{sub=Object.assign({},sub,{open:open?null:id(l)});render()}},h("span",{class:"d"},l.date.slice(5)),h("span",{class:"grow"},h("span",{class:"muted small"},(KIND[l.kind]||l.kind)+" · "),l.title,l.secs?h("span",{class:"muted small"}," · "+fmt(l.secs)):null),l.level?lvChip(l.level):null,h("span",{class:"muted"},open?"▴":"▾"));
+  const row=l0=>{const open=sub.open!=null&&String(sub.open)===String(id(l0));
+    const head=h("div",{class:"li",role:"button",style:"cursor:pointer",onclick:()=>{sub=Object.assign({},sub,{open:open?null:id(l0)});render()}},h("span",{class:"d"},l0.date.slice(5)),h("span",{class:"grow"},h("span",{class:"muted small"},(KIND[l0.kind]||l0.kind)+" · "),l0.title,l0.secs?h("span",{class:"muted small"}," · "+fmt(l0.secs)):null),l0.level?lvChip(l0.level):null,h("span",{class:"muted"},open?"▴":"▾"));
     if(!open)return head;
+    // details that were moved to the account archive are fetched when the record is opened
+    let l=hasDet(l0)?l0:(HIST[l0.ts]||l0);
+    if(!hasDet(l)&&l0.ts&&cloud.ref&&!HIST["_"+l0.ts]){HIST["_"+l0.ts]=1;histLoad(l0.ts).then(x=>{if(x&&view==="today"&&sub&&sub.history)render()})}
+    const t=TOPICS.find(x=>x.id===l.tid);const q=l.q&&t?t.qs.find(x=>x.q===l.q):null;
     const fx=(l.fixes||[]).filter(x=>x.o||x.b||x.w);
-    const det=h("div",{class:"card",style:"margin:-4px 0 6px;gap:10px"},
-      l.q?h("div",{},h("p",{class:"eyebrow"},"질문"),h("p",{class:"small",style:"font-weight:600"},l.q)):null,
+    const det=h("div",{class:"card",style:"margin:-4px 0 6px;gap:12px"},
+      l.q?h("div",{},h("p",{class:"eyebrow"},"질문"),h("div",{class:"row",style:"align-items:flex-start;flex-wrap:nowrap"},h("p",{class:"small grow",style:"font-weight:600"},l.q),spkBtn(l.q,null,q?"q_"+t.id+"_"+t.qs.indexOf(q):null))):null,
       l.a?h("div",{},h("p",{class:"eyebrow"},"내 답변"),h("div",{class:"model"},l.a)):null,
-      l.sum?h("div",{},h("p",{class:"eyebrow"},"총평"),h("p",{class:"small"},l.sum)):null,
-      (l.str||[]).length?h("div",{},h("p",{class:"eyebrow"},"잘한 점"),...l.str.map(x=>h("p",{class:"small"},"✓ "+x))):null,
-      fx.length?h("div",{},h("p",{class:"eyebrow"},l.kind==="mock"?"개선 포인트":"고칠 표현"),...fx.map(x=>x.o||x.b?h("div",{class:"fix"},x.o?h("span",{class:"o"},x.o):null,x.b?h("span",{class:"b"},x.b):null,x.w?h("span",{class:"w"},x.w):null):h("p",{class:"small"},"• "+x.w))):null,
-      l.model?h("div",{},h("p",{class:"eyebrow"},"모범답안 · "+tgt()),h("div",{class:"model"},l.model),h("div",{class:"row",style:"margin-top:6px"},spkBtn(l.model),h("button",{class:"btn sm",onclick:()=>go("listen",{text:l.model,title:l.title})},"쉐도잉"))):null,
+      fx.length?h("div",{},h("p",{class:"eyebrow"},l.kind==="mock"?"개선 포인트":"고칠 부분"),...fx.map(x=>x.o||x.b?h("div",{class:"fix"},x.o?h("span",{class:"o"},x.o):null,x.b?h("span",{class:"b"},x.b):null,x.w?h("span",{class:"w"},x.w):null):h("p",{class:"small"},"• "+x.w))):null,
+      l.model?h("div",{},h("p",{class:"eyebrow"},"모범답안"),h("div",{class:"model"},l.model),h("div",{class:"row",style:"margin-top:6px"},spkBtn(l.model),h("button",{class:"btn sm",onclick:()=>go("listen",{text:l.model,title:l.title})},"쉐도잉"))):null,
       (l.pq||[]).length?h("details",{},h("summary",{},"문항별 피드백 ("+l.pq.length+")"),...l.pq.map((x,i)=>h("div",{style:"margin-top:8px"},h("p",{class:"small",style:"font-weight:600"},(i+1)+". "+(x.q||"")+(x.l?" · "+x.l:"")),x.a?h("p",{class:"muted small"},x.a):null,x.c?h("p",{class:"small"},x.c):null,x.b?h("p",{class:"small",style:"color:var(--accent)"},"→ "+x.b):null))):null,
-      !l.a&&!l.sum&&!fx.length&&!(l.pq||[]).length?h("p",{class:"muted small"},"이 기록은 세부 내용이 저장되기 전에 만든 기록이라 점수만 남아 있어요."):null,
+      l.kind!=="practice"&&l.sum?h("p",{class:"small muted"},l.sum):null,
+      !hasDet(l)&&!fx.length?h("p",{class:"muted small"},HIST["_"+l0.ts]&&!HIST[l0.ts]&&cloud.ref?"세부 내용을 불러오는 중이거나, 세부 내용이 저장되기 전에 만든 기록이에요.":"세부 내용이 저장되기 전에 만든 기록이라 점수만 남아 있어요."):null,
       t&&q?h("div",{class:"row"},h("button",{class:"btn sm primary",onclick:()=>go("practice",{topic:t,q,kind:QT[q.t]})},"이 질문 다시 연습")):null);
     return h("div",{},head,det)};
   put(m,h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("today")},"← 오늘"),h("p",{class:"eyebrow",style:"margin-top:10px"},"History"),h("h1",{},"내 기록")),tabs,
+    window.claude?.use?h("p",{class:"muted small"},"Claude에서는 최근 40개 기록의 세부 내용만 보관돼요. 웹 앱(웹으로 통합 후)에서는 모든 기록의 세부 내용을 볼 수 있어요."):null,
     all.length?h("div",{class:"list"},...all.slice(0,sub.n||40).map(row),all.length>(sub.n||40)?h("button",{class:"btn",onclick:()=>{sub=Object.assign({},sub,{n:(sub.n||40)+40});render()}},"더 보기"):null):h("p",{class:"muted small"},"아직 기록이 없어요."))}
 function planItem(done,title,progress,min,onclick){return h("div",{class:"item"+(done?" done":""),onclick,role:"button",tabindex:"0"},h("span",{class:"box",html:done?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-11"/></svg>':""}),h("span",{class:"t grow"},title," ",h("span",{class:"muted small mono"},progress)),h("span",{class:"min"},min))}
 function calcStreak(){const days=[...new Set(S.log.map(l=>l.date))].sort().reverse();if(!days.length)return 0;let s=0;let d=new Date();if(days[0]!==todayStr()){d.setDate(d.getDate()-1);const y=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");if(days[0]!==y)return 0}
