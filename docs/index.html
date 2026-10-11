@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261011-141119-2d00e8">
+<html lang="ko" data-build="20261011-162159-d230ef">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -611,6 +611,13 @@ function clipSentences(){const out={};const add=t=>{for(const sn of splitSent(t)
   for(const m of Object.values(S.models||{}))add(m);return out}
 function clipMissing(){const all=clipSentences();return Object.entries(all).filter(([h])=>!CLIPS.idx.has(h))}
 function isMp3(u8){return u8&&u8.length>500&&((u8[0]===0x49&&u8[1]===0x44&&u8[2]===0x33)||(u8[0]===0xFF&&(u8[1]&0xE0)===0xE0))}
+async function ttsSrvDiag(log){const u=TTS_URL;log("주소: "+(u||"(비어 있음)")+" · 앱 위치: "+location.origin);
+if(!u){log("✗ 주소를 먼저 입력하세요 (https://이름.계정.workers.dev)");return}
+if(!/^https:\/\/[^\/]+\.workers\.dev$/i.test(u))log("⚠ 주소 모양이 https://…workers.dev 가 아니에요. 대시보드의 Visit 주소를 그대로 복사하세요");
+try{await fetch(u,{mode:"no-cors",cache:"no-store"});log("① 서버 접속 ✓")}catch(x){log("① 서버 접속 ✗ — 주소 오타이거나 Worker가 없어요 ("+(x.message||x)+")");return}
+try{const r=await fetch(u+"/voices",{cache:"no-store"});const j=await r.json();if(!j||!j.m)throw new Error("형식 다름");log("② OSS 코드 확인 ✓")}catch(x){log("② OSS 코드 ✗ — Worker에 tts-worker.js 가 아니라 기본 코드(Hello World)가 남아 있어요. Edit code → 전체 붙여넣기 → Deploy");return}
+try{const t0=Date.now();const u8=await ttsFetch("Hello! This is a voice test.","m");log("③ 음성 생성 ✓ ("+Math.round(u8.length/1024)+"KB, "+((Date.now()-t0)/1000).toFixed(1)+"초) — 재생합니다");const a=new Audio(URL.createObjectURL(new Blob([u8],{type:"audio/mpeg"})));a.play().catch(()=>{})}
+catch(x){const m=String(x.message||x);log("③ 음성 생성 ✗ — "+m);if(/403/.test(m))log("   → Microsoft가 Cloudflare 서버의 요청을 거절했어요 (서버 쪽 문제, 앱/주소 문제 아님)");else if(/forbidden origin/.test(m))log("   → 이 앱 주소가 Worker 허용 목록에 없어요");}}
 async function ttsFetch(text,tag){const r=await fetch(TTS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,tag})});if(!r.ok)throw new Error("tts "+r.status+" "+(await r.text()).slice(0,80));const u8=new Uint8Array(await r.arrayBuffer());if(!isMp3(u8))throw new Error("tts 응답이 mp3가 아님 ("+u8.length+"B)");return u8}
 async function clipSync(force){if(clipJob.on||!WEB||!cloud.ref||!TTS_URL||!navigator.onLine)return;const todo=clipMissing();if(!todo.length)return;
   clipJob.on=true;clipJob.done=0;clipJob.total=todo.length;clipJob.err=0;clipJob.last="";const upd=()=>{const el=$("#clipst");if(el)el.replaceChildren(clipStatus())};upd();
@@ -1291,7 +1298,7 @@ function vSettings(m){
       h("textarea",{id:"imp",autocapitalize:"off",autocorrect:"off",spellcheck:"false",style:"min-height:70px;font-family:var(--mono);font-size:11px",placeholder:"다른 곳에서 복사한 기록 코드를 붙여넣기"}),
       h("div",{class:"row"},h("button",{class:"btn",onclick:async()=>{try{const o=await parseCode($("#imp").value);mergeState(o,false);$("#imp").value="";toast("기록을 합쳤어요");render()}catch(e){toast("코드를 읽을 수 없어요")}}},"가져와서 합치기"))),
     WEB?h("div",{class:"card"},h("h3",{},"음성 서버 (자연스러운 음성 자동 녹음)"),h("p",{class:"muted small"},"스크립트·예시·모범답안 문장을 Microsoft 신경망 음성으로 자동 녹음해 내 계정에 저장해요. 중계 서버 주소를 한 번만 넣으면 됩니다."),
-      h("input",{type:"url",id:"ttsurl",value:TTS_URL,placeholder:"https://….workers.dev"}),h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>{TTS_URL=$("#ttsurl").value.trim();try{localStorage.setItem("oss_tts_url",TTS_URL)}catch(e){}toast(TTS_URL?"저장했어요. 듣기 탭에서 녹음이 시작돼요":"음성 서버를 껐어요");clipSync(false)}},"저장"),h("button",{class:"btn sm ghost",onclick:async e=>{const out=e.target.parentNode.nextSibling;out.textContent="테스트 중…";TTS_URL=$("#ttsurl").value.trim();try{const t0=Date.now();const u8=await ttsFetch("Hello! This is a voice test.","m");out.textContent="✓ 음성 생성 OK ("+Math.round(u8.length/1024)+"KB, "+((Date.now()-t0)/1000).toFixed(1)+"초) — 재생합니다";const a=new Audio(URL.createObjectURL(new Blob([u8],{type:"audio/mpeg"})));a.play().catch(()=>{})}catch(x){out.textContent="✗ "+(x.message||x)+(String(x.message).includes("Failed to fetch")?" — 주소가 틀렸거나 Worker 코드가 배포되지 않았어요":"")}}},"연결 테스트")),h("p",{class:"small mono",style:"word-break:break-all"},""),
+      h("input",{type:"url",id:"ttsurl",value:TTS_URL,placeholder:"https://….workers.dev"}),h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>{TTS_URL=$("#ttsurl").value.trim();try{localStorage.setItem("oss_tts_url",TTS_URL)}catch(e){}toast(TTS_URL?"저장했어요. 듣기 탭에서 녹음이 시작돼요":"음성 서버를 껐어요");clipSync(false)}},"저장"),h("button",{class:"btn sm ghost",onclick:async e=>{const out=e.target.parentNode.nextSibling;out.style.whiteSpace="pre-wrap";out.textContent="";TTS_URL=$("#ttsurl").value.trim().replace(/\/+$/,"");$("#ttsurl").value=TTS_URL;await ttsSrvDiag(t=>{out.textContent+=t+"\n"})}},"연결 테스트")),h("p",{class:"small mono",style:"word-break:break-all"},""),
       h("p",{class:"muted small"},cloud.ref?"계정 녹음 "+CLIPS.idx.size+"문장 저장됨":"로그인하면 계정에 녹음이 저장돼요")):null,
     h("div",{class:"card"},h("h3",{},"데이터"),h("p",{class:"muted small mono",style:"font-size:10px"},"진단: "+(window.claude?.use?"claude":"web")+" · hash="+(HASH_SEEN||"-")+" · ds="+("DecompressionStream" in window)+" · clip="+!!navigator.clipboard?.readText+"\n재생 로그: "+(audLog.slice(-8).join(" | ")||"-")),h("p",{class:"muted small"},uid?h("span",{},"학습 기록은 내 Claude 계정에 저장되어 다른 기기에서도 이어집니다. ",h("b",{id:"csave"},claudeStatus())):cloud.user?"학습 기록은 OSS 계정("+cloud.user.email+")에 저장돼요.":"지금은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장됩니다."),
       h("div",{class:"row",id:"resetrow"},Object.keys(S.samples||{}).length?h("button",{class:"btn sm ghost",onclick:()=>{S.samples={};save();toast("예시 스크립트를 지웠어요. 듣기 탭에서 다시 만들 수 있어요");render()}},"듣기용 예시 스크립트 지우기"):null,h("button",{class:"btn sm ghost",onclick:e=>{if(e.currentTarget.nextSibling)return;e.currentTarget.after(h("button",{class:"btn sm",style:"color:var(--bad)",onclick:()=>{S=structuredClone(DEF);save();deck.order=[];render();toast("초기화했어요")}},"정말 초기화할게요"))}},"기록 전체 초기화…"))));
