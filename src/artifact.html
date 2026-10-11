@@ -583,7 +583,7 @@ async function clipUrl(tag,h){const k=tag+"/"+h;if(CLIPS.urls[k])return CLIPS.ur
   CLIPS.busy[k]=(async()=>{try{const cache=await (self.caches?caches.open("oss-clips").catch(()=>null):null);const ck="/clip/"+k;
     if(cache){const hit=await cache.match(ck);if(hit){const u=URL.createObjectURL(await hit.blob());CLIPS.urls[k]=u;return u}}
     if(!cloud.ref)return null;const d=await cloud.ref.collection("clips").doc(h).get();if(!d.exists)return null;const v=d.data()[tag];if(!v)return null;
-    const bytes=v.toUint8Array?v.toUint8Array():v;const blob=new Blob([bytes],{type:"audio/mpeg"});if(cache)cache.put(ck,new Response(blob)).catch(()=>{});
+    const bytes=v.toUint8Array?v.toUint8Array():v;if(!isMp3(bytes)){audLog.push("clip "+k+" 손상");return null}const blob=new Blob([bytes],{type:"audio/mpeg"});if(cache)cache.put(ck,new Response(blob)).catch(()=>{});
     const u=URL.createObjectURL(blob);CLIPS.urls[k]=u;return u}catch(e){return null}finally{delete CLIPS.busy[k]}})();return CLIPS.busy[k]}
 let TTS_URL="";try{TTS_URL=localStorage.getItem("oss_tts_url")||TTS_URL}catch(e){}
 const clipJob={on:false,done:0,total:0,err:0,last:""};
@@ -591,7 +591,8 @@ function clipSentences(){const out={};const add=t=>{for(const sn of splitSent(t)
   for(const st of [S.samples||{},S.scripts||{}])for(const sc of Object.values(st))for(const x of (sc.scripts||[]))add(x.answer||"");
   for(const m of Object.values(S.models||{}))add(m);return out}
 function clipMissing(){const all=clipSentences();return Object.entries(all).filter(([h])=>!CLIPS.idx.has(h))}
-async function ttsFetch(text,tag){const r=await fetch(TTS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,tag})});if(!r.ok)throw new Error("tts "+r.status+" "+(await r.text()).slice(0,80));return new Uint8Array(await r.arrayBuffer())}
+function isMp3(u8){return u8&&u8.length>500&&((u8[0]===0x49&&u8[1]===0x44&&u8[2]===0x33)||(u8[0]===0xFF&&(u8[1]&0xE0)===0xE0))}
+async function ttsFetch(text,tag){const r=await fetch(TTS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,tag})});if(!r.ok)throw new Error("tts "+r.status+" "+(await r.text()).slice(0,80));const u8=new Uint8Array(await r.arrayBuffer());if(!isMp3(u8))throw new Error("tts 응답이 mp3가 아님 ("+u8.length+"B)");return u8}
 async function clipSync(force){if(clipJob.on||!WEB||!cloud.ref||!TTS_URL||!navigator.onLine)return;const todo=clipMissing();if(!todo.length)return;
   clipJob.on=true;clipJob.done=0;clipJob.total=todo.length;clipJob.err=0;clipJob.last="";const upd=()=>{const el=$("#clipst");if(el)el.replaceChildren(clipStatus())};upd();
   const col=cloud.ref.collection("clips");const idxRef=cloud.ref.collection("meta").doc("clipidx");
@@ -611,12 +612,12 @@ function clipStatus(){const miss=clipMissing().length;const n=clipSentences();co
   return h("span",{class:"chip good"},"스크립트 "+total+"문장 모두 자연스러운 음성 준비됨")}
 const txtSrc=(text,lang="en")=>{const t=lang==="ko"?"ko":AUD.tag;if(t==="off")return null;const h=txtHash(text);
   if(AUD.txt[t]&&AUD.txt[t][h])return "audio/s/"+t+"/"+h+".mp3";
-  if(CLIPS.idx.has(h)&&(lang==="ko"?true:true))return "fs:"+t+"/"+h;return null};
+  if(CLIPS.idx.has(h)&&!(CLIPS.bad&&CLIPS.bad.has(h)))return "fs:"+t+"/"+h;return null};
 let audCb=null;
 const audLog=[];
-function audPlay(src,{rate=1,onend=null}={}){const a=audEl();audCb=onend;const t0=Date.now();a.onended=()=>{audLog.push(src.split("/").pop()+" ok "+((Date.now()-t0)/1000).toFixed(1)+"s");if(audLog.length>30)audLog.shift();const cb=audCb;audCb=null;cb&&cb()};
-  a.onerror=()=>{audLog.push(src.split("/").pop()+" ERR"+(a.error?.code||"")+" "+((Date.now()-t0)/1000).toFixed(1)+"s");const cb=audCb;audCb=null;cb&&cb()};
-  a.src=src;a.playbackRate=rate;a.play().catch(e=>{if(e&&e.name==="AbortError")return;audLog.push(src.split("/").pop()+" play-fail "+(e&&e.name||""));const cb=audCb;audCb=null;cb&&cb()})}
+function audPlay(src,{rate=1,onend=null,onerror=null}={}){const a=audEl();audCb=onend;const t0=Date.now();a.onended=()=>{audLog.push(src.split("/").pop()+" ok "+((Date.now()-t0)/1000).toFixed(1)+"s");if(audLog.length>30)audLog.shift();const cb=audCb;audCb=null;cb&&cb()};
+  a.onerror=()=>{audLog.push(src.split("/").pop().slice(0,24)+" ERR"+(a.error?.code||"")+" "+((Date.now()-t0)/1000).toFixed(1)+"s");const cb=audCb;audCb=null;if(onerror)onerror();else cb&&cb()};
+  a.src=src;a.playbackRate=rate;a.play().catch(e=>{if(e&&e.name==="AbortError")return;audLog.push(src.split("/").pop().slice(0,24)+" play-fail "+(e&&e.name||""));const cb=audCb;audCb=null;if(onerror)onerror();else cb&&cb()})}
 function audStop(){audCb=null;try{const a=audEl();a.onended=null;a.pause();a.removeAttribute("src");a.load()}catch(e){}}
 
 /* ============ TTS (듣기) ============ */
@@ -1102,8 +1103,9 @@ function playerStep(){if(!player.on||player.paused)return;const it=player.items[
   const after=()=>{if(!player.on||player.paused||tok!==player.tok)return;player.tok++;player.si++;if(view==="listen")updateNow();playerStep()};
   player.cur=seg;if(view==="listen")updateNow();
   if(seg.t==="file"&&/^fs:/.test(seg.src)){const [tag,h]=seg.src.slice(3).split("/");clearTimeout(player.t);player.t=setTimeout(()=>{player.t=null},20000);
-    clipUrl(tag,h).then(u=>{clearTimeout(player.t);player.t=null;if(!player.on||player.paused||tok!==player.tok)return;if(u){seg.src=u;playerStep()}else{// no clip for this sentence (e.g. no translation yet): fall back to device voice
-        seg.t=(tag==="ko")?"ko":"en";if(tag==="ko")seg.text=seg.ko;playerStep()}});
+    const fallback=()=>{seg.t=(tag==="ko")?"ko":"en";if(tag==="ko")seg.text=seg.ko;delete seg.src;playerStep()};
+    clipUrl(tag,h).then(u=>{clearTimeout(player.t);player.t=null;if(!player.on||player.paused||tok!==player.tok)return;if(!u){fallback();return}
+      audPlay(u,{rate:seg.rate||1,onend:after,onerror:()=>{audLog.push("clip "+tag+"/"+h+" 재생 실패 → 기기 음성");CLIPS.bad=CLIPS.bad||new Set();CLIPS.bad.add(h);if(!player.on||tok!==player.tok)return;fallback()}})});
     // prefetch the next few account clips so playback does not stall
     player.segs.slice(player.si+1,player.si+6).forEach(x=>{if(x.t==="file"&&/^fs:/.test(x.src)){const [t2,h2]=x.src.slice(3).split("/");clipUrl(t2,h2)}});return}
   if(seg.t==="file"){const m=/silence_(\d+)/.exec(seg.src||"");if(m){const want=+m[1]*1000;const t0=Date.now();audPlay(seg.src,{rate:1,onend:()=>{const left=want-(Date.now()-t0);if(left>150){audLog.push("silence short by "+(left/1000).toFixed(1)+"s → 타이머 보정");player.t=setTimeout(()=>{player.t=null;after()},left)}else after()}});return}
