@@ -573,6 +573,10 @@ function audEl(){if(!AUD.el){AUD.el=new Audio();AUD.el.preload="auto"}return AUD
 async function loadManifests(){for(const t of [...Object.keys(AUD.tags),"ko"]){try{const r=await fetch("audio/"+t+"/manifest.json");if(r.ok)AUD.man[t]=await r.json()}catch(e){}}AUD.ready=true;if(!AUD.man[AUD.tag]){AUD.tag=Object.keys(AUD.man).find(t=>t!=="ko")||"off"}}
 const audSrc=key=>(AUD.tag!=="off"&&key&&AUD.man[AUD.tag]&&AUD.man[AUD.tag][key])?"audio/"+AUD.tag+"/"+key+".mp3":null;
 const koSrc=key=>(key&&AUD.man.ko&&AUD.man.ko[key])?"audio/ko/"+key+".mp3":null;
+const txtHash=t=>{let h=5381;const x=(t||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();for(let i=0;i<x.length;i++)h=((h*33)^x.charCodeAt(i))>>>0;return h.toString(36)};
+AUD.txt={};// {m:{hash:1}, f:{...}, ko:{...}}
+async function loadTextManifests(){for(const t of ["m","f","ko"]){try{const r=await fetch("audio/s/"+t+"/manifest.json");if(r.ok)AUD.txt[t]=await r.json()}catch(e){}}}
+const txtSrc=(text,lang="en")=>{const t=lang==="ko"?"ko":AUD.tag;if(t==="off"||!AUD.txt[t])return null;const h=txtHash(text);return AUD.txt[t][h]?"audio/s/"+t+"/"+h+".mp3":null};
 let audCb=null;
 const audLog=[];
 function audPlay(src,{rate=1,onend=null}={}){const a=audEl();audCb=onend;const t0=Date.now();a.onended=()=>{audLog.push(src.split("/").pop()+" ok "+((Date.now()-t0)/1000).toFixed(1)+"s");if(audLog.length>30)audLog.shift();const cb=audCb;audCb=null;cb&&cb()};
@@ -1015,7 +1019,7 @@ function mediaSession(){if(!("mediaSession" in navigator))return;try{const it=pl
   for(const k in H){try{navigator.mediaSession.setActionHandler(k,H[k])}catch(e){}}}catch(e){}}
 
 /* ============ INFINITE PLAYER ============ */
-const player={on:false,paused:false,items:[],i:0,s:0,sents:[],t:null,lock:null,opts:{mode:"sent",q:true,scripts:true,cards:true,texts:true,shuffle:true,pause:3,gap:1,ko:"sent",repeat:2,withQ:true,topics:[],stopics:[]}};
+const player={on:false,paused:false,items:[],i:0,s:0,sents:[],t:null,lock:null,opts:{mode:"sent",q:true,scripts:true,cards:true,texts:true,shuffle:true,pause:3,gap:1,ko:"sent",repeat:2,withQ:true,topics:[],stopics:[],unit:"whole"}};
 try{Object.assign(player.opts,JSON.parse(localStorage.getItem("opic30_player")||"{}"))}catch(e){}
 if(player.opts.pause==null){player.opts.pause=player.opts.think!=null?Math.min(10,+player.opts.think||3):3}
 function scriptTopics(){return TOPICS.filter(t=>S.scripts[t.id]&&(S.scripts[t.id].scripts||[]).length)}
@@ -1046,8 +1050,14 @@ function buildSegs(it){const o=player.opts;const segs=[];const src=audSrc(it.key
   if(src||it.kind==="Q"||it.kind==="C"){// one recorded sentence/question: [EN → (KO, first time only) → pause] × n
     const en=src?{t:"file",src,rate:tts.rate,text:it.en,ko:it.ko||""}:{t:"en",text:it.en,ko:""};
     for(let r=0;r<n;r++){segs.push({...en});if(r===0&&ko&&it.ko)segs.push(koSeg(it.ko,it.key));segs.push(...P())}}
-  else{// scripts / model answers: sentence by sentence, each sentence [EN → (KO first time) → pause] × n
-    for(const sn of (sents.length?sents:[it.en])){const k=transOf(sn);for(let r=0;r<n;r++){segs.push({t:"en",text:sn,ko:k});if(r===0&&ko&&k)segs.push({t:"ko",text:k});segs.push(...P())}}}
+  else{// scripts / model answers (no per-item clip): text-keyed clips if rendered, else device voice
+    const list=sents.length?sents:[it.en];
+    const EN=sn=>{const f=txtSrc(sn);return f?{t:"file",src:f,rate:tts.rate,text:sn,ko:transOf(sn)}:{t:"en",text:sn,ko:transOf(sn)}};
+    const KO=k=>{const f=txtSrc(k,"ko");return f?{t:"file",src:f,rate:1,text:"",ko:k}:{t:"ko",text:k}};
+    if(o.unit==="sent"){// sentence by sentence: [EN → (KO first time) → pause] × n per sentence
+      for(const sn of list){const k=transOf(sn);for(let r=0;r<n;r++){segs.push(EN(sn));if(r===0&&ko&&k)segs.push(KO(k));segs.push(...P())}}}
+    else{// whole: all sentences in a row → (all translations, first time) → pause, × n
+      for(let r=0;r<n;r++){for(const sn of list)segs.push(EN(sn));if(r===0&&ko){for(const sn of list){const k=transOf(sn);if(k)segs.push(KO(k))}}segs.push(...P())}}}
   if(o.gap>=0.1)segs.push(...silenceSegs(o.gap));
   return segs}
 function playerStep(){if(!player.on||player.paused)return;const it=player.items[player.i];if(!it){playerStop();return}
@@ -1098,11 +1108,12 @@ function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem
     try{for(const t of sMissing){k++;b.textContent=`예시 만드는 중 ${k}/${sMissing.length} · ${t.ko}`;const r=await genSample(t);if(r&&Array.isArray(r.scripts)){S.samples[t.id]={scripts:r.scripts.map(x=>({answer:(x.answer||"").trim()})).filter(x=>x.answer),date:todayStr()};save()}}
       const sents=[];for(const t of sMissing)for(const x of (S.samples[t.id]?.scripts||[]))sents.push(...needTrans(x.answer));if(sents.length){await translateSents([...new Set(sents)],(d,n)=>b.textContent=`해석 중 ${d}/${n}`)}
       toast("예시 스크립트를 만들었어요");if(player.on&&o.mode==="sample"){player.items=buildPlaylist()}render()}catch(x){toast(errMsg(x));b.disabled=false;b.textContent="선택한 주제 예시 만들기"}}},sMissing.length?"선택한 주제 예시 만들기 ("+sMissing.length+")":"선택한 주제 모두 준비됨");
-  const common=[h("div",{class:"row"},h("label",{class:"f"},"한국어 해석",h("select",{id:"pl_ko",onchange:e=>{o.ko=e.target.value;saveO()}},...[["sent","영어 뒤에 한국어로 듣기"],["off","영어만"]].map(([v,l])=>h("option",{value:v,selected:o.ko===v},l)))),o.mode!=="sent"?transBtn():null),
+  const unitSel=o.mode==="sent"?null:h("label",{class:"f"},"읽는 단위",h("select",{onchange:e=>{o.unit=e.target.value;saveO()}},...[["whole","전체 읽고 → 전체 해석"],["sent","한 문장 읽고 → 해석"]].map(([v,l])=>h("option",{value:v,selected:(o.unit||"whole")===v},l))));
+  const common=[h("div",{class:"row"},unitSel,h("label",{class:"f"},"한국어 해석",h("select",{id:"pl_ko",onchange:e=>{o.ko=e.target.value;saveO()}},...[["sent","영어 뒤에 한국어로 듣기"],["off","영어만"]].map(([v,l])=>h("option",{value:v,selected:o.ko===v},l)))),o.mode!=="sent"?transBtn():null),
     h("div",{class:"row"},h("label",{class:"f"},"반복 횟수",h("select",{id:"pl_rep",onchange:e=>{o.repeat=+e.target.value;saveO()}},...[1,2,3,4,5].map(v=>h("option",{value:v,selected:o.repeat===v},v+"회")))),
       h("label",{class:"f"},"문장 뒤 쉬는 시간 (따라 말하기·생각)",h("select",{id:"pl_pause",onchange:e=>{o.pause=+e.target.value;saveO()}},...[0,1,2,3,4,5,6,8,10,15,20].map(v=>h("option",{value:v,selected:+o.pause===v},v?v+"초":"없음")))),
       h("label",{class:"f"},"다음 항목까지 간격",h("select",{id:"pl_gap",onchange:e=>{o.gap=+e.target.value;saveO()}},...[0,0.5,1,2,3].map(v=>h("option",{value:v,selected:+o.gap===v},v?v+"초":"없음"))))),
-    h("p",{class:"muted small"},"재생 순서: 영어 → (첫 번째만 한국어 해석) → 쉬는 시간 → 영어 → 쉬는 시간 … 반복 횟수만큼 → 다음 항목까지 간격. 스크립트는 문장 단위로 같은 순서예요.")];
+    h("p",{class:"muted small"},o.mode==="sent"?"재생 순서: 영어 → (첫 번째만 한국어 해석) → 쉬는 시간 → 영어 → 쉬는 시간 … 반복 횟수만큼 → 다음 항목까지 간격.":(o.unit||"whole")==="whole"?"재생 순서: 스크립트 전체 영어 → (첫 번째만 전체 해석) → 쉬는 시간 → 전체 영어 → 쉬는 시간 … 반복 횟수만큼 → 다음 스크립트.":"재생 순서: 한 문장 영어 → (첫 번째만 해석) → 쉬는 시간 → 같은 문장 … 반복 횟수만큼 → 다음 문장.")];
   const sentOpts=[h("p",{class:"eyebrow"},"재생 내용"),
     h("div",{class:"cks"},ck("q","시험 질문 (80+)"),ck("cards","표현카드 ("+(CARDS.length+S.custom.length)+")"),ck("shuffle","섞기")),
     ...common,
@@ -1236,7 +1247,7 @@ function micBtn(ta,{onFinal=null,label="🎤 말하기"}={}){if(!SR_OK)return nu
   return b}
 // web build: auto-refresh when a newer version is deployed (home-screen apps cache the old page)
 (async()=>{if(window.claude?.use||!/github\.io|localhost/.test(location.host))return;try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)return;const v=(await r.json()).v;const cur=document.documentElement.dataset.build;if(cur&&v&&v!==cur){toast("새 버전으로 업데이트 중…");setTimeout(()=>location.reload(),800)}}catch(e){}})();
-loadLocal();cloudInit();render();setTimeout(prepSyncCode,500);setTimeout(()=>{if(!cloud.ok||cloud.skip)applyPendingSync()},800);loadManifests().then(()=>{if(view==="listen"||view==="settings")render()});
+loadLocal();cloudInit();render();setTimeout(prepSyncCode,500);setTimeout(()=>{if(!cloud.ok||cloud.skip)applyPendingSync()},800);loadManifests().then(()=>{if(view==="listen"||view==="settings")render()});loadTextManifests();
 (async()=>{
   if(!window.claude?.use)return;
   const [u,d,s]=await Promise.all([claude.use("user"),claude.use("db"),claude.use("sample")]);
