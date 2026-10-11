@@ -1174,12 +1174,14 @@ function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[pla
     const qOn=!!seg.isQ;const qBox=it.q?h("div",{style:"margin:2px 0 8px;padding:6px 8px;border-radius:8px;"+(qOn?"background:rgba(15,118,110,.18)":"background:var(--bg)")},h("div",{class:"small",style:"font-weight:600"},"Q. "+it.q.en),it.q.ko?h("div",{class:"muted small"},it.q.ko):null):null;
     b.replaceChildren(...[head,qBox,enP,koP,silent?h("span",{class:"small",style:"color:var(--accent)"},"⏱ 따라 말하기 / 생각하기 "+pauseLeft.toFixed(pauseLeft%1?1:0)+"초"):null].filter(Boolean));return}
   b.replaceChildren(...[head,h("span",{class:"en"},en||it.en||""),ko?h("span",{class:"muted small"},ko):h("span",{class:"muted small"},"(해석 없음)"),silent?h("span",{class:"small",style:"color:var(--accent)"},"⏱ 따라 말하기 / 생각하기 "+pauseLeft.toFixed(pauseLeft%1?1:0)+"초"):null,it.ex?h("span",{class:"small",style:"color:var(--accent);margin-top:4px"},"예) "+it.ex):null].filter(Boolean))}
-function transBtn(){const missing=[];for(const sc of [...Object.values(S.scripts),...Object.values(S.samples||{})])for(const x of (sc.scripts||[]))missing.push(...needTrans(x.answer));
-  const n=new Set(missing).size;
-  if(!n){const all=[];for(const g of transSources())all.push(...g.sents);const old=(S.transVer||1)<TRANS_VER?[...new Set(all)].filter(x=>S.trans[x]):[];
-    if(!old.length)return h("span",{class:"chip good"},"해석 준비됨");
-    const rb=h("button",{class:"btn sm",disabled:!sample,title:sample?"":"Claude에서 열었을 때만 가능해요",onclick:async()=>{rb.disabled=true;try{await translateSents(old,(d,t)=>rb.textContent=`해석 다듬는 중 ${d}/${t}`,true);S.transVer=TRANS_VER;save();toast("해석을 자연스럽게 다시 만들었어요");render()}catch(e){toast(errMsg(e));rb.disabled=false}}},"해석 자연스럽게 다시 만들기 ("+old.length+"문장)");return rb}
-  const b=h("button",{class:"btn sm",disabled:!sample,onclick:async()=>{b.disabled=true;try{await translateSents([...new Set(missing)],(d,t)=>b.textContent=`해석 중 ${d}/${t}`);toast("해석을 만들었어요");render()}catch(e){toast(errMsg(e));b.disabled=false}}},"AI 해석 만들기 ("+n+"문장)");return b}
+function transBtn(){const all=[...new Set(transSources().flatMap(g=>g.sents))];const missing=all.filter(x=>!S.trans[x]);const old=(S.transVer||1)<TRANS_VER?all.filter(x=>S.trans[x]):[];
+  const run=async(b,list,force,label)=>{b.disabled=true;try{await translateSents(list,(d,t)=>b.textContent=`${label} ${d}/${t}`,force);if(force||!old.length)S.transVer=TRANS_VER;save();toast("해석을 만들었어요");render()}catch(e){toast(errMsg(e));b.disabled=false}};
+  if(!missing.length&&!old.length)return h("span",{class:"chip good"},"해석 준비됨 ✓");
+  if(!sample)return h("span",{class:"muted small"},(missing.length?"해석 없는 문장 "+missing.length+"개":"해석 개선 가능 "+old.length+"문장")+" — Claude 앱의 듣기 탭에서 만들 수 있어요");
+  const out=h("div",{class:"row",style:"flex-wrap:wrap;gap:6px"});
+  if(old.length){const b=h("button",{class:"btn sm primary",onclick:()=>run(b,all,true,"해석 만드는 중")},"✨ 해석 자연스럽게 다시 만들기 ("+all.length+"문장)");out.append(b)}
+  if(missing.length&&!old.length){const b2=h("button",{class:"btn sm",onclick:()=>run(b2,missing,false,"해석 중")},"빠진 해석만 만들기 ("+missing.length+")");out.append(b2)}
+  return out}
 function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem("opic30_player",JSON.stringify(o))}catch(e){}};
   const ck=(k,l)=>h("label",{},h("input",{type:"checkbox",id:"pl_"+k,checked:o[k],onchange:e=>{o[k]=e.target.checked;saveO()}}),l);
   const setMode=m=>{if(o.mode===m)return;o.mode=m;saveO();if(player.on){player.items=buildPlaylist();player.i=0;player.segs=[];player.si=0;audStop();if(tts.ok)speechSynthesis.cancel();if(!player.items.length){playerStop();toast("재생할 항목이 없어요")}else{clearTimeout(player.t);player.t=null;playerStep()}}render()};
@@ -1195,7 +1197,7 @@ function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem
       const sents=[];for(const t of sMissing)for(const x of (S.samples[t.id]?.scripts||[]))sents.push(...needTrans(x.answer));if(sents.length){await translateSents([...new Set(sents)],(d,n)=>b.textContent=`해석 중 ${d}/${n}`)}
       toast("예시 스크립트를 만들었어요");if(player.on&&o.mode==="sample"){player.items=buildPlaylist()}render()}catch(x){toast(errMsg(x));b.disabled=false;b.textContent="선택한 주제 예시 만들기"}}},sMissing.length?"선택한 주제 예시 만들기 ("+sMissing.length+")":"선택한 주제 모두 준비됨");
   const unitSel=o.mode==="sent"?null:h("label",{class:"f"},"읽는 단위",h("select",{onchange:e=>{o.unit=e.target.value;saveO()}},...[["whole","전체 읽고 → 전체 해석"],["sent","한 문장 읽고 → 해석"]].map(([v,l])=>h("option",{value:v,selected:(o.unit||"whole")===v},l))));
-  const common=[h("div",{class:"row"},unitSel,h("label",{class:"f"},"한국어 해석",h("select",{id:"pl_ko",onchange:e=>{o.ko=e.target.value;saveO()}},...[["sent","영어 뒤에 한국어로 듣기"],["off","영어만"]].map(([v,l])=>h("option",{value:v,selected:o.ko===v},l)))),o.mode!=="sent"?transBtn():null),
+  const common=[h("div",{class:"row"},unitSel,h("label",{class:"f"},"한국어 해석",h("select",{id:"pl_ko",onchange:e=>{o.ko=e.target.value;saveO()}},...[["sent","영어 뒤에 한국어로 듣기"],["off","영어만"]].map(([v,l])=>h("option",{value:v,selected:o.ko===v},l))))),o.mode!=="sent"?h("div",{style:"margin:2px 0 8px"},transBtn()):null,
     h("div",{class:"row"},h("label",{class:"f"},"반복 횟수",h("select",{id:"pl_rep",onchange:e=>{o.repeat=+e.target.value;saveO()}},...[1,2,3,4,5].map(v=>h("option",{value:v,selected:o.repeat===v},v+"회")))),
       h("label",{class:"f"},"문장 뒤 쉬는 시간 (따라 말하기·생각)",h("select",{id:"pl_pause",onchange:e=>{o.pause=+e.target.value;saveO()}},...[0,1,2,3,4,5,6,8,10,15,20].map(v=>h("option",{value:v,selected:+o.pause===v},v?v+"초":"없음")))),
       h("label",{class:"f"},"다음 항목까지 간격",h("select",{id:"pl_gap",onchange:e=>{o.gap=+e.target.value;saveO()}},...[0,0.5,1,2,3].map(v=>h("option",{value:v,selected:+o.gap===v},v?v+"초":"없음"))))),
