@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261011-193230-f57209">
+<html lang="ko" data-build="20261011-195112-299ba3">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1092,7 +1092,7 @@ Reply with ONLY a JSON object: {"answers":[["번역1","번역2",...], ...]} — 
 
 ${body}`,{cache:false});
     const arr=r&&Array.isArray(r.answers)?r.answers:Array.isArray(r)?r:[];
-    batch.forEach((g,k)=>{const tr=arr[k];if(!Array.isArray(tr))return;g.sents.forEach((en,m)=>{if((force?want.has(en):!S.trans[en]||want.has(en))&&typeof tr[m]==="string"&&tr[m].trim())S.trans[en]=tr[m].trim()})});
+    batch.forEach((g,k)=>{const tr=arr[k];if(!Array.isArray(tr)||tr.length!==g.sents.length){audLog.push("번역 줄 수 불일치 → 건너뜀");return}g.sents.forEach((en,m)=>{if((force?want.has(en):!S.trans[en]||want.has(en))&&typeof tr[m]==="string"&&tr[m].trim())S.trans[en]=tr[m].trim()})});
     done+=n;onProgress&&onProgress(Math.min(done,total),total);save()}}
 function transOf(sent){return S.trans[sent]||""}
 
@@ -1148,7 +1148,7 @@ function buildSegs(it){const o=player.opts;const segs=[];const src=audSrc(it.key
     if(o.unit==="sent"){// question once, then sentence by sentence: [EN → (KO first time) → pause] × n per sentence
       segs.push(...Q(0));for(const sn of list){const k=transOf(sn);for(let r=0;r<n;r++){segs.push(EN(sn));if(r===0&&ko&&k)segs.push(KO(k,sn));segs.push(...P())}}}
     else{// whole: all sentences in a row → (all translations, first time) → pause, × n
-      for(let r=0;r<n;r++){segs.push(...Q(r));for(const sn of list)segs.push(EN(sn));if(r===0&&ko){for(const sn of list){const k=transOf(sn);if(k)segs.push(KO(k,sn))}}segs.push(...P())}}}
+      for(let r=0;r<n;r++){segs.push(...Q(r));for(const sn of list)segs.push(EN(sn));if(r===0&&ko){{let prev="";const norm=x=>x.replace(/[\s.,!?~…"'“”‘’]/g,"");for(const sn of list){const k=transOf(sn);if(!k)continue;const a=norm(k),b=norm(prev);if(b&&(a===b||(a.length>=6&&b.includes(a))))continue;segs.push(KO(k,sn));prev=k}}}segs.push(...P())}}}
   if(o.gap>=0.1)segs.push(...silenceSegs(o.gap));
   return segs}
 function playerStep(){if(!player.on||player.paused)return;const it=player.items[player.i];if(!it){playerStop();return}
