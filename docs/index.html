@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261011-223022-b90e69">
+<html lang="ko" data-build="20261011-232838-06fb82">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -527,7 +527,8 @@ function profileFill(){const p=S.profile;return PF.filter(([k])=>k!=="extra"&&(p
 
 /* ============ AI ============ */
 const ERR={not_granted:"이 페이지에서 Claude 사용이 허용되지 않았습니다. AI 평가는 꺼져 있어요.",rate_limited:"요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",session_expired:"다시 로그인이 필요해요.",invalid_json:"응답 형식 오류예요. 다시 시도해 주세요.",refused:"이 입력은 평가할 수 없어요. 내용을 바꿔 다시 시도해 주세요.",upstream_error:"연결 문제가 있었어요. 다시 시도해 주세요."};
-const errMsg=e=>{const c=e?.code||"";const base=ERR[c]||(c==="empty_completion"?"AI가 답을 만들지 못했어요. 다시 시도해 주세요.":c==="prompt_too_large"?"입력이 너무 길어요. 조금 줄여서 다시 시도해 주세요.":ERR.upstream_error);return base+(c?" ["+c+"]":"")};
+const APPV=()=>(document.documentElement.dataset.build||document.querySelector("[data-build]")?.dataset.build||"dev").slice(-14);
+const errMsg=e=>{const c=e?.code||"";const base=ERR[c]||(c==="empty_completion"?"AI가 답을 만들지 못했어요. 다시 시도해 주세요.":c==="prompt_too_large"?"입력이 너무 길어요. 조금 줄여서 다시 시도해 주세요.":ERR.upstream_error);return base+(c?" ["+c+"]":"")+" · v"+APPV()};
 const RUBRIC=()=>`You are an OPIc (ACTFL) rater. The learner is Korean; target level is ${tgt()}. OPIc levels in order: NL, NM, NH, IL, IM1, IM2, IM3, IH, AL.
 Rating guide: IL = short sentences, lists; IM1-2 = full sentences, basic connectors, some past tense errors; IM3 = paragraph-length answers with a clear structure (intro-body-ending), fluent connectors, mostly accurate past tense, personal details; IH = handles complications and unexpected questions, varied vocabulary, past/present/future controlled; AL = narrates in all time frames consistently, supports opinions, native-like idioms.
 Judge primarily on: structure, amount of detail, tense control, connectors/fillers, vocabulary range, and task completion. Ignore spelling and punctuation (the answer was dictated by voice). Explanations for the learner are in Korean (존댓말, 간결하게); example sentences are in English.`;
@@ -860,7 +861,7 @@ function vAnswer(m,s){
       S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",qt:q.t,title:topic.en+" · "+(s.kind||""),level:r.level,score:r.score,secs:secs||0,fixes:(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}))});S.today.practice++;save();
       const nextRp=s.rp&&s.step<13?h("button",{class:"btn primary",onclick:()=>{const st=s.step+1;go("practice",{topic,q:{t:"rp",q:s.rp["q"+st]},kind:"롤플레이 "+st+"번 · "+(st===12?"문제 해결":"관련 경험"),rp:s.rp,step:st})}},"다음: "+(s.step+1)+"번 →"):null;
       put(fbBox,h("div",{class:"row"},nextRp,h("button",{class:"btn",onclick:()=>{ta.value="";ta._timed=false;startBtn.textContent="말하기 시작";fbBox.replaceChildren();secs=0;tEl.textContent="0:00";bar.firstChild.style.width="0";evalBtn.disabled=false}},"같은 질문 다시"),h("button",{class:"btn",onclick:()=>go("practice")},"다른 질문")));
-    }catch(e){fbBox.replaceChildren(h("p",{class:"small",style:"color:var(--bad)"},errMsg(e)));if(e.code!=="not_granted"&&e.code!=="sampling_disabled")evalBtn.disabled=false}
+    }catch(e){console.warn("evaluate failed",e);fbBox.replaceChildren(h("p",{class:"small",style:"color:var(--bad)"},errMsg(e)),e?.message?h("p",{class:"muted small mono",style:"word-break:break-all"},String(e.message).slice(0,200)):null,(e.code!=="not_granted"&&e.code!=="sampling_disabled")?h("button",{class:"btn sm",onclick:()=>{evalBtn.disabled=false;evalBtn.click()}},"다시 시도"):null);if(e.code!=="not_granted"&&e.code!=="sampling_disabled")evalBtn.disabled=false}
     finally{stopBtn.hidden=true}
   }},"AI 평가 받기");
   const stopBtn=h("button",{class:"btn",hidden:true,onclick:()=>ctl?.abort()},"중지");
