@@ -508,7 +508,7 @@ function profileFill(){const p=S.profile;return PF.filter(([k])=>k!=="extra"&&(p
 
 /* ============ AI ============ */
 const ERR={not_granted:"이 페이지에서 Claude 사용이 허용되지 않았습니다. AI 평가는 꺼져 있어요.",rate_limited:"요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",session_expired:"다시 로그인이 필요해요.",invalid_json:"응답 형식 오류예요. 다시 시도해 주세요.",refused:"이 입력은 평가할 수 없어요. 내용을 바꿔 다시 시도해 주세요.",upstream_error:"연결 문제가 있었어요. 다시 시도해 주세요."};
-const errMsg=e=>ERR[e?.code]||ERR.upstream_error;
+const errMsg=e=>{const c=e?.code||"";const base=ERR[c]||(c==="empty_completion"?"AI가 답을 만들지 못했어요. 다시 시도해 주세요.":c==="prompt_too_large"?"입력이 너무 길어요. 조금 줄여서 다시 시도해 주세요.":ERR.upstream_error);return base+(c?" ["+c+"]":"")};
 const RUBRIC=()=>`You are an OPIc (ACTFL) rater. The learner is Korean; target level is ${tgt()}. OPIc levels in order: NL, NM, NH, IL, IM1, IM2, IM3, IH, AL.
 Rating guide: IL = short sentences, lists; IM1-2 = full sentences, basic connectors, some past tense errors; IM3 = paragraph-length answers with a clear structure (intro-body-ending), fluent connectors, mostly accurate past tense, personal details; IH = handles complications and unexpected questions, varied vocabulary, past/present/future controlled; AL = narrates in all time frames consistently, supports opinions, native-like idioms.
 Judge primarily on: structure, amount of detail, tense control, connectors/fillers, vocabulary range, and task completion. Ignore spelling and punctuation (the answer was dictated by voice). Explanations for the learner are in Korean (존댓말, 간결하게); example sentences are in English.`;
@@ -528,7 +528,7 @@ ${answer}
 Reply with ONLY one JSON object:
 {"level":"IM2","score":62,"summary":"한국어 총평 2-3문장","strengths":["한국어로 잘한 점 2-3개"],"fixes":[{"original":"learner's phrase","better":"improved phrase","why":"한국어 설명 한 줄"}],"model_target":"A model answer at ${T} level (${spec().words} words): ${spec().desc} First person, natural spoken English, using the learner's own details where possible",${T==="AL"?"":`"model_up":"The same answer upgraded to ${up} level (${TARGET_SPEC[up].words} words)",`}"expressions":[{"en":"useful expression from the model answers","ko":"한국어 뜻"}]}
 Give 3-5 fixes and 4-6 expressions. "score" is 0-100 within the overall scale (IM3 starts around 65, IH around 78, AL around 90).`;
-  const r=await sample.json(prompt,{onText,cache:false});if(r){r.model_target=r.model_target||r.model_im3;r.model_up=r.model_up||r.model_ih;r.target=T;r.up=T==="AL"?null:up}return r;
+  const r=await sample.json(prompt,{...(typeof onText==="function"?{onText}:{}),cache:false});if(r){r.model_target=r.model_target||r.model_im3;r.model_up=r.model_up||r.model_ih;r.target=T;r.up=T==="AL"?null:up}return r;
 }
 async function genScript(topic,onText){
   const qs=topic.qs.map((q,i)=>`${i+1}. [${QT[q.t]}] ${q.q}`).join("\n");
@@ -541,7 +541,7 @@ ${qs}
 
 Reply with ONLY one JSON object: {"scripts":[{"n":1,"answer":"..."}],"expressions":[{"en":"...","ko":"한국어 뜻"}]}
 Include 6-8 reusable expressions taken from the scripts.`;
-  return sample.json(prompt,{onText,cache:false});
+  return sample.json(prompt,{...(typeof onText==="function"?{onText}:{}),cache:false});
 }
 async function genSample(topic){
   const qs=topic.qs.map((q,i)=>`${i+1}. [${QT[q.t]}] ${q.q}`).join("\n");
@@ -566,7 +566,7 @@ ${body}
 
 Reply with ONLY one JSON object:
 {"level":"IM2","score":60,"summary":"한국어 총평 3-4문장 (레벨 판정 근거, 다음 목표)","top_fixes":["가장 시급한 개선점 3개, 한국어"],"per_question":[{"n":1,"level":"IM2","comment":"한국어 한 줄 코멘트","better":"One improved English sentence the learner could have said"}]}`;
-  return sample.json(prompt,{onText,cache:false});
+  return sample.json(prompt,{...(typeof onText==="function"?{onText}:{}),cache:false});
 }
 
 /* ============ RECORDED AUDIO (Kokoro neural voices, pre-rendered) ============ */
@@ -834,7 +834,7 @@ function vAnswer(m,s){
     if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}
     evalBtn.disabled=true;stopBtn.hidden=false;ctl=new AbortController();
     fbBox.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"Claude가 평가 중… (10–40초)")));
-    try{const r=await evaluate(q.q,a,secs||Math.round(a.split(/\s+/).length/2.3),null);
+    try{const prog=fbBox.querySelector(".thinking span");const r=await evaluate(q.q,a,secs||Math.round(a.split(/\s+/).length/2.3),({text})=>{if(prog)prog.textContent="Claude가 평가 작성 중… "+(text||"").length+"자"});
       renderFeedback(fbBox,r,q.q,a);if(r.model_target){S.models=S.models||{};S.models[q.q]=r.model_target}
       S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",qt:q.t,title:topic.en+" · "+(s.kind||""),level:r.level,score:r.score,secs:secs||0,fixes:(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}))});S.today.practice++;save();
       const nextRp=s.rp&&s.step<13?h("button",{class:"btn primary",onclick:()=>{const st=s.step+1;go("practice",{topic,q:{t:"rp",q:s.rp["q"+st]},kind:"롤플레이 "+st+"번 · "+(st===12?"문제 해결":"관련 경험"),rp:s.rp,step:st})}},"다음: "+(s.step+1)+"번 →"):null;
