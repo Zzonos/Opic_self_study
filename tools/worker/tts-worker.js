@@ -6,7 +6,7 @@
 
 const ALLOW_ORIGINS = ["https://zzonos.github.io", "http://localhost:8765", "http://127.0.0.1:8765"];
 const TRUSTED_CLIENT_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
-const CHROMIUM_FULL_VERSION = "130.0.2849.68";
+const CHROMIUM_FULL_VERSION = "143.0.3650.75"; // keep in sync with edge-tts constants.py
 const WSS_HOST = "speech.platform.bing.com";
 const VOICES = {
   m: ["en-US-AndrewMultilingualNeural", "-8%"],
@@ -20,9 +20,10 @@ function cors(origin) {
   return { "Access-Control-Allow-Origin": ok, "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Max-Age": "86400", "Vary": "Origin" };
 }
 
+let clockSkew = 0; // seconds, corrected from Microsoft's Date header after a 403
 async function secMsGec() {
   // edge-tts DRM: Windows file-time ticks rounded down to 5 minutes, hashed with the trusted token
-  let ticks = Math.floor(Date.now() / 1000) + 11644473600;
+  let ticks = Math.floor(Date.now() / 1000 + clockSkew) + 11644473600;
   ticks -= ticks % 300;
   const str = `${ticks}0000000${TRUSTED_CLIENT_TOKEN}`;
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
@@ -33,16 +34,30 @@ function uuid() { return crypto.randomUUID().replace(/-/g, ""); }
 function ts() { return new Date().toString().replace(/\(.*\)/, "(Coordinated Universal Time)"); }
 function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;"); }
 
-async function synthesize(text, voice, rate) {
+function muid() { return [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase(); }
+
+async function openSocket() {
   const gec = await secMsGec();
   const url = `https://${WSS_HOST}/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${TRUSTED_CLIENT_TOKEN}&Sec-MS-GEC=${gec}&Sec-MS-GEC-Version=1-${CHROMIUM_FULL_VERSION}&ConnectionId=${uuid()}`;
+  const major = CHROMIUM_FULL_VERSION.split(".")[0];
   const resp = await fetch(url, { headers: {
-    "Upgrade": "websocket", "Connection": "Upgrade",
+    "Upgrade": "websocket", "Connection": "Upgrade", "Sec-WebSocket-Version": "13",
     "Pragma": "no-cache", "Cache-Control": "no-cache",
     "Origin": "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold",
-    "Accept-Encoding": "gzip, deflate, br", "Accept-Language": "en-US,en;q=0.9",
-    "User-Agent": `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROMIUM_FULL_VERSION.split(".")[0]}.0.0.0 Safari/537.36 Edg/${CHROMIUM_FULL_VERSION.split(".")[0]}.0.0.0`,
+    "Accept-Encoding": "gzip, deflate, br, zstd", "Accept-Language": "en-US,en;q=0.9",
+    "User-Agent": `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36 Edg/${major}.0.0.0`,
+    "Cookie": `muid=${muid()};`,
   }});
+  return resp;
+}
+
+async function synthesize(text, voice, rate) {
+  let resp = await openSocket();
+  if (!resp.webSocket && resp.status === 403) {
+    // clock skew correction (same as edge-tts): use the server's Date header and retry once
+    const d = Date.parse(resp.headers.get("Date") || "");
+    if (!isNaN(d)) { clockSkew += (d - Date.now()) / 1000; resp = await openSocket(); }
+  }
   const ws = resp.webSocket;
   if (!ws) throw new Error("websocket upgrade failed: " + resp.status + " " + (await resp.text()).slice(0, 200));
   ws.accept();
