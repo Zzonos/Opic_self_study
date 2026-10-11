@@ -804,10 +804,11 @@ function vHistory(m){const KIND={practice:"연습",mock:"모의시험",chat:"대
     const det=h("div",{class:"card",style:"margin:-4px 0 6px;gap:12px"},
       l.q?h("div",{},h("p",{class:"eyebrow"},"질문"),h("div",{class:"row",style:"align-items:flex-start;flex-wrap:nowrap"},h("p",{class:"small grow",style:"font-weight:600"},l.q),spkBtn(l.q,null,q?"q_"+t.id+"_"+t.qs.indexOf(q):null))):null,
       l.a?h("div",{},h("p",{class:"eyebrow"},"내 답변"),h("div",{class:"model"},l.a)):null,
+      l.sum?h("div",{},h("p",{class:"eyebrow"},"총평"),h("p",{class:"small"},l.sum)):null,
+      (l.str||[]).length?h("div",{},h("p",{class:"eyebrow"},"잘한 점"),...l.str.map(x=>h("p",{class:"small"},"✓ "+x))):null,
       fx.length?h("div",{},h("p",{class:"eyebrow"},l.kind==="mock"?"개선 포인트":"고칠 부분"),...fx.map(x=>x.o||x.b?h("div",{class:"fix"},x.o?h("span",{class:"o"},x.o):null,x.b?h("span",{class:"b"},x.b):null,x.w?h("span",{class:"w"},x.w):null):h("p",{class:"small"},"• "+x.w))):null,
       l.model?h("div",{},h("p",{class:"eyebrow"},"모범답안"),h("div",{class:"model"},l.model),h("div",{class:"row",style:"margin-top:6px"},spkBtn(l.model),h("button",{class:"btn sm",onclick:()=>go("listen",{text:l.model,title:l.title})},"쉐도잉"))):null,
       (l.pq||[]).length?h("details",{},h("summary",{},"문항별 피드백 ("+l.pq.length+")"),...l.pq.map((x,i)=>h("div",{style:"margin-top:8px"},h("p",{class:"small",style:"font-weight:600"},(i+1)+". "+(x.q||"")+(x.l?" · "+x.l:"")),x.a?h("p",{class:"muted small"},x.a):null,x.c?h("p",{class:"small"},x.c):null,x.b?h("p",{class:"small",style:"color:var(--accent)"},"→ "+x.b):null))):null,
-      l.kind!=="practice"&&l.sum?h("p",{class:"small muted"},l.sum):null,
       !hasDet(l)&&!fx.length?h("p",{class:"muted small"},HIST["_"+l0.ts]&&!HIST[l0.ts]&&cloud.ref?"세부 내용을 불러오는 중이거나, 세부 내용이 저장되기 전에 만든 기록이에요.":"세부 내용이 저장되기 전에 만든 기록이라 점수만 남아 있어요."):null,
       t&&q?h("div",{class:"row"},h("button",{class:"btn sm primary",onclick:()=>go("practice",{topic:t,q,kind:QT[q.t]})},"이 질문 다시 연습")):null);
     return h("div",{},head,det)};
