@@ -574,7 +574,10 @@ async function loadManifests(){for(const t of [...Object.keys(AUD.tags),"ko"]){t
 const audSrc=key=>(AUD.tag!=="off"&&key&&AUD.man[AUD.tag]&&AUD.man[AUD.tag][key])?"audio/"+AUD.tag+"/"+key+".mp3":null;
 const koSrc=key=>(key&&AUD.man.ko&&AUD.man.ko[key])?"audio/ko/"+key+".mp3":null;
 let audCb=null;
-function audPlay(src,{rate=1,onend=null}={}){const a=audEl();audCb=onend;a.onended=()=>{const cb=audCb;audCb=null;cb&&cb()};a.onerror=()=>{const cb=audCb;audCb=null;cb&&cb()};a.src=src;a.playbackRate=rate;a.play().catch(()=>{const cb=audCb;audCb=null;cb&&cb()})}
+const audLog=[];
+function audPlay(src,{rate=1,onend=null}={}){const a=audEl();audCb=onend;const t0=Date.now();a.onended=()=>{audLog.push(src.split("/").pop()+" ok "+((Date.now()-t0)/1000).toFixed(1)+"s");if(audLog.length>30)audLog.shift();const cb=audCb;audCb=null;cb&&cb()};
+  a.onerror=()=>{audLog.push(src.split("/").pop()+" ERR"+(a.error?.code||"")+" "+((Date.now()-t0)/1000).toFixed(1)+"s");const cb=audCb;audCb=null;cb&&cb()};
+  a.src=src;a.playbackRate=rate;a.play().catch(e=>{if(e&&e.name==="AbortError")return;audLog.push(src.split("/").pop()+" play-fail "+(e&&e.name||""));const cb=audCb;audCb=null;cb&&cb()})}
 function audStop(){audCb=null;try{const a=audEl();a.onended=null;a.pause();a.removeAttribute("src");a.load()}catch(e){}}
 
 /* ============ TTS (듣기) ============ */
@@ -1068,7 +1071,8 @@ function renderMini(){const m=$("#mini");if(!player.on){m.hidden=true;return}m.h
   m.replaceChildren(h("span",{class:"now"},(player.paused?"⏸ ":"▶ ")+(it.label||"")+" — "+(it.en||"")),h("button",{onclick:playerPause},player.paused?"재생":"일시정지"),h("button",{onclick:playerNext},"다음"),h("button",{onclick:playerStop},"끄기"))}
 function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[player.i]||{};const seg=player.cur||{};
   const en=(seg.t==="file"&&seg.text)||seg.t==="en"?(seg.text||it.en):it.en;const ko=seg.t==="ko"?seg.text:(seg.ko||"");
-  b.replaceChildren(...[h("span",{class:"eyebrow"},({Q:"질문",A:"답변",C:"표현",T:"내 자료"}[it.kind]||"")+" · "+(it.label||"")+" · "+(player.i+1)+"/"+player.items.length+(audSrc(it.key)?" · 🎧":"")),h("span",{class:"en"},en||it.en||""),ko?h("span",{class:"muted small"},ko):h("span",{class:"muted small"},"(해석 없음)"),it.ex?h("span",{class:"small",style:"color:var(--accent);margin-top:4px"},"예) "+it.ex):null].filter(Boolean))}
+  const silent=seg.t==="wait"||(seg.t==="file"&&/silence_/.test(seg.src||""));const pauseLeft=silent?player.segs.slice(player.si).reduce((a,x)=>(x.t==="wait")?a+x.ms/1000:(x.t==="file"&&/silence_/.test(x.src))?a+(+x.src.match(/_(\d+)/)[1]):a,0):0;
+  b.replaceChildren(...[h("span",{class:"eyebrow"},({Q:"질문",A:"답변",C:"표현",T:"내 자료"}[it.kind]||"")+" · "+(it.label||"")+" · "+(player.i+1)+"/"+player.items.length+(audSrc(it.key)?" · 🎧":"")),h("span",{class:"en"},en||it.en||""),ko?h("span",{class:"muted small"},ko):h("span",{class:"muted small"},"(해석 없음)"),silent?h("span",{class:"small",style:"color:var(--accent)"},"⏱ "+(it.kind==="Q"&&(it.think||0)?"생각할 시간 ":"쉬는 중 ")+pauseLeft.toFixed(pauseLeft%1?1:0)+"초"):null,it.ex?h("span",{class:"small",style:"color:var(--accent);margin-top:4px"},"예) "+it.ex):null].filter(Boolean))}
 function transBtn(){const missing=[];for(const sc of [...Object.values(S.scripts),...Object.values(S.samples||{})])for(const x of (sc.scripts||[]))missing.push(...needTrans(x.answer));
   const n=new Set(missing).size;if(!n)return h("span",{class:"chip good"},"해석 준비됨");
   const b=h("button",{class:"btn sm",disabled:!sample,onclick:async()=>{b.disabled=true;try{await translateSents([...new Set(missing)],(d,t)=>b.textContent=`해석 중 ${d}/${t}`);toast("해석을 만들었어요");render()}catch(e){toast(errMsg(e));b.disabled=false}}},"AI 해석 만들기 ("+n+"문장)");return b}
@@ -1197,7 +1201,7 @@ function vSettings(m){
       h("textarea",{id:"expbox",readonly:"",hidden:true,autocapitalize:"off",autocorrect:"off",spellcheck:"false",style:"min-height:60px;font-family:var(--mono);font-size:11px",onclick:e=>{e.target.select()}}),
       h("textarea",{id:"imp",autocapitalize:"off",autocorrect:"off",spellcheck:"false",style:"min-height:70px;font-family:var(--mono);font-size:11px",placeholder:"다른 곳에서 복사한 기록 코드를 붙여넣기"}),
       h("div",{class:"row"},h("button",{class:"btn",onclick:async()=>{try{const o=await parseCode($("#imp").value);mergeState(o,false);$("#imp").value="";toast("기록을 합쳤어요");render()}catch(e){toast("코드를 읽을 수 없어요")}}},"가져와서 합치기"))),
-    h("div",{class:"card"},h("h3",{},"데이터"),h("p",{class:"muted small mono",style:"font-size:10px"},"진단: "+(window.claude?.use?"claude":"web")+" · hash="+(HASH_SEEN||"-")+" · ds="+("DecompressionStream" in window)+" · clip="+!!navigator.clipboard?.readText),h("p",{class:"muted small"},uid?h("span",{},"학습 기록은 내 Claude 계정에 저장되어 다른 기기에서도 이어집니다. ",h("b",{id:"csave"},claudeStatus())):cloud.user?"학습 기록은 OSS 계정("+cloud.user.email+")에 저장돼요.":"지금은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장됩니다."),
+    h("div",{class:"card"},h("h3",{},"데이터"),h("p",{class:"muted small mono",style:"font-size:10px"},"진단: "+(window.claude?.use?"claude":"web")+" · hash="+(HASH_SEEN||"-")+" · ds="+("DecompressionStream" in window)+" · clip="+!!navigator.clipboard?.readText+"\n재생 로그: "+(audLog.slice(-8).join(" | ")||"-")),h("p",{class:"muted small"},uid?h("span",{},"학습 기록은 내 Claude 계정에 저장되어 다른 기기에서도 이어집니다. ",h("b",{id:"csave"},claudeStatus())):cloud.user?"학습 기록은 OSS 계정("+cloud.user.email+")에 저장돼요.":"지금은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장됩니다."),
       h("div",{class:"row",id:"resetrow"},Object.keys(S.samples||{}).length?h("button",{class:"btn sm ghost",onclick:()=>{S.samples={};save();toast("예시 스크립트를 지웠어요. 듣기 탭에서 다시 만들 수 있어요");render()}},"듣기용 예시 스크립트 지우기"):null,h("button",{class:"btn sm ghost",onclick:e=>{if(e.currentTarget.nextSibling)return;e.currentTarget.after(h("button",{class:"btn sm",style:"color:var(--bad)",onclick:()=>{S=structuredClone(DEF);save();deck.order=[];render();toast("초기화했어요")}},"정말 초기화할게요"))}},"기록 전체 초기화…"))));
 }
 
