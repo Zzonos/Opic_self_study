@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261011-095050-b81445">
+<html lang="ko" data-build="20261011-101415-8ef34e">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1034,8 +1034,9 @@ function mediaSession(){if(!("mediaSession" in navigator))return;try{const it=pl
   for(const k in H){try{navigator.mediaSession.setActionHandler(k,H[k])}catch(e){}}}catch(e){}}
 
 /* ============ INFINITE PLAYER ============ */
-const player={on:false,paused:false,items:[],i:0,s:0,sents:[],t:null,lock:null,opts:{mode:"sent",q:true,scripts:true,cards:true,texts:true,shuffle:true,think:5,gap:1.5,ko:"sent",repeat:1,withQ:true,topics:[],stopics:[]}};
+const player={on:false,paused:false,items:[],i:0,s:0,sents:[],t:null,lock:null,opts:{mode:"sent",q:true,scripts:true,cards:true,texts:true,shuffle:true,pause:3,gap:1,ko:"sent",repeat:2,withQ:true,topics:[],stopics:[]}};
 try{Object.assign(player.opts,JSON.parse(localStorage.getItem("opic30_player")||"{}"))}catch(e){}
+if(player.opts.pause==null){player.opts.pause=player.opts.think!=null?Math.min(10,+player.opts.think||3):3}
 function scriptTopics(){return TOPICS.filter(t=>S.scripts[t.id]&&(S.scripts[t.id].scripts||[]).length)}
 function sampleTopics(){return TOPICS.filter(t=>t.id!=="intro"&&(S.profile.survey.includes(t.id)||t.group==="돌발"))}
 function buildPlaylist(){const o=player.opts;const items=[];
@@ -1058,14 +1059,15 @@ function playerStop(){player.on=false;player.paused=false;clearTimeout(player.t)
 function playerPause(){if(!player.on)return;player.paused=!player.paused;clearTimeout(player.t);player.t=null;if(player.paused){audStop();if(tts.ok)speechSynthesis.cancel();keepAlive(false)}else{keepAlive(true);playerStep()}mediaSession();renderMini();if(view==="listen")render()}
 function playerNext(){if(!player.on)return;clearTimeout(player.t);player.t=null;audStop();if(tts.ok)speechSynthesis.cancel();player.i=(player.i+1)%player.items.length;player.segs=[];player.si=0;player.paused=false;playerStep()}
 function silenceSegs(sec){const out=[];let left=Math.floor(sec+0.001);for(const d of [20,10,5,3,2,1]){while(left>=d){out.push({t:"file",src:"audio/silence_"+d+".mp3",rate:1});left-=d}}const frac=Math.round((sec-Math.floor(sec+0.001))*1000);if(frac>=100)out.push({t:"wait",ms:frac});return out}
-function buildSegs(it){const o=player.opts;const segs=[];const src=audSrc(it.key);const sents=splitSent(it.en);const ko=o.ko!=="off";const n=Math.max(1,o.repeat|0);
+function buildSegs(it){const o=player.opts;const segs=[];const src=audSrc(it.key);const sents=splitSent(it.en);const ko=o.ko!=="off";const n=Math.max(1,o.repeat|0);const pause=Math.max(0,+o.pause||0);
   const koSeg=(text,key)=>{const f=koSrc(key);return f?{t:"file",src:f,rate:1,text:"",ko:text}:{t:"ko",text}};
-  const enSegs=()=>src?[{t:"file",src,rate:tts.rate,text:it.en,ko:it.ko||sents.map(transOf).filter(Boolean).join(" ")}]:(sents.length?sents:[it.en]).map(sn=>({t:"en",text:sn,ko:(it.kind==="Q"||it.kind==="C")?"":transOf(sn)}));
-  // pattern: EN → 해석 → EN × (n-1)
-  if(src||it.kind==="Q"||it.kind==="C"){segs.push(...enSegs());if(ko&&it.ko)segs.push(koSeg(it.ko,it.key));for(let r=1;r<n;r++){segs.push(...silenceSegs(1),...enSegs())}}
-  else{// sentence-level fallback for scripts/texts: each sentence EN → KO, whole item repeated n times
-    for(let r=0;r<n;r++){for(const sn of (sents.length?sents:[it.en])){segs.push({t:"en",text:sn,ko:transOf(sn)});const k=transOf(sn);if(ko&&k&&r===0)segs.push({t:"ko",text:k})}if(r<n-1)segs.push(...silenceSegs(1))}}
-  const wait=(it.kind==="Q"?(it.think||0):0)+o.gap;if(wait>=0.1)segs.push(...silenceSegs(wait));
+  const P=()=>pause>=0.1?silenceSegs(pause):[];
+  if(src||it.kind==="Q"||it.kind==="C"){// one recorded sentence/question: [EN → (KO, first time only) → pause] × n
+    const en=src?{t:"file",src,rate:tts.rate,text:it.en,ko:it.ko||""}:{t:"en",text:it.en,ko:""};
+    for(let r=0;r<n;r++){segs.push({...en});if(r===0&&ko&&it.ko)segs.push(koSeg(it.ko,it.key));segs.push(...P())}}
+  else{// scripts / model answers: sentence by sentence, each sentence [EN → (KO first time) → pause] × n
+    for(const sn of (sents.length?sents:[it.en])){const k=transOf(sn);for(let r=0;r<n;r++){segs.push({t:"en",text:sn,ko:k});if(r===0&&ko&&k)segs.push({t:"ko",text:k});segs.push(...P())}}}
+  if(o.gap>=0.1)segs.push(...silenceSegs(o.gap));
   return segs}
 function playerStep(){if(!player.on||player.paused)return;const it=player.items[player.i];if(!it){playerStop();return}
   if(!player.segs.length){player.segs=buildSegs(it);player.si=0;renderMini();mediaSession();if(view==="listen")updateNow()}
@@ -1092,7 +1094,7 @@ function renderMini(){const m=$("#mini");if(!player.on){m.hidden=true;return}m.h
 function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[player.i]||{};const seg=player.cur||{};
   const en=(seg.t==="file"&&seg.text)||seg.t==="en"?(seg.text||it.en):it.en;const ko=seg.t==="ko"?seg.text:(seg.ko||"");
   const silent=seg.t==="wait"||(seg.t==="file"&&/silence_/.test(seg.src||""));const pauseLeft=silent?player.segs.slice(player.si).reduce((a,x)=>(x.t==="wait")?a+x.ms/1000:(x.t==="file"&&/silence_/.test(x.src))?a+(+x.src.match(/_(\d+)/)[1]):a,0):0;
-  b.replaceChildren(...[h("span",{class:"eyebrow"},({Q:"질문",A:"답변",C:"표현",T:"내 자료"}[it.kind]||"")+" · "+(it.label||"")+" · "+(player.i+1)+"/"+player.items.length+(audSrc(it.key)?" · 🎧":"")),h("span",{class:"en"},en||it.en||""),ko?h("span",{class:"muted small"},ko):h("span",{class:"muted small"},"(해석 없음)"),silent?h("span",{class:"small",style:"color:var(--accent)"},"⏱ "+(it.kind==="Q"&&(it.think||0)?"생각할 시간 ":"쉬는 중 ")+pauseLeft.toFixed(pauseLeft%1?1:0)+"초"):null,it.ex?h("span",{class:"small",style:"color:var(--accent);margin-top:4px"},"예) "+it.ex):null].filter(Boolean))}
+  b.replaceChildren(...[h("span",{class:"eyebrow"},({Q:"질문",A:"답변",C:"표현",T:"내 자료"}[it.kind]||"")+" · "+(it.label||"")+" · "+(player.i+1)+"/"+player.items.length+(audSrc(it.key)?" · 🎧":"")),h("span",{class:"en"},en||it.en||""),ko?h("span",{class:"muted small"},ko):h("span",{class:"muted small"},"(해석 없음)"),silent?h("span",{class:"small",style:"color:var(--accent)"},"⏱ 따라 말하기 / 생각하기 "+pauseLeft.toFixed(pauseLeft%1?1:0)+"초"):null,it.ex?h("span",{class:"small",style:"color:var(--accent);margin-top:4px"},"예) "+it.ex):null].filter(Boolean))}
 function transBtn(){const missing=[];for(const sc of [...Object.values(S.scripts),...Object.values(S.samples||{})])for(const x of (sc.scripts||[]))missing.push(...needTrans(x.answer));
   const n=new Set(missing).size;if(!n)return h("span",{class:"chip good"},"해석 준비됨");
   const b=h("button",{class:"btn sm",disabled:!sample,onclick:async()=>{b.disabled=true;try{await translateSents([...new Set(missing)],(d,t)=>b.textContent=`해석 중 ${d}/${t}`);toast("해석을 만들었어요");render()}catch(e){toast(errMsg(e));b.disabled=false}}},"AI 해석 만들기 ("+n+"문장)");return b}
@@ -1111,9 +1113,10 @@ function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem
       const sents=[];for(const t of sMissing)for(const x of (S.samples[t.id]?.scripts||[]))sents.push(...needTrans(x.answer));if(sents.length){await translateSents([...new Set(sents)],(d,n)=>b.textContent=`해석 중 ${d}/${n}`)}
       toast("예시 스크립트를 만들었어요");if(player.on&&o.mode==="sample"){player.items=buildPlaylist()}render()}catch(x){toast(errMsg(x));b.disabled=false;b.textContent="선택한 주제 예시 만들기"}}},sMissing.length?"선택한 주제 예시 만들기 ("+sMissing.length+")":"선택한 주제 모두 준비됨");
   const common=[h("div",{class:"row"},h("label",{class:"f"},"한국어 해석",h("select",{id:"pl_ko",onchange:e=>{o.ko=e.target.value;saveO()}},...[["sent","영어 뒤에 한국어로 듣기"],["off","영어만"]].map(([v,l])=>h("option",{value:v,selected:o.ko===v},l)))),o.mode!=="sent"?transBtn():null),
-    h("div",{class:"row"},o.mode==="sent"?h("label",{class:"f"},"질문 뒤 생각할 시간",h("select",{id:"pl_think",onchange:e=>{o.think=+e.target.value;saveO()}},...[0,3,5,10,20].map(v=>h("option",{value:v,selected:o.think===v},v?v+"초 (속으로 답해보기)":"없음")))):null,
-      h("label",{class:"f"},"반복 횟수",h("select",{id:"pl_rep",onchange:e=>{o.repeat=+e.target.value;saveO()}},...[1,2,3,4,5].map(v=>h("option",{value:v,selected:o.repeat===v},v===1?"1회":v+"회 (영어 → 해석 → 영어 ×"+(v-1)+")")))),
-      h("label",{class:"f"},"항목 사이 간격",h("select",{id:"pl_gap",onchange:e=>{o.gap=+e.target.value;saveO()}},...[0.5,1.5,3].map(v=>h("option",{value:v,selected:o.gap===v},v+"초")))))];
+    h("div",{class:"row"},h("label",{class:"f"},"반복 횟수",h("select",{id:"pl_rep",onchange:e=>{o.repeat=+e.target.value;saveO()}},...[1,2,3,4,5].map(v=>h("option",{value:v,selected:o.repeat===v},v+"회")))),
+      h("label",{class:"f"},"문장 뒤 쉬는 시간 (따라 말하기·생각)",h("select",{id:"pl_pause",onchange:e=>{o.pause=+e.target.value;saveO()}},...[0,1,2,3,4,5,6,8,10,15,20].map(v=>h("option",{value:v,selected:+o.pause===v},v?v+"초":"없음")))),
+      h("label",{class:"f"},"다음 항목까지 간격",h("select",{id:"pl_gap",onchange:e=>{o.gap=+e.target.value;saveO()}},...[0,0.5,1,2,3].map(v=>h("option",{value:v,selected:+o.gap===v},v?v+"초":"없음"))))),
+    h("p",{class:"muted small"},"재생 순서: 영어 → (첫 번째만 한국어 해석) → 쉬는 시간 → 영어 → 쉬는 시간 … 반복 횟수만큼 → 다음 항목까지 간격. 스크립트는 문장 단위로 같은 순서예요.")];
   const sentOpts=[h("p",{class:"eyebrow"},"재생 내용"),
     h("div",{class:"cks"},ck("q","시험 질문 (80+)"),ck("cards","표현카드 ("+(CARDS.length+S.custom.length)+")"),ck("shuffle","섞기")),
     ...common,
