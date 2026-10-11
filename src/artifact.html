@@ -1035,7 +1035,7 @@ function playerStart(){if(!tts.ok&&!Object.keys(AUD.man).length){toast("이 브�
 function playerStop(){player.on=false;player.paused=false;clearTimeout(player.t);player.t=null;ttsStop();wakeLock(false);keepAlive(false);try{navigator.mediaSession.playbackState="none"}catch(e){}renderMini();if(view==="listen")render()}
 function playerPause(){if(!player.on)return;player.paused=!player.paused;clearTimeout(player.t);player.t=null;if(player.paused){audStop();if(tts.ok)speechSynthesis.cancel();keepAlive(false)}else{keepAlive(true);playerStep()}mediaSession();renderMini();if(view==="listen")render()}
 function playerNext(){if(!player.on)return;clearTimeout(player.t);player.t=null;audStop();if(tts.ok)speechSynthesis.cancel();player.i=(player.i+1)%player.items.length;player.segs=[];player.si=0;player.paused=false;playerStep()}
-function silenceSegs(sec){const out=[];let left=Math.round(sec);for(const d of [20,10,5,3,2,1]){while(left>=d){out.push({t:"file",src:"audio/silence_"+d+".mp3",rate:1});left-=d}}return out}
+function silenceSegs(sec){const out=[];let left=Math.floor(sec+0.001);for(const d of [20,10,5,3,2,1]){while(left>=d){out.push({t:"file",src:"audio/silence_"+d+".mp3",rate:1});left-=d}}const frac=Math.round((sec-Math.floor(sec+0.001))*1000);if(frac>=100)out.push({t:"wait",ms:frac});return out}
 function buildSegs(it){const o=player.opts;const segs=[];const src=audSrc(it.key);const sents=splitSent(it.en);const ko=o.ko!=="off";const n=Math.max(1,o.repeat|0);
   const koSeg=(text,key)=>{const f=koSrc(key);return f?{t:"file",src:f,rate:1,text:"",ko:text}:{t:"ko",text}};
   const enSegs=()=>src?[{t:"file",src,rate:tts.rate,text:it.en,ko:it.ko||sents.map(transOf).filter(Boolean).join(" ")}]:(sents.length?sents:[it.en]).map(sn=>({t:"en",text:sn,ko:(it.kind==="Q"||it.kind==="C")?"":transOf(sn)}));
@@ -1043,7 +1043,7 @@ function buildSegs(it){const o=player.opts;const segs=[];const src=audSrc(it.key
   if(src||it.kind==="Q"||it.kind==="C"){segs.push(...enSegs());if(ko&&it.ko)segs.push(koSeg(it.ko,it.key));for(let r=1;r<n;r++){segs.push(...silenceSegs(1),...enSegs())}}
   else{// sentence-level fallback for scripts/texts: each sentence EN → KO, whole item repeated n times
     for(let r=0;r<n;r++){for(const sn of (sents.length?sents:[it.en])){segs.push({t:"en",text:sn,ko:transOf(sn)});const k=transOf(sn);if(ko&&k&&r===0)segs.push({t:"ko",text:k})}if(r<n-1)segs.push(...silenceSegs(1))}}
-  const wait=(it.kind==="Q"?(it.think||0):0)+o.gap;if(wait>=1)segs.push(...silenceSegs(wait));
+  const wait=(it.kind==="Q"?(it.think||0):0)+o.gap;if(wait>=0.1)segs.push(...silenceSegs(wait));
   return segs}
 function playerStep(){if(!player.on||player.paused)return;const it=player.items[player.i];if(!it){playerStop();return}
   if(!player.segs.length){player.segs=buildSegs(it);player.si=0;renderMini();mediaSession();if(view==="listen")updateNow()}
@@ -1052,6 +1052,7 @@ function playerStep(){if(!player.on||player.paused)return;const it=player.items[
   const after=()=>{if(!player.on||player.paused||tok!==player.tok)return;player.tok++;player.si++;if(view==="listen")updateNow();playerStep()};
   player.cur=seg;if(view==="listen")updateNow();
   if(seg.t==="file"){audPlay(seg.src,{rate:seg.rate,onend:after});return}
+  if(seg.t==="wait"){player.t=setTimeout(()=>{player.t=null;after()},seg.ms);return}
   // speech synthesis segments (fallback / Korean): cannot run while the page is in the background on iPhone → skip
   if(!tts.ok||document.hidden){after();return}
   const u=new SpeechSynthesisUtterance(seg.t==="ko"?seg.text:ttsText(seg.text));
