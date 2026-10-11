@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261011-232838-06fb82">
+<html lang="ko" data-build="20261011-233240-8e366c">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1399,7 +1399,8 @@ loadLocal();cloudInit();render();setTimeout(prepSyncCode,500);setTimeout(()=>{if
   if(!window.claude?.use)return;
   const [u,d,s]=await Promise.all([claude.use("user"),claude.use("db"),claude.use("sample")]);
   if(!u){gated=true;render();return}
-  sample=s;
+  // results from the platform are frozen: hand the app plain mutable copies
+  if(s){const w=(...a)=>s(...a);w.json=async(...a)=>{const r=await s.json(...a);return r==null?r:JSON.parse(JSON.stringify(r))};if(s.limits)w.limits=(...a)=>s.limits(...a);sample=w}else sample=s;
   if(u&&d){try{uid=await u.id();db=d;const col=db.collection("data/users/"+uid);const refs={main:col.doc("main"),scripts:col.doc("scripts"),trans:col.doc("trans")};
     const [m,sc,tr]=await Promise.all([refs.main.get(),refs.scripts.get(),refs.trans.get()]);
     if(m.exists){const remote=Object.assign({},m.data(),sc.exists?sc.data():{},{trans:(tr.exists&&tr.data().t)||{}});
