@@ -600,7 +600,7 @@ try{const r=await fetch(u+"/voices",{cache:"no-store"});const j=await r.json();i
 try{const t0=Date.now();const u8=await ttsFetch("Hello! This is a voice test.","m");log("③ 음성 생성 ✓ ("+Math.round(u8.length/1024)+"KB, "+((Date.now()-t0)/1000).toFixed(1)+"초) — 재생합니다");const a=new Audio(URL.createObjectURL(new Blob([u8],{type:"audio/mpeg"})));a.play().catch(()=>{})}
 catch(x){const m=String(x.message||x);log("③ 음성 생성 ✗ — "+m);if(/403/.test(m))log("   → Microsoft가 Cloudflare 서버의 요청을 거절했어요 (서버 쪽 문제, 앱/주소 문제 아님)");else if(/forbidden origin/.test(m))log("   → 이 앱 주소가 Worker 허용 목록에 없어요");}}
 async function ttsFetch(text,tag){const r=await fetch(TTS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,tag})});if(!r.ok)throw new Error("tts "+r.status+" "+(await r.text()).slice(0,400));const u8=new Uint8Array(await r.arrayBuffer());if(!isMp3(u8))throw new Error("tts 응답이 mp3가 아님 ("+u8.length+"B)");return u8}
-async function clipSync(force){if(clipJob.on||!WEB||!cloud.ref||!TTS_URL||!navigator.onLine)return;const todo=clipMissing();if(!todo.length)return;
+async function clipSync(force){if(clipJob.on||!WEB||!cloud.ref||!TTS_URL||!navigator.onLine)return;let todo=clipMissing();if(!todo.length)return;{const want=new Map();let i=0;const its=player.on?[...player.items.slice(player.i),...player.items.slice(0,player.i)]:[];for(const it of its)for(const sn of splitSent(it.en||""))if(!want.has(txtHash(sn)))want.set(txtHash(sn),i++);todo.sort((a,b)=>(want.has(a[0])?want.get(a[0]):1e9)-(want.has(b[0])?want.get(b[0]):1e9))}
   clipJob.on=true;clipJob.done=0;clipJob.total=todo.length;clipJob.err=0;clipJob.last="";const upd=()=>{const el=$("#clipst");if(el)el.replaceChildren(clipStatus())};upd();
   const col=cloud.ref.collection("clips");const idxRef=cloud.ref.collection("meta").doc("clipidx");
   for(const [h,sn] of todo){if(!player||!cloud.ref)break;try{const ko=transOf(sn);const doc={h,en:sn,t:Date.now()};
@@ -617,7 +617,7 @@ function clipStatus(){const miss=clipMissing().length;const n=clipSentences();co
   if(clipJob.on)return h("span",{class:"small",style:"color:var(--accent)"},"🎙 자동 녹음 중 "+clipJob.done+"/"+clipJob.total+(clipJob.err?" (실패 "+clipJob.err+")":"")+" · "+clipJob.last);
   if(miss)return h("span",{class:"row",style:"flex-wrap:wrap"},h("span",{class:"small"},"🎙 자연스러운 음성 녹음 안 된 문장 "+miss+"/"+total),h("button",{class:"btn sm",onclick:()=>clipSync(true)},"지금 녹음"),clipJob.lastErr?h("span",{class:"small",style:"color:var(--bad);width:100%"},"마지막 오류: "+clipJob.lastErr):null);
   return h("span",{class:"chip good"},"스크립트 "+total+"문장 모두 자연스러운 음성 준비됨")}
-const txtSrc=(text,lang="en")=>{const t=lang==="ko"?"ko":AUD.tag;if(t==="off")return null;const h=txtHash(text);
+const txtSrc=(text,lang="en")=>{const t=lang==="ko"?"ko":AUD.tag;if(t==="off")return null;const h=txtHash(text);/* text = the English sentence, also for its Korean clip */
   if(AUD.txt[t]&&AUD.txt[t][h])return "audio/s/"+t+"/"+h+".mp3";
   if(CLIPS.idx.has(h)&&!(CLIPS.bad&&CLIPS.bad.has(h)))return "fs:"+t+"/"+h;return null};
 let audCb=null;
@@ -1096,11 +1096,11 @@ function buildSegs(it){const o=player.opts;const segs=[];const src=audSrc(it.key
   else{// scripts / model answers (no per-item clip): text-keyed clips if rendered, else device voice
     const list=sents.length?sents:[it.en];
     const EN=sn=>{const f=txtSrc(sn);return f?{t:"file",src:f,rate:tts.rate,text:sn,ko:transOf(sn)}:{t:"en",text:sn,ko:transOf(sn)}};
-    const KO=k=>{const f=txtSrc(k,"ko");return f?{t:"file",src:f,rate:1,text:"",ko:k}:{t:"ko",text:k}};
+    const KO=(k,sn)=>{const f=txtSrc(sn,"ko");return f?{t:"file",src:f,rate:1,text:"",ko:k}:{t:"ko",text:k,en:sn}};
     if(o.unit==="sent"){// sentence by sentence: [EN → (KO first time) → pause] × n per sentence
-      for(const sn of list){const k=transOf(sn);for(let r=0;r<n;r++){segs.push(EN(sn));if(r===0&&ko&&k)segs.push(KO(k));segs.push(...P())}}}
+      for(const sn of list){const k=transOf(sn);for(let r=0;r<n;r++){segs.push(EN(sn));if(r===0&&ko&&k)segs.push(KO(k,sn));segs.push(...P())}}}
     else{// whole: all sentences in a row → (all translations, first time) → pause, × n
-      for(let r=0;r<n;r++){for(const sn of list)segs.push(EN(sn));if(r===0&&ko){for(const sn of list){const k=transOf(sn);if(k)segs.push(KO(k))}}segs.push(...P())}}}
+      for(let r=0;r<n;r++){for(const sn of list)segs.push(EN(sn));if(r===0&&ko){for(const sn of list){const k=transOf(sn);if(k)segs.push(KO(k,sn))}}segs.push(...P())}}}
   if(o.gap>=0.1)segs.push(...silenceSegs(o.gap));
   return segs}
 function playerStep(){if(!player.on||player.paused)return;const it=player.items[player.i];if(!it){playerStop();return}
@@ -1110,7 +1110,7 @@ function playerStep(){if(!player.on||player.paused)return;const it=player.items[
   const after=()=>{if(!player.on||player.paused||tok!==player.tok)return;player.tok++;player.si++;if(view==="listen")updateNow();playerStep()};
   player.cur=seg;if(view==="listen")updateNow();
   if(seg.t==="file"&&/^fs:/.test(seg.src)){const [tag,h]=seg.src.slice(3).split("/");clearTimeout(player.t);player.t=setTimeout(()=>{player.t=null},20000);
-    const fallback=()=>{seg.t=(tag==="ko")?"ko":"en";if(tag==="ko")seg.text=seg.ko;delete seg.src;playerStep()};
+    const fallback=()=>{seg.noUp=true;seg.t=(tag==="ko")?"ko":"en";if(tag==="ko")seg.text=seg.ko;delete seg.src;playerStep()};
     clipUrl(tag,h).then(u=>{clearTimeout(player.t);player.t=null;if(!player.on||player.paused||tok!==player.tok)return;if(!u){fallback();return}
       audPlay(u,{rate:seg.rate||1,onend:after,onerror:()=>{audLog.push("clip "+tag+"/"+h+" 재생 실패 → 기기 음성");CLIPS.bad=CLIPS.bad||new Set();CLIPS.bad.add(h);if(!player.on||tok!==player.tok)return;fallback()}})});
     // prefetch the next few account clips so playback does not stall
@@ -1119,6 +1119,7 @@ function playerStep(){if(!player.on||player.paused)return;const it=player.items[
     audPlay(seg.src,{rate:seg.rate,onend:after});return}
   if(seg.t==="wait"){player.t=setTimeout(()=>{player.t=null;after()},seg.ms);return}
   // speech synthesis segments (fallback / Korean): cannot run while the page is in the background on iPhone → skip
+  {const up=seg.noUp?null:seg.t==="en"&&seg.text?txtSrc(seg.text):seg.t==="ko"&&seg.en?txtSrc(seg.en,"ko"):null;if(up){const isKo=seg.t==="ko";if(isKo){seg.ko=seg.text;seg.text=""}seg.t="file";seg.src=up;seg.rate=isKo?1:tts.rate;playerStep();return}}
   if(!tts.ok||document.hidden){after();return}
   const u=new SpeechSynthesisUtterance(seg.t==="ko"?seg.text:ttsText(seg.text));
   if(seg.t==="ko"){const kv=koVoice();u.lang="ko-KR";if(kv)u.voice=kv;u.rate=Math.min(1.1,tts.rate+0.1)}else{u.lang=tts.voice?.lang||"en-US";if(tts.voice)u.voice=tts.voice;u.rate=tts.rate}u.pitch=1;
