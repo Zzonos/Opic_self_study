@@ -11,13 +11,20 @@
     - 계정의 users/<uid>/clips/<hash> 문서에 m/f(영어)·ko(해석) mp3 저장 → 웹 앱이 자동으로 사용
     - 이 파일 옆 out/s/{m,f,ko}/<hash>.mp3 + manifest.json 도 생성 → Claude 앱에 올릴 때 사용
 """
-import asyncio, base64, json, pathlib, re, sys, time
+import asyncio, base64, json, pathlib, re, sys, time, traceback
 try:
     import edge_tts, requests
 except ImportError:
     print("edge-tts / requests 가 없습니다. 먼저  pip install edge-tts requests  를 실행하세요."); sys.exit(1)
 
 HERE = pathlib.Path(__file__).resolve().parent
+_LOG = open(HERE / "render_upload.log", "a", encoding="utf-8")
+_print = print
+def print(*a, **k):
+    msg = " ".join(str(x) for x in a)
+    _LOG.write(time.strftime("%H:%M:%S ") + msg + "\n"); _LOG.flush()
+    try: _print(msg, **k)
+    except Exception: _print(msg.encode("ascii", "replace").decode(), **k)
 OUT = HERE / "out" / "s"
 API_KEY = "AIzaSyAkIuOOuG_MUlgE3GRrqlC3THnVcZHeq8M"
 PROJECT = "opic-self-study"
@@ -124,4 +131,9 @@ async def main():
     print(f"완료: {done}개 녹음·업로드, 총 {len(allh)}개 문장에 클립 있음 → {OUT}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except SystemExit:
+        raise
+    except Exception:
+        print("오류:", traceback.format_exc())
