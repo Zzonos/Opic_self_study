@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261011-182842-946c56">
+<html lang="ko" data-build="20261011-183904-8e5971">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -190,6 +190,9 @@ details summary{cursor:pointer;font-weight:500}
 <div class="toast" id="toast"></div>
 
 <script>
+/* show a startup/runtime error on screen instead of a blank page */
+window.addEventListener("error",e=>{try{const m=document.getElementById("main");const box=document.getElementById("errbox")||Object.assign(document.createElement("div"),{id:"errbox"});box.style.cssText="margin:12px 16px;padding:10px 12px;border-radius:10px;background:#f9e3e0;color:#b4433a;font:12px/1.5 monospace;white-space:pre-wrap;word-break:break-all";box.textContent="⚠ 오류: "+(e.message||e.error)+"\n"+((e.error&&e.error.stack)||"").split("\n").slice(0,3).join("\n");(m||document.body).prepend(box)}catch(x){}});
+window.addEventListener("unhandledrejection",e=>{try{const r=e.reason;if(r&&(r.code||/network|fetch/i.test(r.message||"")))return;const ev=new ErrorEvent("error",{message:"(async) "+((r&&r.message)||r),error:r});window.dispatchEvent(ev)}catch(x){}});
 /* ============ DATA ============ */
 const LEVELS=["NL","NM","NH","IL","IM1","IM2","IM3","IH","AL"];
 const TARGETS=["IM3","IH","AL"];
@@ -610,7 +613,7 @@ async function clipUrl(tag,h){const k=tag+"/"+h;if(CLIPS.urls[k])return CLIPS.ur
 const TTS_DEFAULT="https://oss-tts.zzono717.workers.dev";let TTS_URL=TTS_DEFAULT;try{const v=localStorage.getItem("oss_tts_url");if(v!==null)TTS_URL=v}catch(e){}
 const clipJob={on:false,done:0,total:0,err:0,last:""};
 function clipSentences(){const out={};const add=t=>{for(const sn of splitSent(t)){out[txtHash(sn)]=sn}};
-  for(const st of [S.samples||{},S.scripts||{}])for(const sc of Object.values(st))for(const x of (sc.scripts||[]))add(x.answer||"");
+  for(const st of [S.samples||{},S.scripts||{}])for(const sc of Object.values(st))for(const x of (sc&&sc.scripts||[]))add(x&&x.answer||"");
   for(const m of Object.values(S.models||{}))add(m);return out}
 function clipMissing(){const all=clipSentences();return Object.entries(all).filter(([h,sn])=>!CLIPS.idx.has(h)||(transOf(sn)&&!koFresh(h,sn)))}
 function isMp3(u8){return u8&&u8.length>500&&((u8[0]===0x49&&u8[1]===0x44&&u8[2]===0x33)||(u8[0]===0xFF&&(u8[1]&0xE0)===0xE0))}
@@ -725,7 +728,7 @@ function ttsTest(log){const vs=speechSynthesis.getVoices();const en=vs.filter(v=
     u.onstart=()=>{st=true;log(name+" ("+(v?v.name:"-")+"): 재생 시작 ✓")};u.onend=()=>{log(name+": 끝 ✓");fin()};u.onerror=e=>{log(name+": 오류 "+(e.error||"?"));fin()};
     speechSynthesis.speak(u);setTimeout(()=>{if(!st&&!done){log(name+": 2초 내 시작 안 됨 ✗ (speaking="+speechSynthesis.speaking+")");speechSynthesis.cancel();fin()}},2500)};next()}
 function spkBtn(text,rate=null,key=null){const b=h("button",{class:"spk","aria-label":"듣기",title:"듣기",html:SPK_ICON});b.onclick=()=>speak(text,{btn:b,rate,key});return b}
-const splitSent=t=>(t||"").replace(/\s+/g," ").match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g)?.map(x=>x.trim()).filter(Boolean)||[];
+const splitSent=t=>(typeof t==="string"?t:t==null?"":String(t)).replace(/\s+/g," ").match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g)?.map(x=>x.trim()).filter(Boolean)||[];
 function rateCtl(){const r=h("select",{id:"rate_"+Math.random().toString(36).slice(2,6),onchange:e=>{tts.rate=parseFloat(e.target.value);try{localStorage.setItem("opic30_rate",tts.rate)}catch(x){}}},...Array.from({length:13},(_,i)=>+(0.7+i*0.05).toFixed(2)).map(v=>h("option",{value:v,selected:Math.abs(tts.rate-v)<.01},v.toFixed(2)+"x"+(v===0.95?" 기본 (시험 속도)":v===1?" 원속도":v===0.7?" 느리게":v===1.3?" 빠르게":""))));r.style.width="auto";return r}
 
 /* ============ TIMER ============ */
@@ -1067,8 +1070,8 @@ function vScriptTopic(m,t){
 /* ============ TRANSLATION ============ */
 function needTrans(text){return splitSent(text).filter(x=>!S.trans[x])}
 const TRANS_VER=2;
-function transSources(){const out=[];const add=(t,q)=>{if(t&&t.trim())out.push({q:q||"",sents:splitSent(t)})};
-  for(const [store,isS] of [[S.scripts,0],[S.samples||{},1]])for(const [tid,sc] of Object.entries(store)){const t=TOPICS.find(x=>x.id===tid);(sc.scripts||[]).forEach((x,i)=>add(x.answer,t&&t.qs[i]?t.qs[i].q:""))}
+function transSources(){const out=[];const add=(t,q)=>{if(typeof t==="string"&&t.trim())out.push({q:q||"",sents:splitSent(t)})};
+  for(const [store,isS] of [[S.scripts,0],[S.samples||{},1]])for(const [tid,sc] of Object.entries(store)){const t=TOPICS.find(x=>x.id===tid);(sc&&sc.scripts||[]).forEach((x,i)=>add(x&&x.answer,t&&t.qs[i]?t.qs[i].q:""))}
   for(const [q,m] of Object.entries(S.models||{}))add(m,q);return out}
 async function translateSents(sents,onProgress,force){if(!sample)throw{code:"not_granted"};if(!Object.keys(S.trans||{}).length)S.transVer=TRANS_VER;const want=new Set(sents.filter(x=>force||!S.trans[x]));if(!want.size)return;
   // translate whole answers (with their question) so each sentence is rendered in context, not in isolation
@@ -1113,7 +1116,7 @@ function sampleTopics(){return TOPICS.filter(t=>t.id!=="intro"&&(S.profile.surve
 function buildPlaylist(){const o=player.opts;const items=[];
   if(o.mode==="sample"||o.mode==="script"){const store=o.mode==="sample"?(S.samples||{}):S.scripts;const sel=o.mode==="sample"?o.stopics:o.topics;
     const ts=(o.mode==="sample"?sampleTopics():scriptTopics()).filter(t=>store[t.id]&&(store[t.id].scripts||[]).length&&(!sel.length||sel.includes(t.id)));
-    for(const t of ts)(store[t.id].scripts||[]).forEach((x,i)=>{const q=t.qs[i];if(!x.answer)return;
+    for(const t of ts)(store[t.id].scripts||[]).forEach((x,i)=>{const q=t.qs[i];if(!x||typeof x.answer!=="string"||!x.answer.trim())return;
       items.push({kind:"A",label:t.en+" · "+(q?QT[q.t]:(o.mode==="sample"?"예시 답변 ":"내 스크립트 ")+(i+1)),en:x.answer,ko:"",ex:"",q:(o.withQ&&q)?{en:q.q,ko:q.k||"",key:"q_"+t.id+"_"+i}:null})});
     return o.shuffle?pick(items,items.length):items}
   const ts=TOPICS.filter(t=>t.id!=="intro"&&(S.profile.survey.includes(t.id)||t.group==="돌발"));
