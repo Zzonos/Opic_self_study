@@ -1054,7 +1054,8 @@ function playerStep(){if(!player.on||player.paused)return;const it=player.items[
   const seg=player.segs[player.si];const tok=player.tok=(player.tok||0)+1;
   const after=()=>{if(!player.on||player.paused||tok!==player.tok)return;player.tok++;player.si++;if(view==="listen")updateNow();playerStep()};
   player.cur=seg;if(view==="listen")updateNow();
-  if(seg.t==="file"){audPlay(seg.src,{rate:seg.rate,onend:after});return}
+  if(seg.t==="file"){const m=/silence_(\d+)/.exec(seg.src||"");if(m){const want=+m[1]*1000;const t0=Date.now();audPlay(seg.src,{rate:1,onend:()=>{const left=want-(Date.now()-t0);if(left>150){audLog.push("silence short by "+(left/1000).toFixed(1)+"s → 타이머 보정");player.t=setTimeout(()=>{player.t=null;after()},left)}else after()}});return}
+    audPlay(seg.src,{rate:seg.rate,onend:after});return}
   if(seg.t==="wait"){player.t=setTimeout(()=>{player.t=null;after()},seg.ms);return}
   // speech synthesis segments (fallback / Korean): cannot run while the page is in the background on iPhone → skip
   if(!tts.ok||document.hidden){after();return}
