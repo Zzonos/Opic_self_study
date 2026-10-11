@@ -577,8 +577,11 @@ const txtHash=t=>{let h=5381;const x=(t||"").toLowerCase().replace(/[^a-z0-9]+/g
 AUD.txt={};// {m:{hash:1}, f:{...}, ko:{...}}
 async function loadTextManifests(){for(const t of ["m","f","ko"]){try{const r=await fetch("audio/s/"+t+"/manifest.json");if(r.ok)AUD.txt[t]=await r.json()}catch(e){}}}
 // account clips (web): index of hashes lives in users/<uid>/meta/clipidx, audio bytes in users/<uid>/clips/<hash>
-const CLIPS={idx:new Set(),urls:{},busy:{}};
-async function clipIdxLoad(){if(!cloud.ref)return;try{const d=await cloud.ref.collection("meta").doc("clipidx").get();CLIPS.idx=new Set(d.exists?(d.data().hashes||[]):[])}catch(e){}setTimeout(()=>clipSync(false),1500)}
+const CLIPS={idx:new Set(),kh:{},urls:{},busy:{}};
+// Korean clip is valid only for the translation it was recorded from (translations can be regenerated)
+const koHash=t=>{let h=5381;for(const c of (t||""))h=((h*33)^c.codePointAt(0))>>>0;return h.toString(36)};
+const koFresh=(h,sn)=>{const k=transOf(sn);return !!k&&CLIPS.kh[h]===koHash(k)};
+async function clipIdxLoad(){if(!cloud.ref)return;try{const d=await cloud.ref.collection("meta").doc("clipidx").get();CLIPS.idx=new Set(d.exists?(d.data().hashes||[]):[]);CLIPS.kh=(d.exists&&d.data().kh)||{}}catch(e){}setTimeout(()=>clipSync(false),1500)}
 async function clipUrl(tag,h){const k=tag+"/"+h;if(CLIPS.urls[k])return CLIPS.urls[k];if(CLIPS.busy[k])return CLIPS.busy[k];
   CLIPS.busy[k]=(async()=>{try{const cache=await (self.caches?caches.open("oss-clips").catch(()=>null):null);const ck="/clip/"+k;
     if(cache){const hit=await cache.match(ck);if(hit){const u=URL.createObjectURL(await hit.blob());CLIPS.urls[k]=u;return u}}
@@ -590,7 +593,7 @@ const clipJob={on:false,done:0,total:0,err:0,last:""};
 function clipSentences(){const out={};const add=t=>{for(const sn of splitSent(t)){out[txtHash(sn)]=sn}};
   for(const st of [S.samples||{},S.scripts||{}])for(const sc of Object.values(st))for(const x of (sc.scripts||[]))add(x.answer||"");
   for(const m of Object.values(S.models||{}))add(m);return out}
-function clipMissing(){const all=clipSentences();return Object.entries(all).filter(([h])=>!CLIPS.idx.has(h))}
+function clipMissing(){const all=clipSentences();return Object.entries(all).filter(([h,sn])=>!CLIPS.idx.has(h)||(transOf(sn)&&!koFresh(h,sn)))}
 function isMp3(u8){return u8&&u8.length>500&&((u8[0]===0x49&&u8[1]===0x44&&u8[2]===0x33)||(u8[0]===0xFF&&(u8[1]&0xE0)===0xE0))}
 async function ttsSrvDiag(log){const u=TTS_URL;log("주소: "+(u||"(비어 있음)")+" · 앱 위치: "+location.origin);
 if(!u){log("✗ 주소를 먼저 입력하세요 (https://이름.계정.workers.dev)");return}
@@ -603,10 +606,10 @@ async function ttsFetch(text,tag){const r=await fetch(TTS_URL,{method:"POST",hea
 async function clipSync(force){if(clipJob.on||!WEB||!cloud.ref||!TTS_URL||!navigator.onLine)return;let todo=clipMissing();if(!todo.length)return;{const want=new Map();let i=0;const its=player.on?[...player.items.slice(player.i),...player.items.slice(0,player.i)]:[];for(const it of its)for(const sn of splitSent(it.en||""))if(!want.has(txtHash(sn)))want.set(txtHash(sn),i++);todo.sort((a,b)=>(want.has(a[0])?want.get(a[0]):1e9)-(want.has(b[0])?want.get(b[0]):1e9))}
   clipJob.on=true;clipJob.done=0;clipJob.total=todo.length;clipJob.err=0;clipJob.last="";const upd=()=>{const el=$("#clipst");if(el)el.replaceChildren(clipStatus())};upd();
   const col=cloud.ref.collection("clips");const idxRef=cloud.ref.collection("meta").doc("clipidx");
-  for(const [h,sn] of todo){if(!player||!cloud.ref)break;try{const ko=transOf(sn);const doc={h,en:sn,t:Date.now()};
-      for(const tag of ["m","f","ko"]){const text=tag==="ko"?ko:sn;if(!text)continue;const bytes=await ttsFetch(text,tag);doc[tag]=firebase.firestore.Blob.fromUint8Array(bytes);
-        try{const cache=await caches.open("oss-clips");await cache.put("/clip/"+tag+"/"+h,new Response(new Blob([bytes],{type:"audio/mpeg"})))}catch(e){}}
-      await col.doc(h).set(doc);await idxRef.set({hashes:firebase.firestore.FieldValue.arrayUnion(h),t:Date.now()},{merge:true});CLIPS.idx.add(h);clipJob.done++;clipJob.last=sn.slice(0,40)}
+  for(const [h,sn] of todo){if(!player||!cloud.ref)break;try{const ko=transOf(sn);const doc={h,en:sn,t:Date.now()};const has=CLIPS.idx.has(h);
+      for(const tag of (has?["ko"]:["m","f","ko"])){const text=tag==="ko"?ko:sn;if(!text)continue;const bytes=await ttsFetch(text,tag);doc[tag]=firebase.firestore.Blob.fromUint8Array(bytes);
+        try{const cache=await caches.open("oss-clips");await cache.put("/clip/"+tag+"/"+h,new Response(new Blob([bytes],{type:"audio/mpeg"})));delete CLIPS.urls[tag+"/"+h]}catch(e){}}
+      if(ko)doc.kt=ko;await col.doc(h).set(doc,{merge:true});const kh=ko?koHash(ko):"";await idxRef.set({hashes:firebase.firestore.FieldValue.arrayUnion(h),t:Date.now(),...(kh?{kh:{[h]:kh}}:{})},{merge:true});CLIPS.idx.add(h);if(kh)CLIPS.kh[h]=kh;clipJob.done++;clipJob.last=sn.slice(0,40)}
     catch(e){clipJob.err++;clipJob.last="실패: "+(e.message||e);clipJob.lastErr=(e.code?e.code+" ":"")+(e.message||String(e)).slice(0,120);if(clipJob.err>=3&&clipJob.done===0)break}
     upd()}
   clipJob.on=false;upd();if(clipJob.done)toast("자연스러운 음성 "+clipJob.done+"문장 준비됨")}
@@ -619,7 +622,7 @@ function clipStatus(){const miss=clipMissing().length;const n=clipSentences();co
   return h("span",{class:"chip good"},"스크립트 "+total+"문장 모두 자연스러운 음성 준비됨")}
 const txtSrc=(text,lang="en")=>{const t=lang==="ko"?"ko":AUD.tag;if(t==="off")return null;const h=txtHash(text);/* text = the English sentence, also for its Korean clip */
   if(AUD.txt[t]&&AUD.txt[t][h])return "audio/s/"+t+"/"+h+".mp3";
-  if(CLIPS.idx.has(h)&&!(CLIPS.bad&&CLIPS.bad.has(h)))return "fs:"+t+"/"+h;return null};
+  if(CLIPS.idx.has(h)&&!(CLIPS.bad&&CLIPS.bad.has(h))&&(t!=="ko"||koFresh(h,text)))return "fs:"+t+"/"+h;return null};
 let audCb=null;
 const audLog=[];
 function audPlay(src,{rate=1,onend=null,onerror=null}={}){const a=audEl();audCb=onend;const t0=Date.now();a.onended=()=>{audLog.push(src.split("/").pop()+" ok "+((Date.now()-t0)/1000).toFixed(1)+"s");if(audLog.length>30)audLog.shift();const cb=audCb;audCb=null;cb&&cb()};
@@ -1044,10 +1047,31 @@ function vScriptTopic(m,t){
 
 /* ============ TRANSLATION ============ */
 function needTrans(text){return splitSent(text).filter(x=>!S.trans[x])}
-async function translateSents(sents,onProgress){if(!sample)throw{code:"not_granted"};const todo=[...new Set(sents.filter(x=>!S.trans[x]))];let done=0;
-  for(let i=0;i<todo.length;i+=40){const chunk=todo.slice(i,i+40);
-    const r=await sample.json(`Translate each English sentence into natural, concise Korean (존댓말 아닌 평서체 해석, OPIc 학습자용). Keep the same order and count.\nReply with ONLY a JSON array of strings, one per input sentence.\n\n`+JSON.stringify(chunk),{modelTier:"quick",cache:false});
-    if(Array.isArray(r))chunk.forEach((en,k)=>{if(typeof r[k]==="string"&&r[k].trim())S.trans[en]=r[k].trim()});done+=chunk.length;onProgress&&onProgress(done,todo.length);save()}}
+const TRANS_VER=2;
+function transSources(){const out=[];const add=(t,q)=>{if(t&&t.trim())out.push({q:q||"",sents:splitSent(t)})};
+  for(const [store,isS] of [[S.scripts,0],[S.samples||{},1]])for(const [tid,sc] of Object.entries(store)){const t=TOPICS.find(x=>x.id===tid);(sc.scripts||[]).forEach((x,i)=>add(x.answer,t&&t.qs[i]?t.qs[i].q:""))}
+  for(const [q,m] of Object.entries(S.models||{}))add(m,q);return out}
+async function translateSents(sents,onProgress,force){if(!sample)throw{code:"not_granted"};if(!Object.keys(S.trans||{}).length)S.transVer=TRANS_VER;const want=new Set(sents.filter(x=>force||!S.trans[x]));if(!want.size)return;
+  // translate whole answers (with their question) so each sentence is rendered in context, not in isolation
+  const groups=[];const seen=new Set();for(const g of transSources()){if(!g.sents.some(x=>want.has(x)))continue;const key=g.sents.join(" ");if(seen.has(key))continue;seen.add(key);groups.push(g)}
+  const orphan=[...want].filter(x=>!groups.some(g=>g.sents.includes(x)));if(orphan.length)groups.push({q:"",sents:orphan});
+  let done=0;const total=groups.reduce((a,g)=>a+g.sents.length,0);
+  for(let i=0;i<groups.length;){const batch=[];let n=0;while(i<groups.length&&(n===0||n+groups[i].sents.length<=36)){batch.push(groups[i]);n+=groups[i].sents.length;i++}
+    const body=batch.map((g,k)=>`### Answer ${k+1}${g.q?"\nQuestion: "+g.q:""}\n`+g.sents.map((x,m)=>`${m+1}. ${x}`).join("\n")).join("\n\n");
+    const r=await sample.json(`You are a professional English→Korean translator making study subtitles for a Korean OPIc learner.
+Translate every numbered sentence of each spoken answer below into natural Korean that a Korean speaker would actually say in the same situation.
+Rules:
+- Read the whole answer first and translate each sentence in context (keep pronouns, tense and flow consistent across sentences).
+- Spoken, friendly 해요체 (e.g. "저는 주말마다 공원에 가요."), the way someone would answer an interviewer. Never stiff written style (~이다/~하였다), never literal word-by-word translation.
+- Render idioms, fillers and discourse markers by meaning (e.g. "You know," → "있잖아요,", "To be honest," → "솔직히 말하면,", "It was a blast" → "정말 재밌었어요").
+- Keep proper nouns and numbers; drop "I" (저는) when Korean would naturally omit it. Keep each translation about as short as the original.
+- Exactly one Korean string per numbered sentence, same order, nothing merged or split.
+Reply with ONLY a JSON object: {"answers":[["번역1","번역2",...], ...]} — one array per answer, in order.
+
+${body}`,{cache:false});
+    const arr=r&&Array.isArray(r.answers)?r.answers:Array.isArray(r)?r:[];
+    batch.forEach((g,k)=>{const tr=arr[k];if(!Array.isArray(tr))return;g.sents.forEach((en,m)=>{if((force?want.has(en):!S.trans[en]||want.has(en))&&typeof tr[m]==="string"&&tr[m].trim())S.trans[en]=tr[m].trim()})});
+    done+=n;onProgress&&onProgress(Math.min(done,total),total);save()}}
 function transOf(sent){return S.trans[sent]||""}
 
 /* ============ BACKGROUND AUDIO SESSION ============ */
@@ -1071,9 +1095,8 @@ function buildPlaylist(){const o=player.opts;const items=[];
   if(o.mode==="sample"||o.mode==="script"){const store=o.mode==="sample"?(S.samples||{}):S.scripts;const sel=o.mode==="sample"?o.stopics:o.topics;
     const ts=(o.mode==="sample"?sampleTopics():scriptTopics()).filter(t=>store[t.id]&&(store[t.id].scripts||[]).length&&(!sel.length||sel.includes(t.id)));
     for(const t of ts)(store[t.id].scripts||[]).forEach((x,i)=>{const q=t.qs[i];if(!x.answer)return;
-      if(o.withQ&&q)items.push({kind:"Q",key:"q_"+t.id+"_"+i,label:t.en+" · "+QT[q.t],en:q.q,ko:q.k||"",think:0,quiet:true});
-      items.push({kind:"A",label:t.en+" · "+(o.mode==="sample"?"예시 답변 ":"내 스크립트 ")+(i+1),en:x.answer,ko:"",ex:""})});
-    if(!o.shuffle)return items;const pairs=[];for(const it of items){if(it.kind==="A"&&pairs.length&&pairs[pairs.length-1].length===1&&pairs[pairs.length-1][0].quiet)pairs[pairs.length-1].push(it);else pairs.push([it])}return pick(pairs,pairs.length).flat()}
+      items.push({kind:"A",label:t.en+" · "+(q?QT[q.t]:(o.mode==="sample"?"예시 답변 ":"내 스크립트 ")+(i+1)),en:x.answer,ko:"",ex:"",q:(o.withQ&&q)?{en:q.q,ko:q.k||"",key:"q_"+t.id+"_"+i}:null})});
+    return o.shuffle?pick(items,items.length):items}
   const ts=TOPICS.filter(t=>t.id!=="intro"&&(S.profile.survey.includes(t.id)||t.group==="돌발"));
   for(const t of ts)for(const q of t.qs){if(o.q)items.push({kind:"Q",key:"q_"+t.id+"_"+t.qs.indexOf(q),label:t.en+" · "+QT[q.t],en:q.q,ko:q.k||"",think:o.think})}
   if(o.q)for(const r of ROLEPLAYS)items.push({kind:"Q",key:r.id+"_11",label:"Role-play · "+r.ko,en:r.q11,ko:r.k11||"",think:o.think});
@@ -1097,10 +1120,12 @@ function buildSegs(it){const o=player.opts;const segs=[];const src=audSrc(it.key
     const list=sents.length?sents:[it.en];
     const EN=sn=>{const f=txtSrc(sn);return f?{t:"file",src:f,rate:tts.rate,text:sn,ko:transOf(sn)}:{t:"en",text:sn,ko:transOf(sn)}};
     const KO=(k,sn)=>{const f=txtSrc(sn,"ko");return f?{t:"file",src:f,rate:1,text:"",ko:k}:{t:"ko",text:k,en:sn}};
-    if(o.unit==="sent"){// sentence by sentence: [EN → (KO first time) → pause] × n per sentence
-      for(const sn of list){const k=transOf(sn);for(let r=0;r<n;r++){segs.push(EN(sn));if(r===0&&ko&&k)segs.push(KO(k,sn));segs.push(...P())}}}
+    const Q=r=>{if(!it.q)return[];const qs=audSrc(it.q.key);const out=[qs?{t:"file",src:qs,rate:tts.rate,text:it.q.en,ko:it.q.ko,isQ:true}:{t:"en",text:it.q.en,ko:it.q.ko,isQ:true,noUp:true}];
+      if(r===0&&ko&&it.q.ko){const f=koSrc(it.q.key);out.push(f?{t:"file",src:f,rate:1,text:"",ko:it.q.ko,isQ:true}:{t:"ko",text:it.q.ko,isQ:true})}out.push(...silenceSegs(1));return out};
+    if(o.unit==="sent"){// question once, then sentence by sentence: [EN → (KO first time) → pause] × n per sentence
+      segs.push(...Q(0));for(const sn of list){const k=transOf(sn);for(let r=0;r<n;r++){segs.push(EN(sn));if(r===0&&ko&&k)segs.push(KO(k,sn));segs.push(...P())}}}
     else{// whole: all sentences in a row → (all translations, first time) → pause, × n
-      for(let r=0;r<n;r++){for(const sn of list)segs.push(EN(sn));if(r===0&&ko){for(const sn of list){const k=transOf(sn);if(k)segs.push(KO(k,sn))}}segs.push(...P())}}}
+      for(let r=0;r<n;r++){segs.push(...Q(r));for(const sn of list)segs.push(EN(sn));if(r===0&&ko){for(const sn of list){const k=transOf(sn);if(k)segs.push(KO(k,sn))}}segs.push(...P())}}}
   if(o.gap>=0.1)segs.push(...silenceSegs(o.gap));
   return segs}
 function playerStep(){if(!player.on||player.paused)return;const it=player.items[player.i];if(!it){playerStop();return}
@@ -1146,10 +1171,14 @@ function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[pla
     const enP=h("p",{class:"en",style:"font-size:16px;line-height:1.5;margin:0"},...sents.map((sn,i)=>h("span",{style:curEn===sn?"background:rgba(15,118,110,.18);border-radius:4px;padding:0 2px":"",class:curEn===sn?"":"muted"},sn+(i<sents.length-1?" ":""))));
     const koRows=sents.map(sn=>transOf(sn)).filter(Boolean);
     const koP=koRows.length?h("p",{class:"small",style:"margin:6px 0 0;line-height:1.5"},...koRows.map((k,i)=>h("span",{style:curKo===k?"background:rgba(15,118,110,.18);border-radius:4px;padding:0 2px":"",class:curKo===k?"":"muted"},k+(i<koRows.length-1?" ":"")))):h("span",{class:"muted small"},"(해석 없음 — 'AI 해석 만들기'로 추가)");
-    b.replaceChildren(...[head,enP,koP,silent?h("span",{class:"small",style:"color:var(--accent)"},"⏱ 따라 말하기 / 생각하기 "+pauseLeft.toFixed(pauseLeft%1?1:0)+"초"):null].filter(Boolean));return}
+    const qOn=!!seg.isQ;const qBox=it.q?h("div",{style:"margin:2px 0 8px;padding:6px 8px;border-radius:8px;"+(qOn?"background:rgba(15,118,110,.18)":"background:var(--bg)")},h("div",{class:"small",style:"font-weight:600"},"Q. "+it.q.en),it.q.ko?h("div",{class:"muted small"},it.q.ko):null):null;
+    b.replaceChildren(...[head,qBox,enP,koP,silent?h("span",{class:"small",style:"color:var(--accent)"},"⏱ 따라 말하기 / 생각하기 "+pauseLeft.toFixed(pauseLeft%1?1:0)+"초"):null].filter(Boolean));return}
   b.replaceChildren(...[head,h("span",{class:"en"},en||it.en||""),ko?h("span",{class:"muted small"},ko):h("span",{class:"muted small"},"(해석 없음)"),silent?h("span",{class:"small",style:"color:var(--accent)"},"⏱ 따라 말하기 / 생각하기 "+pauseLeft.toFixed(pauseLeft%1?1:0)+"초"):null,it.ex?h("span",{class:"small",style:"color:var(--accent);margin-top:4px"},"예) "+it.ex):null].filter(Boolean))}
 function transBtn(){const missing=[];for(const sc of [...Object.values(S.scripts),...Object.values(S.samples||{})])for(const x of (sc.scripts||[]))missing.push(...needTrans(x.answer));
-  const n=new Set(missing).size;if(!n)return h("span",{class:"chip good"},"해석 준비됨");
+  const n=new Set(missing).size;
+  if(!n){const all=[];for(const g of transSources())all.push(...g.sents);const old=(S.transVer||1)<TRANS_VER?[...new Set(all)].filter(x=>S.trans[x]):[];
+    if(!old.length)return h("span",{class:"chip good"},"해석 준비됨");
+    const rb=h("button",{class:"btn sm",disabled:!sample,title:sample?"":"Claude에서 열었을 때만 가능해요",onclick:async()=>{rb.disabled=true;try{await translateSents(old,(d,t)=>rb.textContent=`해석 다듬는 중 ${d}/${t}`,true);S.transVer=TRANS_VER;save();toast("해석을 자연스럽게 다시 만들었어요");render()}catch(e){toast(errMsg(e));rb.disabled=false}}},"해석 자연스럽게 다시 만들기 ("+old.length+"문장)");return rb}
   const b=h("button",{class:"btn sm",disabled:!sample,onclick:async()=>{b.disabled=true;try{await translateSents([...new Set(missing)],(d,t)=>b.textContent=`해석 중 ${d}/${t}`);toast("해석을 만들었어요");render()}catch(e){toast(errMsg(e));b.disabled=false}}},"AI 해석 만들기 ("+n+"문장)");return b}
 function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem("opic30_player",JSON.stringify(o))}catch(e){}};
   const ck=(k,l)=>h("label",{},h("input",{type:"checkbox",id:"pl_"+k,checked:o[k],onchange:e=>{o[k]=e.target.checked;saveO()}}),l);
@@ -1178,14 +1207,14 @@ function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem
   const clipLine=(WEB&&o.mode!=="sent")?h("div",{id:"clipst",class:"note",style:"align-items:center;margin:0"},clipStatus()):null;
   const scriptOpts=[h("p",{class:"eyebrow"},"주제 선택 · 스크립트 탭에서 만든 내 스크립트 "+nScripts+"개"),
     sts.length?topicPick:h("p",{class:"muted small"},"저장된 스크립트가 아직 없어요. 스크립트 탭에서 주제별로 만들면 여기에 나타납니다."),
-    h("div",{class:"cks"},ck("withQ","질문 먼저 듣기"),ck("shuffle","섞기")),
+    h("div",{class:"cks"},ck("withQ","질문도 같이 듣기"),ck("shuffle","섞기")),
     ...common,
     h("div",{class:"note"},"스크립트 탭에서 공부한 내 스크립트를 문장 단위로 영어 → 한국어 해석 순으로 들어요. 스크립트는 녹음이 없어 기기 음성으로 나오므로 iPhone에서는 화면이 켜져 있을 때만 재생되고, 꺼져 있으면 건너뜁니다. 해석이 없는 문장은 'AI 해석 만들기'로 채울 수 있어요(Claude에서만).")];
   const sampleOpts=[profileFill()<4?h("div",{class:"note"},h("b",{},"프로필이 거의 비어 있어요. "),"설정에서 하는 일·사는 곳·취미·좋아하는 것 등을 채우면 예시가 내 이야기로 만들어집니다. ",h("button",{class:"btn sm",onclick:()=>go("settings")},"프로필 채우기 →")):null,
     h("p",{class:"eyebrow"},"주제 선택 · 예시 답변 "+nSamples+"개 준비됨 (✓)"),
     samplePick,
     h("div",{class:"row"},genBtn,sample?null:h("span",{class:"muted small"},"예시 생성은 Claude에서 열었을 때만 가능해요")),
-    h("div",{class:"cks"},ck("withQ","질문 먼저 듣기"),ck("shuffle","섞기")),
+    h("div",{class:"cks"},ck("withQ","질문도 같이 듣기"),ck("shuffle","섞기")),
     ...common,
     h("div",{class:"note"},"설정의 프로필(직업·거주지 등)을 바탕으로 AI가 주제별 예시 답변을 만들어 두고 무한재생해요. 한 번 만들면 저장되어 웹에서도 들을 수 있고, 다시 만들고 싶으면 설정 → 초기화에서 예시만 지울 수 있어요. 예시는 녹음이 없어 기기 음성으로 나오므로 iPhone에서는 화면이 켜져 있을 때만 재생됩니다.")];
   const box=h("div",{class:"card"},h("div",{class:"hdr"},h("div",{},h("h3",{},"무한 재생"),h("p",{class:"muted small"},"업무 중 배경으로 계속 듣기. 끝나면 처음부터 다시 반복합니다.")),rateCtl()),
