@@ -410,7 +410,7 @@ function syncCard(){if(window.claude?.use===undefined)return null;const n=unsync
 let pendingSync=null;
 let syncClose=false;
 (async()=>{const m=location.hash.match(/^#([sx])_(.+)$/);if(!m)return;syncClose=m[1]==="x";try{pendingSync=await unpackState(m[2]);history.replaceState(null,"",location.pathname+location.search)}catch(e){toast("가져온 기록을 읽을 수 없어요")}})();
-function applyPendingSync(){if(!pendingSync)return;const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;toast((window.claude?.use?"웹 계정 기록":"Claude 기록")+" "+n+"건을 합쳤어요");render();if(syncClose)syncDone(n)}
+function applyPendingSync(){if(!pendingSync)return;const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;toast((window.claude?.use?"웹 계정 기록":"Claude 기록")+" "+n+"건을 합쳤어요");render();if(syncClose)syncDone(n);setTimeout(()=>clipSync(false),2000)}
 async function syncDone(n){const ov=h("div",{style:"position:fixed;left:0;top:0;width:100%;height:100%;margin:0;padding:24px;box-sizing:border-box;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center"},h("div",{class:"card",style:"text-align:center"},h("h3",{},"통합 중…"),h("p",{class:"muted small",id:"sdmsg"},"계정에 저장하고 있어요")));document.body.append(ov);
   const msg=t=>{const el=$("#sdmsg");if(el)el.textContent=t};
   try{if(cloud.ref)await cloudPush(true);ov.querySelector("h3").textContent="통합 완료 ✓";msg(cloud.ref?"기록 "+n+"건이 "+(cloud.user?.email||"계정")+"에 저장됐어요. 홈 화면의 OSS 앱을 열면 반영되어 있어요. 이 화면은 그냥 두고 Claude 앱으로 돌아가면 됩니다.":"이 기기(브라우저)에만 저장됐어요. 홈 화면 앱에 반영하려면 로그인이 필요해요.")}catch(e){ov.querySelector("h3").textContent="저장 실패";msg(e.code||e.message||String(e));return}
@@ -578,13 +578,37 @@ AUD.txt={};// {m:{hash:1}, f:{...}, ko:{...}}
 async function loadTextManifests(){for(const t of ["m","f","ko"]){try{const r=await fetch("audio/s/"+t+"/manifest.json");if(r.ok)AUD.txt[t]=await r.json()}catch(e){}}}
 // account clips (web): index of hashes lives in users/<uid>/meta/clipidx, audio bytes in users/<uid>/clips/<hash>
 const CLIPS={idx:new Set(),urls:{},busy:{}};
-async function clipIdxLoad(){if(!cloud.ref)return;try{const d=await cloud.ref.collection("meta").doc("clipidx").get();CLIPS.idx=new Set(d.exists?(d.data().hashes||[]):[])}catch(e){}}
+async function clipIdxLoad(){if(!cloud.ref)return;try{const d=await cloud.ref.collection("meta").doc("clipidx").get();CLIPS.idx=new Set(d.exists?(d.data().hashes||[]):[])}catch(e){}setTimeout(()=>clipSync(false),1500)}
 async function clipUrl(tag,h){const k=tag+"/"+h;if(CLIPS.urls[k])return CLIPS.urls[k];if(CLIPS.busy[k])return CLIPS.busy[k];
   CLIPS.busy[k]=(async()=>{try{const cache=await (self.caches?caches.open("oss-clips").catch(()=>null):null);const ck="/clip/"+k;
     if(cache){const hit=await cache.match(ck);if(hit){const u=URL.createObjectURL(await hit.blob());CLIPS.urls[k]=u;return u}}
     if(!cloud.ref)return null;const d=await cloud.ref.collection("clips").doc(h).get();if(!d.exists)return null;const v=d.data()[tag];if(!v)return null;
     const bytes=v.toUint8Array?v.toUint8Array():v;const blob=new Blob([bytes],{type:"audio/mpeg"});if(cache)cache.put(ck,new Response(blob)).catch(()=>{});
     const u=URL.createObjectURL(blob);CLIPS.urls[k]=u;return u}catch(e){return null}finally{delete CLIPS.busy[k]}})();return CLIPS.busy[k]}
+let TTS_URL="";try{TTS_URL=localStorage.getItem("oss_tts_url")||TTS_URL}catch(e){}
+const clipJob={on:false,done:0,total:0,err:0,last:""};
+function clipSentences(){const out={};const add=t=>{for(const sn of splitSent(t)){out[txtHash(sn)]=sn}};
+  for(const st of [S.samples||{},S.scripts||{}])for(const sc of Object.values(st))for(const x of (sc.scripts||[]))add(x.answer||"");
+  for(const m of Object.values(S.models||{}))add(m);return out}
+function clipMissing(){const all=clipSentences();return Object.entries(all).filter(([h])=>!CLIPS.idx.has(h))}
+async function ttsFetch(text,tag){const r=await fetch(TTS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,tag})});if(!r.ok)throw new Error("tts "+r.status+" "+(await r.text()).slice(0,80));return new Uint8Array(await r.arrayBuffer())}
+async function clipSync(force){if(clipJob.on||!WEB||!cloud.ref||!TTS_URL||!navigator.onLine)return;const todo=clipMissing();if(!todo.length)return;
+  clipJob.on=true;clipJob.done=0;clipJob.total=todo.length;clipJob.err=0;clipJob.last="";const upd=()=>{const el=$("#clipst");if(el)el.replaceChildren(clipStatus())};upd();
+  const col=cloud.ref.collection("clips");const idxRef=cloud.ref.collection("meta").doc("clipidx");
+  for(const [h,sn] of todo){if(!player||!cloud.ref)break;try{const ko=transOf(sn);const doc={h,en:sn,t:Date.now()};
+      for(const tag of ["m","f","ko"]){const text=tag==="ko"?ko:sn;if(!text)continue;const bytes=await ttsFetch(text,tag);doc[tag]=firebase.firestore.Blob.fromUint8Array(bytes);
+        try{const cache=await caches.open("oss-clips");await cache.put("/clip/"+tag+"/"+h,new Response(new Blob([bytes],{type:"audio/mpeg"})))}catch(e){}}
+      await col.doc(h).set(doc);await idxRef.set({hashes:firebase.firestore.FieldValue.arrayUnion(h),t:Date.now()},{merge:true});CLIPS.idx.add(h);clipJob.done++;clipJob.last=sn.slice(0,40)}
+    catch(e){clipJob.err++;clipJob.last="실패: "+(e.message||e);if(/tts 5|Failed to fetch|403/.test(String(e.message))&&clipJob.err>=3)break}
+    upd()}
+  clipJob.on=false;upd();if(clipJob.done)toast("자연스러운 음성 "+clipJob.done+"문장 준비됨")}
+function clipStatus(){const miss=clipMissing().length;const n=clipSentences();const total=Object.keys(n).length;
+  if(!WEB)return h("span",{class:"muted small"},"");
+  if(!TTS_URL)return h("span",{class:"muted small"},"음성 서버 주소가 없어 기기 음성으로 읽어요 (설정 → 음성 서버)");
+  if(!cloud.ref)return h("span",{class:"muted small"},"로그인하면 스크립트 문장을 자연스러운 음성으로 자동 녹음해요");
+  if(clipJob.on)return h("span",{class:"small",style:"color:var(--accent)"},"🎙 자동 녹음 중 "+clipJob.done+"/"+clipJob.total+(clipJob.err?" (실패 "+clipJob.err+")":"")+" · "+clipJob.last);
+  if(miss)return h("span",{class:"row"},h("span",{class:"muted small"},"녹음 없는 문장 "+miss+"/"+total),h("button",{class:"btn sm",onclick:()=>clipSync(true)},"지금 녹음"));
+  return h("span",{class:"chip good"},"스크립트 "+total+"문장 모두 자연스러운 음성 준비됨")}
 const txtSrc=(text,lang="en")=>{const t=lang==="ko"?"ko":AUD.tag;if(t==="off")return null;const h=txtHash(text);
   if(AUD.txt[t]&&AUD.txt[t][h])return "audio/s/"+t+"/"+h+".mp3";
   if(CLIPS.idx.has(h)&&(lang==="ko"?true:true))return "fs:"+t+"/"+h;return null};
@@ -1141,13 +1165,14 @@ function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem
     h("div",{class:"cks"},ck("q","시험 질문 (80+)"),ck("cards","표현카드 ("+(CARDS.length+S.custom.length)+")"),ck("shuffle","섞기")),
     ...common,
     h("div",{class:"note"},"시험 질문과 표현카드는 영어·한국어 해석 모두 녹음 파일이라 화면을 꺼도, 다른 앱을 써도 이어지고 잠금화면·이어폰 버튼으로 조작돼요. 빈칸(___)이 있는 표현은 화면에 실제 예문이 함께 표시됩니다.")];
-  const scriptOpts=[h("p",{class:"eyebrow"},"주제 선택 · 스크립트 탭에서 만든 내 스크립트 "+nScripts+"개"),
+  const clipLine=h("div",{id:"clipst"},clipStatus());
+  const scriptOpts=[h("p",{class:"eyebrow"},"주제 선택 · 스크립트 탭에서 만든 내 스크립트 "+nScripts+"개"),clipLine,
     sts.length?topicPick:h("p",{class:"muted small"},"저장된 스크립트가 아직 없어요. 스크립트 탭에서 주제별로 만들면 여기에 나타납니다."),
     h("div",{class:"cks"},ck("withQ","질문 먼저 듣기"),ck("shuffle","섞기")),
     ...common,
     h("div",{class:"note"},"스크립트 탭에서 공부한 내 스크립트를 문장 단위로 영어 → 한국어 해석 순으로 들어요. 스크립트는 녹음이 없어 기기 음성으로 나오므로 iPhone에서는 화면이 켜져 있을 때만 재생되고, 꺼져 있으면 건너뜁니다. 해석이 없는 문장은 'AI 해석 만들기'로 채울 수 있어요(Claude에서만).")];
   const sampleOpts=[profileFill()<4?h("div",{class:"note"},h("b",{},"프로필이 거의 비어 있어요. "),"설정에서 하는 일·사는 곳·취미·좋아하는 것 등을 채우면 예시가 내 이야기로 만들어집니다. ",h("button",{class:"btn sm",onclick:()=>go("settings")},"프로필 채우기 →")):null,
-    h("p",{class:"eyebrow"},"주제 선택 · 예시 답변 "+nSamples+"개 준비됨 (✓)"),
+    h("p",{class:"eyebrow"},"주제 선택 · 예시 답변 "+nSamples+"개 준비됨 (✓)"),clipLine.cloneNode(true),
     samplePick,
     h("div",{class:"row"},genBtn,sample?null:h("span",{class:"muted small"},"예시 생성은 Claude에서 열었을 때만 가능해요")),
     h("div",{class:"cks"},ck("withQ","질문 먼저 듣기"),ck("shuffle","섞기")),
@@ -1244,6 +1269,8 @@ function vSettings(m){
       h("textarea",{id:"expbox",readonly:"",hidden:true,autocapitalize:"off",autocorrect:"off",spellcheck:"false",style:"min-height:60px;font-family:var(--mono);font-size:11px",onclick:e=>{e.target.select()}}),
       h("textarea",{id:"imp",autocapitalize:"off",autocorrect:"off",spellcheck:"false",style:"min-height:70px;font-family:var(--mono);font-size:11px",placeholder:"다른 곳에서 복사한 기록 코드를 붙여넣기"}),
       h("div",{class:"row"},h("button",{class:"btn",onclick:async()=>{try{const o=await parseCode($("#imp").value);mergeState(o,false);$("#imp").value="";toast("기록을 합쳤어요");render()}catch(e){toast("코드를 읽을 수 없어요")}}},"가져와서 합치기"))),
+    WEB?h("div",{class:"card"},h("h3",{},"음성 서버 (자연스러운 음성 자동 녹음)"),h("p",{class:"muted small"},"스크립트·예시·모범답안 문장을 Microsoft 신경망 음성으로 자동 녹음해 내 계정에 저장해요. 중계 서버 주소를 한 번만 넣으면 됩니다."),
+      h("input",{type:"url",id:"ttsurl",value:TTS_URL,placeholder:"https://….workers.dev"}),h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>{TTS_URL=$("#ttsurl").value.trim();try{localStorage.setItem("oss_tts_url",TTS_URL)}catch(e){}toast(TTS_URL?"저장했어요. 듣기 탭에서 녹음이 시작돼요":"음성 서버를 껐어요");clipSync(false)}},"저장"),h("button",{class:"btn sm ghost",onclick:async()=>{try{const r=await fetch(TTS_URL+(TTS_URL.endsWith("/")?"":"/")+"voices");toast(r.ok?"서버 연결 OK":"서버 응답 "+r.status)}catch(e){toast("연결 실패: "+(e.message||e))}}},"연결 테스트"))):null,
     h("div",{class:"card"},h("h3",{},"데이터"),h("p",{class:"muted small mono",style:"font-size:10px"},"진단: "+(window.claude?.use?"claude":"web")+" · hash="+(HASH_SEEN||"-")+" · ds="+("DecompressionStream" in window)+" · clip="+!!navigator.clipboard?.readText+"\n재생 로그: "+(audLog.slice(-8).join(" | ")||"-")),h("p",{class:"muted small"},uid?h("span",{},"학습 기록은 내 Claude 계정에 저장되어 다른 기기에서도 이어집니다. ",h("b",{id:"csave"},claudeStatus())):cloud.user?"학습 기록은 OSS 계정("+cloud.user.email+")에 저장돼요.":"지금은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장됩니다."),
       h("div",{class:"row",id:"resetrow"},Object.keys(S.samples||{}).length?h("button",{class:"btn sm ghost",onclick:()=>{S.samples={};save();toast("예시 스크립트를 지웠어요. 듣기 탭에서 다시 만들 수 있어요");render()}},"듣기용 예시 스크립트 지우기"):null,h("button",{class:"btn sm ghost",onclick:e=>{if(e.currentTarget.nextSibling)return;e.currentTarget.after(h("button",{class:"btn sm",style:"color:var(--bad)",onclick:()=>{S=structuredClone(DEF);save();deck.order=[];render();toast("초기화했어요")}},"정말 초기화할게요"))}},"기록 전체 초기화…"))));
 }
