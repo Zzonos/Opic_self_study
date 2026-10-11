@@ -62,29 +62,36 @@ async function synthesize(text, voice, rate) {
   if (!ws) throw new Error("websocket upgrade failed: " + resp.status + " " + (await resp.text()).slice(0, 200));
   ws.accept();
   const lang = voice.startsWith("ko") ? "ko-KR" : "en-US";
-  const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='http://www.w3.org/2001/mstts' xml:lang='${lang}'><voice name='${voice}'><prosody pitch='+0Hz' rate='${rate}' volume='+0%'>${esc(text)}</prosody></voice></speak>`;
+  // the service wants the long voice name (same conversion as edge-tts)
+  const m = /^([a-z]{2,}-[A-Z]{2,})-(.+)$/.exec(voice);
+  const full = voice.startsWith("Microsoft") || !m ? voice : `Microsoft Server Speech Text to Speech Voice (${m[1]}, ${m[2]})`;
+  const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${lang}'><voice name='${full}'><prosody pitch='+0Hz' rate='${rate}' volume='+0%'>${esc(text)}</prosody></voice></speak>`;
   const chunks = [];
+  const notes = []; // text frames / close info, returned in the error for diagnosis
   const done = new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("timeout")), 25000);
     ws.addEventListener("message", ev => {
       if (typeof ev.data === "string") {
+        const p = (/Path:([^\r\n]+)/.exec(ev.data) || [])[1] || "?";
+        if (notes.length < 6) notes.push(p === "turn.end" || p === "turn.start" || p === "response" ? p : ev.data.slice(0, 160));
         if (ev.data.includes("Path:turn.end")) { clearTimeout(timer); try { ws.close(); } catch (e) {} resolve(); }
         return;
       }
+      if (!(ev.data instanceof ArrayBuffer)) { notes.push("bin:" + typeof ev.data); return; }
       const u8 = new Uint8Array(ev.data);
       const hlen = (u8[0] << 8) | u8[1];
       const header = new TextDecoder().decode(u8.subarray(2, 2 + hlen));
       if (header.includes("Path:audio")) chunks.push(u8.subarray(2 + hlen));
     });
     ws.addEventListener("error", e => { clearTimeout(timer); reject(new Error("ws error")); });
-    ws.addEventListener("close", () => { clearTimeout(timer); resolve(); });
+    ws.addEventListener("close", ev => { notes.push("close " + ev.code + " " + (ev.reason || "")); clearTimeout(timer); resolve(); });
   });
   ws.send(`X-Timestamp:${ts()}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n` +
     JSON.stringify({ context: { synthesis: { audio: { metadataoptions: { sentenceBoundaryEnabled: "false", wordBoundaryEnabled: "false" }, outputFormat: "audio-24khz-48kbitrate-mono-mp3" } } } }) + "\r\n");
   ws.send(`X-RequestId:${uuid()}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${ts()}Z\r\nPath:ssml\r\n\r\n${ssml}`);
   await done;
   const total = chunks.reduce((a, c) => a + c.length, 0);
-  if (!total) throw new Error("no audio");
+  if (!total) throw new Error("no audio [" + notes.join(" | ") + "]");
   const out = new Uint8Array(total); let o = 0; for (const c of chunks) { out.set(c, o); o += c.length; }
   return out;
 }

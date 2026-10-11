@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261011-162159-d230ef">
+<html lang="ko" data-build="20261011-162421-cb32a1">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -604,7 +604,7 @@ async function clipUrl(tag,h){const k=tag+"/"+h;if(CLIPS.urls[k])return CLIPS.ur
     if(!cloud.ref)return null;const d=await cloud.ref.collection("clips").doc(h).get();if(!d.exists)return null;const v=d.data()[tag];if(!v)return null;
     const bytes=v.toUint8Array?v.toUint8Array():v;if(!isMp3(bytes)){audLog.push("clip "+k+" 손상");return null}const blob=new Blob([bytes],{type:"audio/mpeg"});if(cache)cache.put(ck,new Response(blob)).catch(()=>{});
     const u=URL.createObjectURL(blob);CLIPS.urls[k]=u;return u}catch(e){return null}finally{delete CLIPS.busy[k]}})();return CLIPS.busy[k]}
-let TTS_URL="";try{TTS_URL=localStorage.getItem("oss_tts_url")||TTS_URL}catch(e){}
+const TTS_DEFAULT="https://oss-tts.zzono717.workers.dev";let TTS_URL=TTS_DEFAULT;try{const v=localStorage.getItem("oss_tts_url");if(v!==null)TTS_URL=v}catch(e){}
 const clipJob={on:false,done:0,total:0,err:0,last:""};
 function clipSentences(){const out={};const add=t=>{for(const sn of splitSent(t)){out[txtHash(sn)]=sn}};
   for(const st of [S.samples||{},S.scripts||{}])for(const sc of Object.values(st))for(const x of (sc.scripts||[]))add(x.answer||"");
@@ -618,7 +618,7 @@ try{await fetch(u,{mode:"no-cors",cache:"no-store"});log("① 서버 접속 ✓"
 try{const r=await fetch(u+"/voices",{cache:"no-store"});const j=await r.json();if(!j||!j.m)throw new Error("형식 다름");log("② OSS 코드 확인 ✓")}catch(x){log("② OSS 코드 ✗ — Worker에 tts-worker.js 가 아니라 기본 코드(Hello World)가 남아 있어요. Edit code → 전체 붙여넣기 → Deploy");return}
 try{const t0=Date.now();const u8=await ttsFetch("Hello! This is a voice test.","m");log("③ 음성 생성 ✓ ("+Math.round(u8.length/1024)+"KB, "+((Date.now()-t0)/1000).toFixed(1)+"초) — 재생합니다");const a=new Audio(URL.createObjectURL(new Blob([u8],{type:"audio/mpeg"})));a.play().catch(()=>{})}
 catch(x){const m=String(x.message||x);log("③ 음성 생성 ✗ — "+m);if(/403/.test(m))log("   → Microsoft가 Cloudflare 서버의 요청을 거절했어요 (서버 쪽 문제, 앱/주소 문제 아님)");else if(/forbidden origin/.test(m))log("   → 이 앱 주소가 Worker 허용 목록에 없어요");}}
-async function ttsFetch(text,tag){const r=await fetch(TTS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,tag})});if(!r.ok)throw new Error("tts "+r.status+" "+(await r.text()).slice(0,80));const u8=new Uint8Array(await r.arrayBuffer());if(!isMp3(u8))throw new Error("tts 응답이 mp3가 아님 ("+u8.length+"B)");return u8}
+async function ttsFetch(text,tag){const r=await fetch(TTS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,tag})});if(!r.ok)throw new Error("tts "+r.status+" "+(await r.text()).slice(0,400));const u8=new Uint8Array(await r.arrayBuffer());if(!isMp3(u8))throw new Error("tts 응답이 mp3가 아님 ("+u8.length+"B)");return u8}
 async function clipSync(force){if(clipJob.on||!WEB||!cloud.ref||!TTS_URL||!navigator.onLine)return;const todo=clipMissing();if(!todo.length)return;
   clipJob.on=true;clipJob.done=0;clipJob.total=todo.length;clipJob.err=0;clipJob.last="";const upd=()=>{const el=$("#clipst");if(el)el.replaceChildren(clipStatus())};upd();
   const col=cloud.ref.collection("clips");const idxRef=cloud.ref.collection("meta").doc("clipidx");
