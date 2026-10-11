@@ -1063,8 +1063,13 @@ function playerStep(){if(!player.on||player.paused)return;const it=player.items[
   if(!tts.ok||document.hidden){after();return}
   const u=new SpeechSynthesisUtterance(seg.t==="ko"?seg.text:ttsText(seg.text));
   if(seg.t==="ko"){const kv=koVoice();u.lang="ko-KR";if(kv)u.voice=kv;u.rate=Math.min(1.1,tts.rate+0.1)}else{u.lang=tts.voice?.lang||"en-US";if(tts.voice)u.voice=tts.voice;u.rate=tts.rate}u.pitch=1;
-  u.onend=()=>{player.t=setTimeout(()=>{player.t=null;after()},300)};u.onerror=e=>{if(e.error==="interrupted"||e.error==="canceled")return;after()};
-  speechSynthesis.cancel();speechSynthesis.speak(u);
+  let started=false,done=false;const finish=()=>{if(done)return;done=true;clearTimeout(player.t);player.t=setTimeout(()=>{player.t=null;after()},300)};
+  u.onstart=()=>{started=true};u.onend=finish;u.onerror=e=>{if(e.error==="interrupted"||e.error==="canceled")return;audLog.push("tts err "+e.error);finish()};
+  // iOS drops an utterance queued right after cancel(): cancel only if busy, then wait a beat before speaking
+  const go=()=>{if(!player.on||player.paused||tok!==player.tok)return;speechSynthesis.speak(u);
+    // safety net: if it never starts (silently dropped), retry once, then move on
+    player.t=setTimeout(()=>{player.t=null;if(done||started)return;audLog.push("tts nostart → retry");try{speechSynthesis.cancel()}catch(x){}setTimeout(()=>{if(done||started||!player.on)return;speechSynthesis.speak(u);player.t=setTimeout(()=>{player.t=null;if(!done&&!started){audLog.push("tts dropped → skip");finish()}},4000)},150)},3500)};
+  if(speechSynthesis.speaking||speechSynthesis.pending){speechSynthesis.cancel();player.t=setTimeout(()=>{player.t=null;go()},120)}else go();
   clearInterval(player.ka);player.ka=setInterval(()=>{if(player.on&&!player.paused&&speechSynthesis.speaking)speechSynthesis.resume()},10000)}
 async function wakeLock(on){try{if(on){player.lock=await navigator.wakeLock?.request("screen")}else{await player.lock?.release();player.lock=null}}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState!=="visible"||!player.on||player.paused)return;if(player.lock===null)wakeLock(true);setTimeout(()=>{const a=AUD.el;const filePlaying=a&&!a.paused&&!a.ended&&a.src;if(player.on&&!player.paused&&!filePlaying&&!(tts.ok&&speechSynthesis.speaking)){clearTimeout(player.t);player.t=null;playerStep()}},800)});
