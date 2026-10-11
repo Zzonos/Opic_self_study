@@ -369,7 +369,7 @@ function save(){S.updatedAt=Date.now();setTimeout(prepSyncCode,50);try{localStor
   if(cloud.ref)cloudPush(false)}
 // Claude account store: three documents (256 KiB cap per document) under the viewer's private path
 let claudePushT=null,claudeErr=false;
-function claudeParts(){const o=structuredClone(S);const trans=o.trans||{};const scripts={scripts:o.scripts||{},samples:o.samples||{}};delete o.trans;delete o.scripts;delete o.samples;if(o.log&&o.log.length>400)o.log=o.log.slice(-400);return {main:o,scripts,trans:{t:trans}}}
+function claudeParts(){const o=structuredClone(S);const trans=o.trans||{};const scripts={scripts:o.scripts||{},samples:o.samples||{}};delete o.trans;delete o.scripts;delete o.samples;if(o.log&&o.log.length>400)o.log=o.log.slice(-400);if(o.log){const keep=o.log.length-40;o.log=o.log.map((l,i)=>i<keep&&(l.a||l.model||l.pq)?(()=>{const c=Object.assign({},l);delete c.a;delete c.model;delete c.pq;delete c.str;return c})():l)}return {main:o,scripts,trans:{t:trans}}}
 function claudePush(){if(!docRef)return;clearTimeout(claudePushT);claudePushT=setTimeout(async()=>{try{const parts=claudeParts();await Promise.all([docRef.main.set(parts.main),docRef.scripts.set(parts.scripts),docRef.trans.set(parts.trans)]);claudeErr=false;claudeSavedAt=Date.now();const el=$("#csave");if(el)el.textContent=claudeStatus()}catch(e){if(!claudeErr){claudeErr=true;toast("Claude 계정 저장 실패: "+(e.code||e.message||e))}}},800)}
 let claudeSavedAt=0;function claudeStatus(){return claudeSavedAt?"Claude 계정에 저장됨 · "+new Date(claudeSavedAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}):"Claude 계정 저장 대기 중"}
 function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;const key=l=>l.date+"|"+l.kind+"|"+l.title+"|"+(l.score??"");const seen=new Set(S.log.map(key));for(const l of (o.log||[]))if(!seen.has(key(l))){S.log.push(l);seen.add(key(l))}S.log.sort((a,b)=>a.date<b.date?-1:1);
@@ -762,7 +762,7 @@ function aiNote(){if(sample||window.claude?.use)return null;prepSyncCode();retur
 function webNote(){if(!window.claude?.use)return null;const n=unsyncedCount();return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"여기(Claude)의 프로필·스크립트·예시·기록을 웹 계정에 보내요. '웹으로 통합'은 저장만 하고 완료 화면을 띄우니, 그 뒤 홈 화면의 OSS 앱을 열면 반영돼 있어요."+(n?" (새 기록 "+n+"건)":"")),h("div",{class:"row",style:"gap:6px"},webLink("웹으로 통합","btn sm primary","x"),webLink("열기 →","btn sm","s")))}
 
 /* ---- TODAY ---- */
-function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);
+function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);if(sub&&sub.history)return vHistory(m);
   const p=S.practice;const logs=S.log.filter(l=>l.kind!=="card");
   const recent=logs.slice(-5);const avg=recent.length?Math.round(recent.reduce((a,l)=>a+lvIdx(l.level),0)/recent.length):null;
   const streak=calcStreak();const todayMin=S.log.filter(l=>l.date===todayStr()).reduce((a,l)=>a+(l.secs||0),0)/60;
@@ -782,10 +782,30 @@ function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);
       planItem(done[2],"질문 3개 말하기 또는 AI 대화 + 피드백",`${t.practice}/3`,"15분",()=>go("practice"))),
     (window.claude?.use&&unsyncedCount()>=3)?h("div",{class:"note",style:"align-items:center"},h("span",{class:"grow"},"웹 계정으로 안 보낸 기록이 "+unsyncedCount()+"건 있어요."),h("button",{class:"btn sm",onclick:syncToWeb},"웹으로 보내기")):null,
     h("div",{class:"card"},h("div",{class:"hdr"},h("h2",{},"레벨 추이"),h("button",{class:"btn sm",onclick:()=>go("today",{analysis:true})},"상세 분석 →")),logs.length?chart(logs.slice(-12)):h("p",{class:"muted small"},"연습을 시작하면 평가 레벨이 여기에 쌓여요. 목표선은 IM3입니다.")),
-    h("div",{class:"card"},h("h2",{},"최근 기록"),logs.length?h("div",{class:"list"},...logs.slice(-6).reverse().map(l=>h("div",{class:"li"},h("span",{class:"d"},l.date.slice(5)),h("span",{class:"grow"},l.title),lvChip(l.level)))):h("p",{class:"muted small"},"아직 기록이 없어요."),
+    h("div",{class:"card"},h("div",{class:"hdr"},h("h2",{},"최근 기록"),logs.length?h("button",{class:"btn sm",onclick:()=>go("today",{history:true})},"전체 보기 →"):null),logs.length?h("div",{class:"list"},...logs.slice(-6).reverse().map(l=>h("div",{class:"li",role:"button",style:"cursor:pointer",onclick:()=>go("today",{history:true,open:l.ts||l.date+l.title})},h("span",{class:"d"},l.date.slice(5)),h("span",{class:"grow"},l.title),lvChip(l.level)))):h("p",{class:"muted small"},"아직 기록이 없어요."),
       h("div",{class:"row"},h("button",{class:"btn",onclick:()=>go("mock")},"15문항 모의시험 보기"))),
   );
 }
+function vHistory(m){const KIND={practice:"연습",mock:"모의시험",chat:"대화"};const f=sub.f||"all";const id=l=>l.ts||l.date+l.title;
+  const all=S.log.filter(l=>l.kind!=="card"&&(f==="all"||l.kind===f)).slice().reverse();
+  const tabs=h("div",{class:"segs"},...[["all","전체"],["practice","연습"],["mock","모의시험"],["chat","대화"]].map(([k,l])=>h("button",{class:"seg"+(f===k?" on":""),onclick:()=>{sub=Object.assign({},sub,{f:k,open:null});render()}},l)));
+  const row=l=>{const open=sub.open!=null&&String(sub.open)===String(id(l));const t=TOPICS.find(x=>x.id===l.tid);const q=l.q&&t?t.qs.find(x=>x.q===l.q):null;
+    const head=h("div",{class:"li",role:"button",style:"cursor:pointer",onclick:()=>{sub=Object.assign({},sub,{open:open?null:id(l)});render()}},h("span",{class:"d"},l.date.slice(5)),h("span",{class:"grow"},h("span",{class:"muted small"},(KIND[l.kind]||l.kind)+" · "),l.title,l.secs?h("span",{class:"muted small"}," · "+fmt(l.secs)):null),l.level?lvChip(l.level):null,h("span",{class:"muted"},open?"▴":"▾"));
+    if(!open)return head;
+    const fx=(l.fixes||[]).filter(x=>x.o||x.b||x.w);
+    const det=h("div",{class:"card",style:"margin:-4px 0 6px;gap:10px"},
+      l.q?h("div",{},h("p",{class:"eyebrow"},"질문"),h("p",{class:"small",style:"font-weight:600"},l.q)):null,
+      l.a?h("div",{},h("p",{class:"eyebrow"},"내 답변"),h("div",{class:"model"},l.a)):null,
+      l.sum?h("div",{},h("p",{class:"eyebrow"},"총평"),h("p",{class:"small"},l.sum)):null,
+      (l.str||[]).length?h("div",{},h("p",{class:"eyebrow"},"잘한 점"),...l.str.map(x=>h("p",{class:"small"},"✓ "+x))):null,
+      fx.length?h("div",{},h("p",{class:"eyebrow"},l.kind==="mock"?"개선 포인트":"고칠 표현"),...fx.map(x=>x.o||x.b?h("div",{class:"fix"},x.o?h("span",{class:"o"},x.o):null,x.b?h("span",{class:"b"},x.b):null,x.w?h("span",{class:"w"},x.w):null):h("p",{class:"small"},"• "+x.w))):null,
+      l.model?h("div",{},h("p",{class:"eyebrow"},"모범답안 · "+tgt()),h("div",{class:"model"},l.model),h("div",{class:"row",style:"margin-top:6px"},spkBtn(l.model),h("button",{class:"btn sm",onclick:()=>go("listen",{text:l.model,title:l.title})},"쉐도잉"))):null,
+      (l.pq||[]).length?h("details",{},h("summary",{},"문항별 피드백 ("+l.pq.length+")"),...l.pq.map((x,i)=>h("div",{style:"margin-top:8px"},h("p",{class:"small",style:"font-weight:600"},(i+1)+". "+(x.q||"")+(x.l?" · "+x.l:"")),x.a?h("p",{class:"muted small"},x.a):null,x.c?h("p",{class:"small"},x.c):null,x.b?h("p",{class:"small",style:"color:var(--accent)"},"→ "+x.b):null))):null,
+      !l.a&&!l.sum&&!fx.length&&!(l.pq||[]).length?h("p",{class:"muted small"},"이 기록은 세부 내용이 저장되기 전에 만든 기록이라 점수만 남아 있어요."):null,
+      t&&q?h("div",{class:"row"},h("button",{class:"btn sm primary",onclick:()=>go("practice",{topic:t,q,kind:QT[q.t]})},"이 질문 다시 연습")):null);
+    return h("div",{},head,det)};
+  put(m,h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("today")},"← 오늘"),h("p",{class:"eyebrow",style:"margin-top:10px"},"History"),h("h1",{},"내 기록")),tabs,
+    all.length?h("div",{class:"list"},...all.slice(0,sub.n||40).map(row),all.length>(sub.n||40)?h("button",{class:"btn",onclick:()=>{sub=Object.assign({},sub,{n:(sub.n||40)+40});render()}},"더 보기"):null):h("p",{class:"muted small"},"아직 기록이 없어요."))}
 function planItem(done,title,progress,min,onclick){return h("div",{class:"item"+(done?" done":""),onclick,role:"button",tabindex:"0"},h("span",{class:"box",html:done?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-11"/></svg>':""}),h("span",{class:"t grow"},title," ",h("span",{class:"muted small mono"},progress)),h("span",{class:"min"},min))}
 function calcStreak(){const days=[...new Set(S.log.map(l=>l.date))].sort().reverse();if(!days.length)return 0;let s=0;let d=new Date();if(days[0]!==todayStr()){d.setDate(d.getDate()-1);const y=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");if(days[0]!==y)return 0}
   for(const day of days){const ds=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");if(day===ds){s++;d.setDate(d.getDate()-1)}else break}return s}
@@ -839,7 +859,7 @@ function vAnswer(m,s){
     fbBox.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"Claude가 평가 중… (10–40초)")));
     try{const prog=fbBox.querySelector(".thinking span");const r=await evaluate(q.q,a,secs||Math.round(a.split(/\s+/).length/2.3),({text})=>{if(prog)prog.textContent="Claude가 평가 작성 중… "+(text||"").length+"자"});
       renderFeedback(fbBox,r,q.q,a);if(r.model_target){S.models=S.models||{};S.models[q.q]=r.model_target}
-      S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",qt:q.t,title:topic.en+" · "+(s.kind||""),level:r.level,score:r.score,secs:secs||0,fixes:(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}))});S.today.practice++;save();
+      S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",qt:q.t,tid:topic.id,q:q.q,a,sum:r.summary||"",str:(r.strengths||[]).slice(0,3),model:r.model_target||"",title:topic.en+" · "+(s.kind||""),level:r.level,score:r.score,secs:secs||0,fixes:(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}))});S.today.practice++;save();
       const nextRp=s.rp&&s.step<13?h("button",{class:"btn primary",onclick:()=>{const st=s.step+1;go("practice",{topic,q:{t:"rp",q:s.rp["q"+st]},kind:"롤플레이 "+st+"번 · "+(st===12?"문제 해결":"관련 경험"),rp:s.rp,step:st})}},"다음: "+(s.step+1)+"번 →"):null;
       put(fbBox,h("div",{class:"row"},nextRp,h("button",{class:"btn",onclick:()=>{ta.value="";ta._timed=false;startBtn.textContent="말하기 시작";fbBox.replaceChildren();secs=0;tEl.textContent="0:00";bar.firstChild.style.width="0";evalBtn.disabled=false}},"같은 질문 다시"),h("button",{class:"btn",onclick:()=>go("practice")},"다른 질문")));
     }catch(e){console.warn("evaluate failed",e);fbBox.replaceChildren(h("p",{class:"small",style:"color:var(--bad)"},errMsg(e)),e?.message?h("p",{class:"muted small mono",style:"word-break:break-all"},String(e.message).slice(0,200)):null,(e.code!=="not_granted"&&e.code!=="sampling_disabled")?h("button",{class:"btn sm",onclick:()=>{evalBtn.disabled=false;evalBtn.click()}},"다시 시도"):null);if(e.code!=="not_granted"&&e.code!=="sampling_disabled")evalBtn.disabled=false}
@@ -994,7 +1014,7 @@ async function vChatSummary(m){
   if(chat.summary==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"대화 평가 중…")));put(m,h("h1",{},"대화 정리"),box);
     const tr=chat.ui.filter(u=>u.who==="ai"||u.who==="me").map(u=>(u.who==="ai"?"Partner: ":"Learner: ")+u.text).join("\n");
     try{const r=await sample.json(`${RUBRIC()}\n\nThis is a transcript of a practice conversation (${chat.sc.en}). Rate ONLY the learner's turns.\n\n${tr}\n\nReply with ONLY JSON: {"level":"IM2","score":60,"summary":"한국어 총평 2-3문장","fixes":[{"original":"...","better":"...","why":"한국어"}],"expressions":[{"en":"useful natural expression the learner could have used","ko":"뜻"}],"next":"다음 대화에서 시도할 한 가지 (한국어)"}\nGive 3-5 fixes and 4-6 expressions.`,{cache:false});
-      chat.summary=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"chat",qt:"chat",title:"대화 · "+chat.sc.ko+" · "+chat.n+"턴",level:r.level,score:r.score,secs:chat.n*45,fixes:[...(chat.ui.filter(u=>u.who==="fix").map(u=>({o:u.fix.original,b:u.fix.better,w:u.fix.why}))),...(r.fixes||[]).map(f=>({o:f.original,b:f.better,w:f.why}))].slice(0,8)});S.today.practice++;save();render()}
+      chat.summary=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"chat",qt:"chat",sum:r.summary||"",title:"대화 · "+chat.sc.ko+" · "+chat.n+"턴",level:r.level,score:r.score,secs:chat.n*45,fixes:[...(chat.ui.filter(u=>u.who==="fix").map(u=>({o:u.fix.original,b:u.fix.better,w:u.fix.why}))),...(r.fixes||[]).map(f=>({o:f.original,b:f.better,w:f.why}))].slice(0,8)});S.today.practice++;save();render()}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("button",{class:"btn",onclick:()=>{chat=null;render()}},"닫기"))}return}
   const r=chat.summary;
   put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation review · "+chat.sc.ko),h("h1",{},"대화 정리")),
@@ -1035,7 +1055,7 @@ async function vMockResult(m){
   if(mock.result==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"15문항 채점 중… (30–90초)")));
     put(m,h("h1",{},"채점 중"),box);
     if(!sample){box.replaceChildren(h("p",{},ERR.not_granted),h("button",{class:"btn",onclick:()=>{mock=null;render()}},"닫기"));return}
-    try{const r=await evalMock(mock.items,null);mock.result=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"mock",qt:"mock",title:"모의시험 15문항",level:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0),fixes:(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)})),perq:(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}))});save();render()}
+    try{const r=await evalMock(mock.items,null);mock.result=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"mock",qt:"mock",sum:r.summary||"",pq:(r.per_question||[]).map((x,i)=>({q:(mock.items[i]||{}).q||"",a:((mock.items[i]||{}).a||"").slice(0,600),l:x.level,c:x.comment,b:x.better})),title:"모의시험 15문항",level:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0),fixes:(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)})),perq:(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}))});save();render()}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{render()}},"다시 시도"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"닫기")))}
     return}
   const r=mock.result;
