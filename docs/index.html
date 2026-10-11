@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261011-195112-299ba3">
+<html lang="ko" data-build="20261011-200144-ef3697">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -704,6 +704,24 @@ function ttsUnlock(){if(!tts.ok||ttsUnlocked)return;try{const u=new SpeechSynthe
 document.addEventListener("click",ttsUnlock,{capture:true,once:false});
 document.addEventListener("touchend",ttsUnlock,{capture:true});
 function ttsStop(){audStop();if(!tts.ok)return;speechSynthesis.cancel();if(tts.cur){tts.cur.btn?.classList.remove("on");if(tts.cur.btn)tts.cur.btn.innerHTML=SPK_ICON}tts.cur=null}
+/* natural voice for any English text: recorded clip if it exists, otherwise synthesized on demand by the voice server (web only) */
+const NAT={urls:{},busy:{}};
+function natOK(text){if(AUD.tag==="off"||!/[a-z]/i.test(text||""))return false;const ss=splitSent(text);if(!ss.length)return false;
+  if(ss.every(sn=>txtSrc(sn)))return true;return WEB&&!!TTS_URL&&navigator.onLine}
+function natUrl(sn){const f=txtSrc(sn);if(f&&!/^fs:/.test(f))return Promise.resolve(f);
+  if(f){const [tag,h]=f.slice(3).split("/");return clipUrl(tag,h).then(u=>u||natFetch(sn))}return natFetch(sn)}
+function natFetch(sn,lang){const tag=lang==="ko"?"ko":AUD.tag==="f"?"f":"m";const k=tag+"/"+(tag==="ko"?"k"+koHash(sn):txtHash(sn));if(NAT.urls[k])return Promise.resolve(NAT.urls[k]);if(NAT.busy[k])return NAT.busy[k];
+  NAT.busy[k]=(async()=>{try{const cache=await (self.caches?caches.open("oss-clips").catch(()=>null):null);const ck="/tts/"+k;
+    if(cache){const hit=await cache.match(ck);if(hit){const u=URL.createObjectURL(await hit.blob());NAT.urls[k]=u;return u}}
+    if(!WEB||!TTS_URL)return null;const bytes=await ttsFetch(sn,tag);const blob=new Blob([bytes],{type:"audio/mpeg"});if(cache)cache.put(ck,new Response(blob)).catch(()=>{});
+    const u=URL.createObjectURL(blob);NAT.urls[k]=u;return u}catch(e){audLog.push("즉석 음성 실패: "+(e.message||e));return null}finally{delete NAT.busy[k]}})();return NAT.busy[k]}
+function natSpeak(text,{btn,rate,onend,fallback}){const ss=splitSent(text);const cur={u:null,btn,nat:true};tts.cur=cur;if(btn){btn.classList.add("on");btn.innerHTML=STOP_ICON}
+  const done=()=>{if(tts.cur!==cur)return;if(btn){btn.classList.remove("on");btn.innerHTML=SPK_ICON}tts.cur=null;onend&&onend()};
+  const urls=ss.map(()=>null);const get=i=>urls[i]||(urls[i]=natUrl(ss[i]));
+  const step=i=>{if(tts.cur!==cur)return;if(i>=ss.length){done();return}get(i);if(i+1<ss.length)get(i+1);if(i+2<ss.length)get(i+2);
+    urls[i].then(u=>{if(tts.cur!==cur)return;if(!u){if(i===0){tts.cur=null;fallback();return}step(i+1);return}
+      audPlay(u,{rate:rate??tts.rate,onend:()=>step(i+1),onerror:()=>step(i+1)})})};
+  step(0)}
 function speak(text,{btn=null,rate=null,onend=null,key=null}={}){
   const src=audSrc(key);
   if(!tts.ok&&!src){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
@@ -712,6 +730,7 @@ function speak(text,{btn=null,rate=null,onend=null,key=null}={}){
   ttsStop();
   if(src){tts.cur={u:null,btn};if(btn){btn.classList.add("on");btn.innerHTML=STOP_ICON}
     audPlay(src,{rate:rate??tts.rate,onend:()=>{if(btn){btn.classList.remove("on");btn.innerHTML=SPK_ICON}tts.cur=null;onend&&onend()}});return}
+  if(!src&&!speak._dev&&natOK(text)){natSpeak(text,{btn,rate,onend,fallback:()=>{speak._dev=true;try{speak(text,{btn,rate,onend,key})}finally{speak._dev=false}}});return}
   const u=new SpeechSynthesisUtterance(ttsText(text));u.lang=tts.voice?.lang||"en-US";if(tts.voice)u.voice=tts.voice;u.rate=rate??tts.rate;u.pitch=1;
   tts.cur={u,btn};if(btn){btn.classList.add("on");btn.innerHTML=STOP_ICON}
   u.onend=u.onerror=()=>{if(tts.cur&&tts.cur.u===u){if(btn){btn.classList.remove("on");btn.innerHTML=SPK_ICON}tts.cur=null;onend&&onend()}};
@@ -1168,6 +1187,12 @@ function playerStep(){if(!player.on||player.paused)return;const it=player.items[
   if(seg.t==="wait"){player.t=setTimeout(()=>{player.t=null;after()},seg.ms);return}
   // speech synthesis segments (fallback / Korean): cannot run while the page is in the background on iPhone → skip
   {const up=seg.noUp?null:seg.t==="en"&&seg.text?txtSrc(seg.text):seg.t==="ko"&&seg.en?txtSrc(seg.en,"ko"):null;if(up){const isKo=seg.t==="ko";if(isKo){seg.ko=seg.text;seg.text=""}seg.t="file";seg.src=up;seg.rate=isKo?koR():tts.rate;playerStep();return}}
+  // English without a recording: synthesize it on demand with the natural voice (web), device voice only as a last resort
+  if(seg.t==="en"&&!seg.noUp&&WEB&&TTS_URL&&navigator.onLine&&AUD.tag!=="off"&&/[a-z]/i.test(seg.text||"")){natUrl(seg.text).then(u=>{if(!player.on||player.paused||tok!==player.tok)return;if(!u){seg.noUp=true;playerStep();return}
+      audPlay(u,{rate:seg.rate||tts.rate,onend:after,onerror:()=>{if(!player.on||tok!==player.tok)return;seg.noUp=true;playerStep()}})});
+    {const nx=player.segs[player.si+1];if(nx&&nx.t==="en"&&nx.text&&!nx.noUp)natUrl(nx.text)}return}
+  if(seg.t==="ko"&&!seg.noUp&&WEB&&TTS_URL&&navigator.onLine&&seg.text){natFetch(seg.text,"ko").then(u=>{if(!player.on||player.paused||tok!==player.tok)return;if(!u){seg.noUp=true;playerStep();return}
+      audPlay(u,{rate:koR(),onend:after,onerror:()=>{if(!player.on||tok!==player.tok)return;seg.noUp=true;playerStep()}})});return}
   if(!tts.ok||document.hidden){after();return}
   const u=new SpeechSynthesisUtterance(seg.t==="ko"?seg.text:ttsText(seg.text));
   if(seg.t==="ko"){const kv=koVoice();u.lang="ko-KR";if(kv)u.voice=kv;u.rate=koR()}else{u.lang=tts.voice?.lang||"en-US";if(tts.voice)u.voice=tts.voice;u.rate=tts.rate}u.pitch=1;
