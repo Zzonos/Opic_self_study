@@ -77,11 +77,16 @@ async function synthesize(text, voice, rate) {
         if (ev.data.includes("Path:turn.end")) { clearTimeout(timer); try { ws.close(); } catch (e) {} resolve(); }
         return;
       }
-      if (!(ev.data instanceof ArrayBuffer)) { notes.push("bin:" + typeof ev.data); return; }
-      const u8 = new Uint8Array(ev.data);
-      const hlen = (u8[0] << 8) | u8[1];
-      const header = new TextDecoder().decode(u8.subarray(2, 2 + hlen));
-      if (header.includes("Path:audio")) chunks.push(u8.subarray(2 + hlen));
+      // binary frame: may arrive as ArrayBuffer, a typed array, or a Blob depending on the runtime
+      const d = ev.data;
+      const p = (d && typeof d.arrayBuffer === "function" && !(d instanceof ArrayBuffer)) ? d.arrayBuffer()
+        : Promise.resolve(ArrayBuffer.isView(d) ? d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength) : d);
+      chunks.push(p.then(buf => {
+        const u8 = new Uint8Array(buf);
+        const hlen = (u8[0] << 8) | u8[1];
+        const header = new TextDecoder().decode(u8.subarray(2, 2 + hlen));
+        return header.includes("Path:audio") ? u8.subarray(2 + hlen) : null;
+      }));
     });
     ws.addEventListener("error", e => { clearTimeout(timer); reject(new Error("ws error")); });
     ws.addEventListener("close", ev => { notes.push("close " + ev.code + " " + (ev.reason || "")); clearTimeout(timer); resolve(); });
@@ -90,6 +95,8 @@ async function synthesize(text, voice, rate) {
     JSON.stringify({ context: { synthesis: { audio: { metadataoptions: { sentenceBoundaryEnabled: "false", wordBoundaryEnabled: "false" }, outputFormat: "audio-24khz-48kbitrate-mono-mp3" } } } }) + "\r\n");
   ws.send(`X-RequestId:${uuid()}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${ts()}Z\r\nPath:ssml\r\n\r\n${ssml}`);
   await done;
+  const parts = (await Promise.all(chunks)).filter(Boolean);
+  chunks.length = 0; chunks.push(...parts);
   const total = chunks.reduce((a, c) => a + c.length, 0);
   if (!total) throw new Error("no audio [" + notes.join(" | ") + "]");
   const out = new Uint8Array(total); let o = 0; for (const c of chunks) { out.set(c, o); o += c.length; }
