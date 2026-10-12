@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261012-210026-11c1ee">
+<html lang="ko" data-build="20261012-223031-4fa800">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -902,7 +902,7 @@ function vAnswer(m,s){
   const {topic,q}=s;let secs=0;let fbBox=h("div",{class:"fb"});let ctl=null;
   const tEl=h("div",{class:"timer"},"0:00");const bar=h("div",{class:"bar"},h("i"));
   const ta=h("textarea",{id:"ans_"+topic.id,placeholder:"여기에 말한 내용을 받아쓰기로 입력하세요. (휴대폰: 키보드의 마이크 키 / Windows: Win+H / Mac: 🎤 키 또는 Fn 두 번)"});
-  const startBtn=h("button",{class:"btn primary",onclick:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작";}else{ta._timed=true;timerStart(tEl,bar.firstChild);startBtn.textContent="답변 끝";ta.focus()}}},"말하기 시작");autoTimer(ta,startBtn);
+  const startBtn=h("button",{class:"btn primary",onclick:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작";}else{if(startBtn.textContent==="다시 시작"){ta.value="";ta.dispatchEvent(new Event("input"));fbBox.replaceChildren();evalBtn.disabled=false;secs=0}ta._timed=true;timerStart(tEl,bar.firstChild);startBtn.textContent="답변 끝";ta.focus()}}},"말하기 시작");autoTimer(ta,startBtn);
   const evalBtn=h("button",{class:"btn primary",disabled:!sample,onclick:async()=>{
     const a=ta.value.trim();if(a.length<20){toast("답변을 좀 더 입력해 주세요 (20자 이상)");return}
     if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}
@@ -1132,7 +1132,7 @@ function vMock(m){
   const replay=h("button",{class:"btn sm",onclick:()=>{if(plays>=2){toast("실제 시험에서는 2번까지만 들을 수 있어요");return}plays++;speak(it.q,{key:it.key});replay.textContent="다시 듣기 ("+(2-plays)+"회 남음)"}},"질문 듣기 (2회)");
   if(mock.listen){qText.hidden=true;setTimeout(()=>{plays=1;speak(it.q,{key:it.key});replay.textContent="다시 듣기 (1회 남음)"},300)}else{hid.hidden=true;reveal.hidden=true}
   put(m,h("div",{},h("p",{class:"eyebrow"},"Question "+(mock.i+1)+" / "+n+" · "+it.kind),nav,qText,hid,h("div",{class:"row",style:"margin-top:8px"},replay,reveal)),
-    h("div",{class:"card"},h("div",{class:"row"},tEl,h("div",{class:"grow"},bar),(()=>{const sb=h("button",{class:"btn primary",onclick:e=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}else{ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝";ta.focus()}}},"말하기 시작");autoTimer(ta,sb);return sb})()),ta,SR_OK?h("div",{class:"row"},(micBtn(ta,{label:"🎤 마이크로 답하기"})||micLink("🎤 마이크로 답하기"))):null,
+    h("div",{class:"card"},h("div",{class:"row"},tEl,h("div",{class:"grow"},bar),(()=>{const sb=h("button",{class:"btn primary",onclick:e=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}else{if(sb.textContent==="다시 시작"){ta.value="";it.a="";it.secs=0}ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝";ta.focus()}}},"말하기 시작");autoTimer(ta,sb);return sb})()),ta,SR_OK?h("div",{class:"row"},(micBtn(ta,{label:"🎤 마이크로 답하기"})||micLink("🎤 마이크로 답하기"))):null,
       h("div",{class:"row"},h("button",{class:"btn primary",onclick:next},mock.i<n-1?"다음 문항 →":"제출하고 채점"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"시험 중단"))));
 }
 async function vMockResult(m){
