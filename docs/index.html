@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261012-154300-5d4d06">
+<html lang="ko" data-build="20261012-163109-1c00f5">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -152,7 +152,8 @@ svg.chart{width:100%;height:auto;display:block}
 .hidden-q{background:var(--bg);border:1px dashed var(--line);border-radius:12px;padding:28px 16px;text-align:center;color:var(--mute)}
 .mini{position:fixed;left:0;right:0;bottom:calc(58px + env(safe-area-inset-bottom,0px));background:var(--accent);color:var(--accent-ink);padding:8px 14px;display:flex;align-items:center;gap:10px;z-index:6;font-size:13px}
 .mini .now{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mini button{background:rgba(255,255,255,.18);border:0;color:inherit;border-radius:8px;padding:5px 10px;cursor:pointer;font-weight:500}
+.mini button{background:rgba(255,255,255,.18);border:0;color:inherit;border-radius:8px;padding:0;width:38px;height:34px;display:inline-grid;place-items:center;cursor:pointer;flex:none}
+.mini button svg{width:18px;height:18px;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;fill:none}
 @media (min-width:900px){.mini{left:112px;bottom:0;padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))}}
 .nowbox{background:var(--accent-soft);border-radius:12px;padding:16px;min-height:96px;display:flex;flex-direction:column;gap:6px}
 .nowbox .en{font-family:var(--display);font-size:19px;font-weight:500;line-height:1.35}
@@ -1267,8 +1268,9 @@ document.addEventListener("visibilitychange",()=>{if(document.visibilityState!==
     audLog.push("복귀: 현재 문장 다시");playerStep()},800)});
 // watchdog: if speech silently died (common after screen lock), restart the current sentence
 setInterval(()=>{if(!player.on||player.paused||player.t||player.busy)return;const a=AUD.el;const filePlaying=a&&!a.paused&&!a.ended&&a.src;if(a&&a.src&&a.paused&&!a.ended&&a.currentTime>0.2){a.play().catch(()=>{});return}if(document.hidden&&a&&a.src&&!a.ended&&!a.paused)return;const ttsBusy=tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending);if(!filePlaying&&!ttsBusy){playerStep()}},4000);
+const MI={prev:'<svg viewBox="0 0 24 24"><path d="M6 5v14"/><path d="M19 5 9 12l10 7z" fill="currentColor"/></svg>',next:'<svg viewBox="0 0 24 24"><path d="M18 5v14"/><path d="M5 5l10 7-10 7z" fill="currentColor"/></svg>',play:'<svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg>',pause:'<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>',stop:'<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>'};
 function renderMini(){const m=$("#mini");if(!player.on){m.hidden=true;return}m.hidden=false;const it=player.items[player.i]||{};
-  m.replaceChildren(h("span",{class:"now"},(player.paused?"⏸ ":"▶ ")+(it.label||"")+" — "+(it.en||"")),h("button",{onclick:playerPrev},"이전"),h("button",{onclick:playerPause},player.paused?"재생":"일시정지"),h("button",{onclick:playerNext},"다음"),h("button",{onclick:playerStop},"끄기"))}
+  m.replaceChildren(h("span",{class:"now"},(player.paused?"⏸ ":"▶ ")+(it.label||"")+" — "+(it.en||"")),h("button",{onclick:playerPrev,"aria-label":"이전",title:"이전",html:MI.prev}),h("button",{onclick:playerPause,"aria-label":player.paused?"재생":"일시정지",title:player.paused?"재생":"일시정지",html:player.paused?MI.play:MI.pause}),h("button",{onclick:playerNext,"aria-label":"다음",title:"다음",html:MI.next}),h("button",{onclick:playerStop,"aria-label":"끄기",title:"끄기",html:MI.stop}))}
 function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[player.i]||{};const seg=player.cur||{};
   const en=(seg.t==="file"&&seg.text)||seg.t==="en"?(seg.text||it.en):it.en;const ko=seg.t==="ko"?seg.text:(seg.ko||"");
   const silent=seg.t==="wait"||(seg.t==="file"&&/silence_/.test(seg.src||""));const pauseLeft=silent?player.segs.slice(player.si).reduce((a,x)=>(x.t==="wait")?a+x.ms/1000:(x.t==="file"&&/silence_/.test(x.src))?a+(+x.src.match(/_(\d+)/)[1]):a,0):0;
