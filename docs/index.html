@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261012-223031-4fa800">
+<html lang="ko" data-build="20261012-231239-b9d3c2">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -986,7 +986,7 @@ function coachCard(a){const cached=S.analysis;const fresh=cached&&(Date.now()-(c
   const box=h("div",{style:"display:flex;flex-direction:column;gap:12px"});let intro=null;
   const sec=(t,...k)=>h("div",{style:"display:flex;flex-direction:column;gap:6px"},h("p",{class:"eyebrow"},t),...k);
   const show=r=>{const old=!r.headline&&!r.gap;box.replaceChildren(...[
-    h("p",{class:"muted small"},"분석 "+new Date(r.ts).toLocaleDateString("ko-KR")+(old?" · 예전 형식 — '다시 분석'을 누르면 상세 코칭으로 바뀌어요":"")),
+    h("p",{class:"muted small"},"분석 "+new Date(r.ts).toLocaleString("ko-KR",{year:"numeric",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})+(()=>{const n=S.log.filter(l=>l.kind!=="card"&&l.level&&(l.ts||0)>r.ts).length;return n?" · 이후 새 기록 "+n+"건 (다시 분석하면 반영돼요)":""})()+(old?" · 예전 형식 — '다시 분석'을 누르면 상세 코칭으로 바뀌어요":"")),
     r.headline?h("p",{style:"font-weight:700;font-size:16px;line-height:1.45"},r.headline):null,
     r.gap?sec("목표 "+tgt()+"까지 남은 것",h("p",{class:"small"},r.gap)):null,
     (r.strengths||[]).length?sec("지금 잘하고 있는 것",...r.strengths.map(x=>h("p",{class:"small"},"✓ "+x))):null,
@@ -1018,9 +1018,11 @@ Reply with ONLY one JSON object:
 "drills":[{"en":"이 학습자의 약점을 메우는 자연스러운 영어 문장","ko":"뜻"}]}
 categories at most 5 (most frequent first), type_tips for the 1-2 weakest types, plan exactly 7 days of ~30 minutes, drills 5 sentences at ${tgt()} level.`,{cache:false,onText:({text})=>{prog.textContent="작성 중… "+(text||"").length+"자"}});
     r.ts=Date.now();S.analysis=r;save();show(r);btn.textContent="다시 분석";prog.textContent=""}catch(e){toast(errMsg(e));btn.textContent="AI 코치 분석";prog.textContent=""}finally{btn.disabled=false}}},cached?"다시 분석":"AI 코치 분석 받기");
-  return h("div",{class:"card"},h("div",{class:"hdr"},h("h3",{},"AI 코치"),fresh?h("span",{class:"chip good"},"최근 분석"):cached?h("span",{class:"chip warn"},"1주 이상 지남"):null),
+  btn.className="btn sm primary";
+  return h("div",{class:"card"},h("div",{class:"hdr",style:"align-items:center"},h("div",{class:"row",style:"gap:8px"},h("h3",{},"AI 코치"),fresh?h("span",{class:"chip good"},"최근 분석"):cached?h("span",{class:"chip warn"},"1주 이상 지남"):null),h("div",{class:"row",style:"gap:6px"},prog,btn)),
+    sample?null:h("p",{class:"muted small"},"Claude에서 열면 AI 코치 분석이 가능해요"),
     cached?null:(intro=h("p",{class:"muted small"},"내 기록·교정·최근 답변을 바탕으로 목표까지의 차이, 반복 실수, 약한 유형 공략법, 7일 처방, 연습 문장을 만들어요.")),
-    box,h("div",{class:"row"},btn,prog,sample?null:h("span",{class:"muted small"},"Claude에서 열면 AI 코치 분석이 가능해요")))}
+    box)}
 
 /* ---- CHAT (AI 회화) ---- */
 const SCEN=[
