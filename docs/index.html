@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261012-163109-1c00f5">
+<html lang="ko" data-build="20261012-172902-184195">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1014,6 +1014,8 @@ function vChat(m){
     if(u.who==="wait")return h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")))};
   chat.ui.forEach(u=>bub.append(render1(u)));
   const ta=h("textarea",{id:"chat_in",style:"min-height:64px",placeholder:"입력하거나 받아쓰기로 말하세요 — "+DICT_HINT});
+  // Enter sends, Shift+Enter makes a new line (ignored while a Korean/IME word is still being composed)
+  ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){e.preventDefault();send()}});
   const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ttsStop();ta.value="";chat.busy=true;
     chat.ui.push({who:"me",text:t});chat.turns.push({role:"user",content:t});bub.append(render1({who:"me",text:t}));const w=render1({who:"wait"});bub.append(w);w.scrollIntoView({block:"end"});
     try{const r=await sample.json([{role:"user",content:chatRules(sc)},...chat.turns],{cache:false,modelTier:"quick"});
