@@ -1,11 +1,14 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 초대 코드: 가입(첫 저장) 때만 검사. 아래 값을 원하는 코드로 바꾸세요.
+    // 가입(첫 저장) 때만 검사합니다. 둘 중 하나만 맞으면 가입돼요.
+    // 1) 초대 코드: 아래 값을 원하는 코드로 바꾸세요. 코드 방식을 끄려면 아무도 모르는 긴 값으로 바꾸면 됩니다.
     function inviteOk() { return request.resource.data.invite == "OPIC2026"; }
+    // 2) 지정한 사람만: 가입을 허락할 이메일 목록 (소문자로). 이 이메일로 가입하면 초대 코드가 틀려도 통과해요.
+    function allowedEmail() { return request.auth.token.email in ["zzono717@gmail.com"]; }
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
-      allow create: if request.auth != null && request.auth.uid == uid && inviteOk();
+      allow create: if request.auth != null && request.auth.uid == uid && (inviteOk() || allowedEmail());
       allow update: if request.auth != null && request.auth.uid == uid;
       allow delete: if false;
       // 녹음 클립(문장별 mp3)과 색인: 본인만
