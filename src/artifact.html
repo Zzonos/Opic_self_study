@@ -397,10 +397,16 @@ function syncPayload(){if(!S.syncedAt||S.syncFull)return fullPayload();
   return {delta:true,log:S.log.filter(l=>(l.ts||Date.parse(l.date)||0)>since),scripts,samples,models,trans,custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,updatedAt:S.updatedAt}}
 function fullPayload(){return {log:S.log,scripts:S.scripts,samples:S.samples||{},models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,updatedAt:S.updatedAt}}
 function packStateSync(){return "r"+b64u(new TextEncoder().encode(JSON.stringify(syncPayload())).buffer)}
-async function packState(){const json=JSON.stringify(syncPayload());
-  const bytes=new TextEncoder().encode(json);
+const SYNC_LIM=180000;
+async function packJSON(obj){const bytes=new TextEncoder().encode(JSON.stringify(obj));
   if("CompressionStream" in window){const cs=new CompressionStream("deflate-raw");const w=cs.writable.getWriter();w.write(bytes);w.close();const buf=await new Response(cs.readable).arrayBuffer();return "z"+b64u(buf)}
   return "r"+b64u(bytes.buffer)}
+async function packState(){let p=syncPayload();let c=await packJSON(p);
+  const shrink=[o=>Object.assign({},o,{analysis:null}),
+    o=>Object.assign({},o,{log:(o.log||[]).map((l,i,a)=>i<a.length-10?(()=>{const x=Object.assign({},l);delete x.a;delete x.model;delete x.pq;delete x.str;return x})():l)}),
+    o=>Object.assign({},o,{log:(o.log||[]).slice(-60)})];
+  for(const f of shrink){if(c.length<=SYNC_LIM)break;p=f(p);c=await packJSON(p)}
+  return c}
 const HASH_SEEN=location.hash.slice(0,3);
 async function parseCode(t){t=(t||"").replace(/^.*#s_/,"").replace(/[\s\u200b"'“”‘’]/g,"");if(!t)throw new Error("비어 있음");if(/^[ZR]/.test(t))t=t[0].toLowerCase()+t.slice(1);
   const head=t.slice(0,4)+"… "+t.length+"자";let o;
@@ -409,10 +415,10 @@ async function parseCode(t){t=(t||"").replace(/^.*#s_/,"").replace(/[\s\u200b"'�
 async function unpackState(t){const kind=t[0];const u=unb64u(t.slice(1));let bytes=u;
   if(kind==="z"){const ds=new DecompressionStream("deflate-raw");const w=ds.writable.getWriter();w.write(u);w.close();bytes=new Uint8Array(await new Response(ds.readable).arrayBuffer())}
   return JSON.parse(new TextDecoder().decode(bytes))}
-function webUrl(mode="s"){let code=(syncCode&&syncCodeAt>=(S.updatedAt||0))?syncCode:packStateSync();const LIM=180000;
+function webUrl(mode="s"){let code=(syncCode&&syncCodeAt>=(S.updatedAt||0))?syncCode:packStateSync();const LIM=SYNC_LIM;
   if(code.length>LIM){const bak=S;S=Object.assign({},bak,{log:bak.log.slice(-60),analysis:null});code=packStateSync();S=bak;if(code.length>LIM)return null}
   return WEB_URL+"#"+mode+"_"+code}
-function webLink(label,cls,mode="s"){const url=webUrl(mode);if(!url)return h("button",{class:cls,onclick:()=>toast("기록이 너무 커서 링크로 못 보내요. 설정의 기록 코드를 사용해 주세요")},label);
+function webLink(label,cls,mode="s"){const url=webUrl(mode);if(!url){prepSyncCode();return h("a",{class:cls,href:"#","data-weblink":mode,style:"text-decoration:none;white-space:nowrap",target:"_blank",rel:"noopener",onclick:e=>{if(e.currentTarget.getAttribute("href")==="#"){e.preventDefault();toast("보낼 기록을 준비하는 중이에요. 1–2초 뒤 다시 눌러 주세요");prepSyncCode()}else{S.syncedAt=Date.now();S.syncFull=false;save()}}},label)}
   return h("a",{class:cls,href:url,"data-weblink":mode,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",onclick:()=>{S.syncedAt=Date.now();S.syncFull=false;save();setTimeout(()=>toast(mode==="x"?"통합이 끝나면 '완료' 화면이 떠요. 그다음 홈 화면 앱을 열면 반영돼 있어요":"웹 앱이 열리면 로그인 후 자동으로 통합돼요"),200)}},label)}
 function syncToWeb(){try{const url=webUrl();if(!url){toast("기록이 너무 커서 링크로 못 보내요. 설정의 기록 코드를 사용해 주세요");return}
   const w=window.open(url,"_blank","noopener");S.syncedAt=Date.now();save();toast(w?"웹 앱이 열리면 로그인 후 자동으로 통합돼요":"팝업이 차단됐어요. 브라우저에서 팝업을 허용해 주세요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
