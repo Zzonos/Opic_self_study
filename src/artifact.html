@@ -954,23 +954,54 @@ function vAnalysis(m){const a=analyze();
       h("p",{class:"small"},"최근 10회 중 "+tgt()+" 이상 "+Math.round(a.pIM3*100)+"%"+(a.mocks?" · 모의시험 최근 "+a.mockN+"회 중 "+tgt()+" 이상 "+a.mockHit+"회":" · 모의시험 기록 없음")),
       h("p",{class:"muted small"},a.pIM3>=0.7&&a.mockHit>=2?"실전에서도 "+tgt()+"가 안정적으로 나오는 구간이에요. 시험 접수를 고려해도 좋아요.":a.pIM3>=0.4?tgt()+"가 절반쯤 나와요. 약한 유형을 집중하면 안정권에 들어갑니다.":"아직 목표("+tgt()+") 아래가 많아요. "+(tgt()==="IM3"?"답변 구조(되받기 → 디테일 2–3개 → 마무리)와 과거시제부터 잡아 보세요.":tgt()==="IH"?"돌발 질문 대응과 과거·현재 비교, 시제 전환을 집중하세요.":"의견을 이유와 반론으로 뒷받침하는 연습과 가정법·관용 표현을 늘리세요.")),
       h("p",{class:"muted small"},"AI 판정은 추정치라 실제 등급과 ±1단계 차이가 날 수 있어요. 범위로 보세요.")),
+    coachCard(a),
     h("div",{class:"card"},h("h3",{},"주간 추세"),a.weekly.length>1?chart(a.weekly.map(w=>({date:w.k,level:LEVELS[Math.round(w.avg)]}))):h("p",{class:"muted small"},"2주 이상 기록되면 추세가 보여요."),
       h("div",{class:"list"},...a.weekly.slice(-4).reverse().map(w=>h("div",{class:"li"},h("span",{class:"d"},w.k.slice(5)+"주"),h("span",{class:"grow small"},w.n+"회 · "+Math.round(w.min)+"분"),lvChip(LEVELS[Math.round(w.avg)]))))),
     h("div",{class:"card"},h("h3",{},"유형별 평균 레벨"),h("p",{class:"muted small"},"아래쪽일수록 약한 유형. 점선이 "+tgt()+" 목표."),barChart(a.byType,r=>QTN[r.k]||r.k),
       a.byType.length?h("p",{class:"small"},h("b",{},"가장 약한 유형: "),QTN[a.byType[0].k]||a.byType[0].k," (",LEVELS[Math.round(a.byType[0].avg)],") → 이번 주엔 이 유형을 하루 1개 더 연습해 보세요."):null),
     h("div",{class:"card"},h("h3",{},"최근 교정 내역 ("+a.fixes.length+")"),a.fixes.length?h("div",{class:"list"},...a.fixes.slice(-12).reverse().map(f=>h("div",{class:"fix"},f.o?h("span",{class:"o"},f.o):null,f.b?h("span",{class:"b"},f.b):null,h("span",{class:"w"},f.w+" · "+f.date.slice(5))))):h("p",{class:"muted small"},"교정 내역은 이 버전부터 저장돼요. AI 평가·대화를 하면 여기에 쌓입니다."),
-      coachCard(a)),
+),
   );
 }
 function coachCard(a){const cached=S.analysis;const fresh=cached&&(Date.now()-(cached.ts||0))<7*864e5;
-  const box=h("div",{style:"display:flex;flex-direction:column;gap:8px"});
-  const show=r=>{box.replaceChildren(h("p",{class:"eyebrow"},"AI 코치 · "+new Date(r.ts).toLocaleDateString("ko-KR")),r.categories?.length?h("div",{class:"kx"},...r.categories.map(c=>h("div",{},h("span",{class:"en"},c.name+" ×"+c.count),h("span",{class:"ko"},c.tip)))):null,h("p",{},r.comment||""),r.plan?.length?h("ul",{style:"margin:0;padding-left:18px"},...r.plan.map(x=>h("li",{class:"small"},x))):null)};
-  if(fresh)show(cached);
-  const btn=h("button",{class:"btn",disabled:!sample,onclick:async()=>{btn.disabled=true;btn.textContent="분석 중…";try{
-    const data={expected:LEVELS[Math.round(a.mean)],range:[LEVELS[a.lo],LEVELS[a.hi]],trend:a.trend,pIM3:a.pIM3,byType:a.byType.map(x=>({type:QTN[x.k]||x.k,avg:LEVELS[Math.round(x.avg)],n:x.n})),weekly:a.weekly.map(w=>({week:w.k,avg:LEVELS[Math.round(w.avg)],n:w.n,minutes:Math.round(w.min)})),fixes:a.fixes.slice(-30).map(f=>f.o?f.o+" → "+f.b+" ("+f.w+")":f.w)};
-    const r=await sample.json(`You are an OPIc coach for a Korean learner (target ${tgt()}). Here is their progress data (JSON):\n${JSON.stringify(data)}\n\nReply with ONLY JSON: {"categories":[{"name":"실수 유형 (한국어, 예: 과거시제, 관사, 연결어 부족)","count":3,"tip":"한 줄 교정 팁"}],"comment":"한국어 종합 코멘트 3-4문장 (현재 수준, 추세, 가장 중요한 한 가지)","plan":["다음 주 처방 3개, 각 한 줄, 구체적으로"]}\nGroup the fixes into at most 5 categories. Be concrete and encouraging but honest.`,{cache:false});
-    r.ts=Date.now();S.analysis=r;save();show(r);btn.textContent="다시 분석"}catch(e){toast(errMsg(e));btn.textContent="AI 코치 분석"}finally{btn.disabled=false}}},fresh?"다시 분석":"AI 코치 분석 (실수 유형 + 다음 주 처방)");
-  return h("div",{style:"display:flex;flex-direction:column;gap:10px;margin-top:6px"},box,h("div",{class:"row"},btn,sample?null:h("span",{class:"muted small"},"Claude에서 열면 AI 코치 분석이 가능해요")))}
+  const box=h("div",{style:"display:flex;flex-direction:column;gap:12px"});let intro=null;
+  const sec=(t,...k)=>h("div",{style:"display:flex;flex-direction:column;gap:6px"},h("p",{class:"eyebrow"},t),...k);
+  const show=r=>{const old=!r.headline&&!r.gap;box.replaceChildren(...[
+    h("p",{class:"muted small"},"분석 "+new Date(r.ts).toLocaleDateString("ko-KR")+(old?" · 예전 형식 — '다시 분석'을 누르면 상세 코칭으로 바뀌어요":"")),
+    r.headline?h("p",{style:"font-weight:700;font-size:16px;line-height:1.45"},r.headline):null,
+    r.gap?sec("목표 "+tgt()+"까지 남은 것",h("p",{class:"small"},r.gap)):null,
+    (r.strengths||[]).length?sec("지금 잘하고 있는 것",...r.strengths.map(x=>h("p",{class:"small"},"✓ "+x))):null,
+    (r.categories||[]).length?sec("반복되는 실수",...r.categories.map(c=>h("div",{class:"fix"},h("span",{class:"b"},c.name+(c.count?" ×"+c.count:"")),c.example&&(c.example.o||c.example.b)?h("span",{class:"small"},h("span",{class:"o"},c.example.o||"")," → ",h("b",{},c.example.b||"")):null,h("span",{class:"w"},c.tip||"")))):null,
+    (r.habits||[]).length?sec("말버릇·습관",...r.habits.map(x=>h("p",{class:"small"},"• "+x))):null,
+    (r.type_tips||[]).length?sec("약한 유형 공략",...r.type_tips.map(t=>h("div",{class:"card",style:"padding:10px 12px;gap:4px"},h("b",{class:"small"},t.type),h("p",{class:"small"},t.tip||""),t.template?h("p",{class:"small mono",style:"white-space:pre-wrap;color:var(--accent)"},t.template):null))):null,
+    (r.plan||[]).length?sec("다음 7일 처방",...r.plan.map(x=>typeof x==="string"?h("p",{class:"small"},"• "+x):h("div",{class:"li"},h("span",{class:"d"},x.day||""),h("span",{class:"grow small"},x.task||""),x.minutes?h("span",{class:"muted small"},x.minutes+"분"):null))):null,
+    (r.drills||[]).length?sec("입에 붙일 문장",...r.drills.map(d=>h("div",{class:"row",style:"flex-wrap:nowrap;align-items:flex-start"},h("div",{class:"grow"},h("p",{class:"small",style:"font-weight:600"},d.en||""),d.ko?h("p",{class:"muted small"},d.ko):null),d.en?spkBtn(d.en):null))):null,
+    (r.comment&&!r.headline)?h("p",{},r.comment):null].filter(Boolean));if(intro)intro.hidden=true};
+  if(cached)show(cached);
+  const prog=h("span",{class:"muted small"});
+  const btn=h("button",{class:"btn primary",disabled:!sample,onclick:async()=>{btn.disabled=true;btn.textContent="분석 중…";try{
+    const recent=S.log.filter(l=>l.kind==="practice"&&l.a).slice(-8).map(l=>({q:l.q||l.title,level:l.level,answer:String(l.a).slice(0,600),summary:l.sum||""}));
+    const data={target:tgt(),expected:LEVELS[Math.round(a.mean)],range:[LEVELS[a.lo],LEVELS[a.hi]],trend:a.trend,targetRate:a.pIM3,byType:a.byType.map(x=>({type:QTN[x.k]||x.k,avg:LEVELS[Math.round(x.avg)],n:x.n})),weekly:a.weekly.map(w=>({week:w.k,avg:LEVELS[Math.round(w.avg)],n:w.n,minutes:Math.round(w.min)})),fixes:a.fixes.slice(-40).map(f=>f.o?f.o+" → "+f.b+" ("+f.w+")":f.w),recentAnswers:recent};
+    const r=await sample.json(`You are an experienced OPIc rater and personal speaking coach for a Korean learner. Target level: ${tgt()} (${spec().desc}).
+Learner profile: ${profileText()}
+Progress data (JSON):
+${JSON.stringify(data)}
+
+Write detailed, specific coaching in Korean, grounded ONLY in this data — quote the learner's own phrases from fixes/recentAnswers as evidence. No generic advice.
+Reply with ONLY one JSON object:
+{"headline":"한 줄 진단 (현재 레벨·추세·핵심 과제)",
+"gap":"현재 예상 레벨에서 목표 ${tgt()}로 가려면 무엇이 부족한지 3-4문장. OPIc 채점 기준(문장 길이·연결, 시제, 디테일, 돌발 대응 등)으로 구체적으로",
+"strengths":["데이터에 근거한 잘하는 점 2-3개"],
+"categories":[{"name":"실수 유형 (예: 과거시제 누락)","count":3,"tip":"고치는 요령 한두 문장","example":{"o":"학습자가 실제로 쓴 표현","b":"고친 표현"}}],
+"habits":["답변에서 보이는 말버릇·패턴 (반복 단어, 짧은 문장 나열, 마무리 없음 등) 2-3개, 각각 대안 포함"],
+"type_tips":[{"type":"가장 약한 유형 이름","tip":"이 유형에서 점수를 올리는 방법 2-3문장","template":"그대로 써먹을 영어 답변 뼈대 3-5줄 (빈칸은 ___)"}],
+"plan":[{"day":"1일차","task":"구체적인 할 일 (앱의 연습/대화/듣기/표현카드 기능을 활용)","minutes":30}],
+"drills":[{"en":"이 학습자의 약점을 메우는 자연스러운 영어 문장","ko":"뜻"}]}
+categories at most 5 (most frequent first), type_tips for the 1-2 weakest types, plan exactly 7 days of ~30 minutes, drills 5 sentences at ${tgt()} level.`,{cache:false,onText:({text})=>{prog.textContent="작성 중… "+(text||"").length+"자"}});
+    r.ts=Date.now();S.analysis=r;save();show(r);btn.textContent="다시 분석";prog.textContent=""}catch(e){toast(errMsg(e));btn.textContent="AI 코치 분석";prog.textContent=""}finally{btn.disabled=false}}},cached?"다시 분석":"AI 코치 분석 받기");
+  return h("div",{class:"card"},h("div",{class:"hdr"},h("h3",{},"AI 코치"),fresh?h("span",{class:"chip good"},"최근 분석"):cached?h("span",{class:"chip warn"},"1주 이상 지남"):null),
+    cached?null:(intro=h("p",{class:"muted small"},"내 기록·교정·최근 답변을 바탕으로 목표까지의 차이, 반복 실수, 약한 유형 공략법, 7일 처방, 연습 문장을 만들어요.")),
+    box,h("div",{class:"row"},btn,prog,sample?null:h("span",{class:"muted small"},"Claude에서 열면 AI 코치 분석이 가능해요")))}
 
 /* ---- CHAT (AI 회화) ---- */
 const SCEN=[
