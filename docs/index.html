@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261012-192427-ff006f">
+<html lang="ko" data-build="20261012-192635-d951ac">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -468,7 +468,9 @@ function cloudInit(){if(!window.firebase?.initializeApp||!window.firebase?.auth)
 async function cloudAttach(u){cloud.user=u;cloud.ref=firebase.firestore().collection("users").doc(u.uid);try{await cloudPull(true)}catch(e){toast("클라우드 기록을 불러오지 못했어요: "+(e.code||e.message))}clipIdxLoad();
   setTimeout(applyPendingSync,300);
   if(cloud.unsub)cloud.unsub();cloud.unsub=cloud.ref.onSnapshot(snap=>{if(!snap.exists||snap.metadata.hasPendingWrites)return;cloudApply(snap.data())});}
-function cloudApply(d){if(!d)return;if((d.updatedAt||0)>cloud.lastPush&&(d.updatedAt||0)>(S.updatedAt||0)){try{mergeState(JSON.parse(d.state||"{}"),true);render();toast("계정의 새 기록을 반영했어요")}catch(e){}}}
+// another device (or the Claude → web sync page) saved: always merge — never skip because this copy was touched more recently,
+// otherwise this copy would later push its older scripts/records over the account
+function cloudApply(d){if(!d)return;if((d.updatedAt||0)===cloud.lastPush)return;try{const before=JSON.stringify(S);mergeState(JSON.parse(d.state||"{}"),true);if(JSON.stringify(S)!==before){render();toast("계정의 새 기록을 반영했어요");if((S.updatedAt||0)>(d.updatedAt||0))cloudPush(false)}}catch(e){}}
 // foreground refresh: the realtime listener can be asleep after the app was in the background
 async function cloudRefresh(){try{if(cloud.ref){const snap=await cloud.ref.get({source:"server"});if(snap.exists)cloudApply(snap.data())}
   if(docRef){const [m,sc,tr]=await Promise.all([docRef.main.get(),docRef.scripts.get(),docRef.trans.get()]);if(m.exists){const remote=JSON.parse(JSON.stringify(Object.assign({},m.data(),sc.exists?sc.data():{},{trans:(tr.exists&&tr.data().t)||{}})));/* db data is frozen: work on a copy */if((remote.updatedAt||0)>(S.updatedAt||0)){mergeState(remote,true);render();toast("다른 기기의 기록을 반영했어요")}}}}catch(e){}}
@@ -478,7 +480,8 @@ const HIST={};const hasDet=l=>!!(l&&(l.a||l.model||(l.pq&&l.pq.length)));
 async function histArchive(){if(!cloud.ref)return;for(const l of S.log){if(!l.ts||l.ar||!hasDet(l))continue;try{await cloud.ref.collection("meta").doc("h_"+l.ts).set({l:JSON.stringify(l),t:l.ts});l.ar=true;HIST[l.ts]=l}catch(e){break}}}
 function histLoad(ts){if(HIST[ts]||!cloud.ref)return Promise.resolve(HIST[ts]||null);return cloud.ref.collection("meta").doc("h_"+ts).get().then(d=>{if(!d.exists)return null;const l=JSON.parse(d.data().l||"null");HIST[ts]=l;return l}).catch(()=>null)}
 function cloudState(){const o=Object.assign({},S);const keep=S.log.length-40;o.log=S.log.map((l,i)=>i<keep&&l.ar&&hasDet(l)?(()=>{const c=Object.assign({},l);delete c.a;delete c.model;delete c.pq;delete c.str;return c})():l);return JSON.stringify(o)}
-async function cloudPush(now){if(!cloud.ref)return;clearTimeout(cloud.pushT);const doIt=async()=>{try{cloud.lastPush=S.updatedAt||Date.now();await histArchive();await cloud.ref.set({state:cloudState(),updatedAt:cloud.lastPush,email:cloud.user?.email||""},{merge:true});const el=$("#syncst");if(el)el.textContent="동기화됨 "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}catch(e){const el=$("#syncst");if(el)el.textContent="동기화 실패: "+(e.code||e.message)}};
+async function cloudPush(now){if(!cloud.ref)return;clearTimeout(cloud.pushT);const doIt=async()=>{try{/* merge what another device saved first, so this push never overwrites it */try{const snap=await cloud.ref.get({source:"server"});if(snap.exists){const d=snap.data();if(d.updatedAt&&d.updatedAt!==cloud.lastPush&&d.state)mergeState(JSON.parse(d.state),true)}}catch(e){}
+    cloud.lastPush=S.updatedAt||Date.now();await histArchive();await cloud.ref.set({state:cloudState(),updatedAt:cloud.lastPush,email:cloud.user?.email||""},{merge:true});const el=$("#syncst");if(el)el.textContent="동기화됨 "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}catch(e){const el=$("#syncst");if(el)el.textContent="동기화 실패: "+(e.code||e.message)}};
   if(now)await doIt();else cloud.pushT=setTimeout(doIt,1500)}
 function cloudErr(e){const m={"auth/invalid-email":"이메일 형식을 확인해 주세요","auth/user-not-found":"가입되지 않은 이메일이에요","auth/wrong-password":"비밀번호가 틀렸어요","auth/invalid-credential":"이메일 또는 비밀번호가 틀렸어요","auth/email-already-in-use":"이미 가입된 이메일이에요. 로그인해 주세요","auth/weak-password":"비밀번호는 6자 이상이어야 해요","auth/too-many-requests":"시도가 너무 많아요. 잠시 후 다시","auth/network-request-failed":"인터넷 연결을 확인해 주세요","permission-denied":"초대 코드가 틀렸어요"};return m[e?.code]||(e?.message||"오류가 났어요")}
 let INV_CODE="";try{const mm=/^#inv_([A-Za-z0-9_-]{3,40})$/.exec(location.hash);if(mm){INV_CODE=mm[1];history.replaceState(null,"",location.pathname+location.search)}}catch(e){}
