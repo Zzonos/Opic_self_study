@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261012-112204-00470c">
+<html lang="ko" data-build="20261012-154300-5d4d06">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1192,9 +1192,11 @@ function playerStart(resume){if(!tts.ok&&!Object.keys(AUD.man).length){toast("�
 function playerStop(){try{localStorage.removeItem("opic30_pos")}catch(e){}player.on=false;player.paused=false;clearTimeout(player.t);player.t=null;ttsStop();wakeLock(false);keepAlive(false);try{navigator.mediaSession.playbackState="none"}catch(e){}renderMini();if(view==="listen")render()}
 function playerPause(){if(!player.on)return;player.paused=!player.paused;clearTimeout(player.t);player.t=null;if(player.paused){audStop();if(tts.ok)speechSynthesis.cancel();keepAlive(false)}else{keepAlive(true);playerStep()}mediaSession();renderMini();if(view==="listen")render()}
 // previous: like a music player — restart the current item if it is already under way, otherwise go back one item
-function playerPrev(){if(!player.on)return;clearTimeout(player.t);player.t=null;audStop();if(tts.ok)speechSynthesis.cancel();
-  if(player.si<=1&&!player.loop&&player.items.length>1)player.i=(player.i-1+player.items.length)%player.items.length;player.loop=0;player.segs=[];player.si=0;player.paused=false;playerStep();renderMini();if(view==="listen")render()}
-function playerNext(){player.loop=0;if(!player.on)return;clearTimeout(player.t);player.t=null;audStop();if(tts.ok)speechSynthesis.cancel();player.i=(player.i+1)%player.items.length;player.segs=[];player.si=0;player.paused=false;playerStep()}
+function audSoftStop(){audCb=null;try{const a=AUD.el;if(a){a.onended=null;a.onerror=null;a.pause()}}catch(e){}}
+function playerKick(){setTimeout(()=>{if(!player.on||player.paused)return;const a=AUD.el;const playing=a&&!a.paused&&!a.ended&&a.src;if(playing||player.t||player.busy||(tts.ok&&speechSynthesis.speaking))return;audLog.push("이동 후 재생 재시도");if(a&&a.src&&a.paused&&!a.ended&&a.currentTime>0.05)a.play().catch(()=>playerStep());else playerStep()},1500)}
+function playerPrev(){if(!player.on)return;clearTimeout(player.t);player.t=null;audSoftStop();if(tts.ok&&speechSynthesis.speaking)speechSynthesis.cancel();keepAlive(true);
+  if(player.si<=1&&!player.loop&&player.items.length>1)player.i=(player.i-1+player.items.length)%player.items.length;player.loop=0;player.segs=[];player.si=0;player.paused=false;playerStep();playerKick();renderMini();if(view==="listen"&&!document.hidden)render()}
+function playerNext(){player.loop=0;if(!player.on)return;clearTimeout(player.t);player.t=null;audSoftStop();if(tts.ok&&speechSynthesis.speaking)speechSynthesis.cancel();keepAlive(true);player.i=(player.i+1)%player.items.length;player.segs=[];player.si=0;player.paused=false;playerStep();playerKick();renderMini()}
 function silenceSegs(sec){const out=[];let left=Math.floor(sec+0.001);for(const d of [20,10,5,3,2,1]){while(left>=d){out.push({t:"file",src:"audio/silence_"+d+".mp3",rate:1});left-=d}}const frac=Math.round((sec-Math.floor(sec+0.001))*1000);if(frac>=100)out.push({t:"wait",ms:frac});return out}
 const koR=()=>Math.min(1.5,Math.max(0.8,+player.opts.koRate||1.2));
 function buildSegs(it){const o=player.opts;const segs=[];const src=audSrc(it.key);const sents=splitSent(it.en);const inf=(+o.repeat)===0;const ko=o.ko!=="off"&&!(inf&&player.loop>0);const n=inf?1:Math.max(1,o.repeat|0);const pause=Math.max(0,+o.pause||0);
@@ -1264,7 +1266,7 @@ document.addEventListener("visibilitychange",()=>{if(document.visibilityState!==
     if(a&&a.src&&a.paused&&!a.ended&&a.currentTime>0.2){audLog.push("복귀: 멈춘 지점부터 이어서");a.play().catch(()=>{playerStep()});return}
     audLog.push("복귀: 현재 문장 다시");playerStep()},800)});
 // watchdog: if speech silently died (common after screen lock), restart the current sentence
-setInterval(()=>{if(!player.on||player.paused||player.t||player.busy||document.hidden)return;const a=AUD.el;const filePlaying=a&&!a.paused&&!a.ended&&a.src;if(a&&a.src&&a.paused&&!a.ended&&a.currentTime>0.2){a.play().catch(()=>{});return}const ttsBusy=tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending);if(!filePlaying&&!ttsBusy){playerStep()}},4000);
+setInterval(()=>{if(!player.on||player.paused||player.t||player.busy)return;const a=AUD.el;const filePlaying=a&&!a.paused&&!a.ended&&a.src;if(a&&a.src&&a.paused&&!a.ended&&a.currentTime>0.2){a.play().catch(()=>{});return}if(document.hidden&&a&&a.src&&!a.ended&&!a.paused)return;const ttsBusy=tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending);if(!filePlaying&&!ttsBusy){playerStep()}},4000);
 function renderMini(){const m=$("#mini");if(!player.on){m.hidden=true;return}m.hidden=false;const it=player.items[player.i]||{};
   m.replaceChildren(h("span",{class:"now"},(player.paused?"⏸ ":"▶ ")+(it.label||"")+" — "+(it.en||"")),h("button",{onclick:playerPrev},"이전"),h("button",{onclick:playerPause},player.paused?"재생":"일시정지"),h("button",{onclick:playerNext},"다음"),h("button",{onclick:playerStop},"끄기"))}
 function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[player.i]||{};const seg=player.cur||{};
