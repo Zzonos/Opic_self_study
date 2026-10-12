@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261012-192635-d951ac">
+<html lang="ko" data-build="20261012-193003-f6c6f0">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -406,7 +406,15 @@ function ensureToday(){if(S.today.date!==todayStr()){S.today={date:todayStr(),ca
 const WEB_URL="https://zzonos.github.io/Opic_self_study/";
 const b64u=b=>{const u=new Uint8Array(b);let bin="";for(let i=0;i<u.length;i+=0x8000)bin+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")};
 const unb64u=t=>{t=t.replace(/-/g,"+").replace(/_/g,"/");t+="=".repeat((4-t.length%4)%4);const bin=atob(t);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u};
-function syncPayload(){return {log:S.log,scripts:S.scripts,samples:S.samples||{},models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,updatedAt:S.updatedAt}}
+function syncPayload(){if(!S.syncedAt||S.syncFull)return fullPayload();
+  const since=S.syncedAt-7*86400e3;const st=x=>x?(x.ts||(x.date?Date.parse(x.date):0)||0):0;
+  const pick=o=>Object.fromEntries(Object.entries(o||{}).filter(([k,v])=>st(v)>since));
+  const scripts=pick(S.scripts),samples=pick(S.samples);const models=Object.fromEntries(Object.entries(S.models||{}).filter(([q])=>((S.modelsAt||{})[q]||0)>since));
+  let trans={};if((S.transAllAt||0)>since)trans=S.trans||{};else{const sents=new Set();const add=t=>splitSent(t).forEach(x=>sents.add(x));
+    for(const sc of [...Object.values(scripts),...Object.values(samples)])for(const x of (sc.scripts||[]))add(x&&x.answer);for(const m of Object.values(models))add(m);
+    for(const x of sents)if(S.trans[x])trans[x]=S.trans[x]}
+  return {delta:true,log:S.log.filter(l=>(l.ts||Date.parse(l.date)||0)>since),scripts,samples,models,trans,custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,updatedAt:S.updatedAt}}
+function fullPayload(){return {log:S.log,scripts:S.scripts,samples:S.samples||{},models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,updatedAt:S.updatedAt}}
 function packStateSync(){return "r"+b64u(new TextEncoder().encode(JSON.stringify(syncPayload())).buffer)}
 async function packState(){const json=JSON.stringify(syncPayload());
   const bytes=new TextEncoder().encode(json);
@@ -424,13 +432,13 @@ function webUrl(mode="s"){let code=(syncCode&&syncCodeAt>=(S.updatedAt||0))?sync
   if(code.length>LIM){const bak=S;S=Object.assign({},bak,{log:bak.log.slice(-60),analysis:null});code=packStateSync();S=bak;if(code.length>LIM)return null}
   return WEB_URL+"#"+mode+"_"+code}
 function webLink(label,cls,mode="s"){const url=webUrl(mode);if(!url)return h("button",{class:cls,onclick:()=>toast("기록이 너무 커서 링크로 못 보내요. 설정의 기록 코드를 사용해 주세요")},label);
-  return h("a",{class:cls,href:url,"data-weblink":mode,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",onclick:()=>{S.syncedAt=Date.now();save();setTimeout(()=>toast(mode==="x"?"통합이 끝나면 '완료' 화면이 떠요. 그다음 홈 화면 앱을 열면 반영돼 있어요":"웹 앱이 열리면 로그인 후 자동으로 통합돼요"),200)}},label)}
+  return h("a",{class:cls,href:url,"data-weblink":mode,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",onclick:()=>{S.syncedAt=Date.now();S.syncFull=false;save();setTimeout(()=>toast(mode==="x"?"통합이 끝나면 '완료' 화면이 떠요. 그다음 홈 화면 앱을 열면 반영돼 있어요":"웹 앱이 열리면 로그인 후 자동으로 통합돼요"),200)}},label)}
 function syncToWeb(){try{const url=webUrl();if(!url){toast("기록이 너무 커서 링크로 못 보내요. 설정의 기록 코드를 사용해 주세요");return}
   const w=window.open(url,"_blank","noopener");S.syncedAt=Date.now();save();toast(w?"웹 앱이 열리면 로그인 후 자동으로 통합돼요":"팝업이 차단됐어요. 브라우저에서 팝업을 허용해 주세요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
 function unsyncedCount(){const t=S.syncedAt||0;return S.log.filter(l=>(l.ts||0)>t||(!l.ts&&t===0)).length}
 function syncCard(){if(window.claude?.use===undefined)return null;const n=unsyncedCount();
   return h("div",{class:"card"},h("h3",{},"웹으로 통합"),h("p",{class:"muted small"},"여기(Claude)가 기본 저장소예요. '웹으로 통합'은 웹 계정에 저장만 하고 완료 화면을 띄우고(처음 한 번은 로그인 필요), '통합하고 웹 열기'는 저장 후 웹 앱에 머물러요. 웹 → Claude 방향은 Claude가 링크 데이터를 전달하지 않아 아래 '기록 코드'로만 가능해요."),
-    h("div",{class:"row"},webLink("웹으로 통합"+(n?" (새 기록 "+n+"건)":""),"btn primary","x"),webLink("통합하고 웹 열기 →","btn","s"),S.syncedAt?h("span",{class:"muted small"},"마지막 전송 "+new Date(S.syncedAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})):null))}
+    h("div",{class:"row"},webLink("웹으로 통합"+(n?" (새 기록 "+n+"건)":""),"btn primary","x"),webLink("통합하고 웹 열기 →","btn","s"),h("button",{class:"btn sm ghost",onclick:()=>{S.syncFull=true;save();toast("다음 '웹으로 통합'은 전체 기록을 보내요 (링크가 길어져요)");render()}},S.syncFull?"전체 보내기 예약됨":"전체 기록 보내기"),S.syncedAt?h("span",{class:"muted small"},"마지막 전송 "+new Date(S.syncedAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})):null))}
 // web side: pick up a payload from the URL hash and merge it once signed in (or right away without an account)
 let pendingSync=null;
 let syncClose=false;
@@ -901,7 +909,7 @@ function vAnswer(m,s){
     evalBtn.disabled=true;stopBtn.hidden=false;ctl=new AbortController();
     fbBox.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"Claude가 평가 중… (10–40초)")));
     try{const prog=fbBox.querySelector(".thinking span");const r=await evaluate(q.q,a,secs||Math.round(a.split(/\s+/).length/2.3),({text})=>{if(prog)prog.textContent="Claude가 평가 작성 중… "+(text||"").length+"자"});
-      renderFeedback(fbBox,r,q.q,a);if(r.model_target){S.models=S.models||{};S.models[q.q]=r.model_target}
+      renderFeedback(fbBox,r,q.q,a);if(r.model_target){S.models=S.models||{};S.models[q.q]=r.model_target;S.modelsAt=S.modelsAt||{};S.modelsAt[q.q]=Date.now()}
       S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",qt:q.t,tid:topic.id,q:q.q,a,sum:r.summary||"",str:(r.strengths||[]).slice(0,3),model:r.model_target||"",title:topic.en+" · "+(s.kind||""),level:r.level,score:r.score,secs:secs||0,fixes:(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}))});S.today.practice++;save();
       const nextRp=s.rp&&s.step<13?h("button",{class:"btn primary",onclick:()=>{const st=s.step+1;go("practice",{topic,q:{t:"rp",q:s.rp["q"+st]},kind:"롤플레이 "+st+"번 · "+(st===12?"문제 해결":"관련 경험"),rp:s.rp,step:st})}},"다음: "+(s.step+1)+"번 →"):null;
       put(fbBox,h("div",{class:"row"},nextRp,h("button",{class:"btn",onclick:()=>{ta.value="";ta._timed=false;startBtn.textContent="말하기 시작";fbBox.replaceChildren();secs=0;tEl.textContent="0:00";bar.firstChild.style.width="0";evalBtn.disabled=false}},"같은 질문 다시"),h("button",{class:"btn",onclick:()=>go("practice")},"다른 질문")));
@@ -1291,7 +1299,7 @@ function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[pla
     b.replaceChildren(...[head,qBox,enP,koP,silent?h("span",{class:"small",style:"color:var(--accent)"},"⏱ 따라 말하기 / 생각하기 "+pauseLeft.toFixed(pauseLeft%1?1:0)+"초"):null].filter(Boolean));return}
   b.replaceChildren(...[head,h("span",{class:"en"},en||it.en||""),ko?h("span",{class:"muted small"},ko):h("span",{class:"muted small"},"(해석 없음)"),silent?h("span",{class:"small",style:"color:var(--accent)"},"⏱ 따라 말하기 / 생각하기 "+pauseLeft.toFixed(pauseLeft%1?1:0)+"초"):null,it.ex?h("span",{class:"small",style:"color:var(--accent);margin-top:4px"},"예) "+it.ex):null].filter(Boolean))}
 function transBtn(){const all=[...new Set(transSources().flatMap(g=>g.sents))];const missing=all.filter(x=>!S.trans[x]);const old=(S.transVer||1)<TRANS_VER?all.filter(x=>S.trans[x]):[];
-  const run=async(b,list,force,label)=>{b.disabled=true;try{await translateSents(list,(d,t)=>b.textContent=`${label} ${d}/${t}`,force);if(force||!old.length)S.transVer=TRANS_VER;save();toast("해석을 만들었어요");render()}catch(e){toast(errMsg(e));b.disabled=false}};
+  const run=async(b,list,force,label)=>{b.disabled=true;try{await translateSents(list,(d,t)=>b.textContent=`${label} ${d}/${t}`,force);if(force||!old.length)S.transVer=TRANS_VER;S.transAllAt=Date.now();save();toast("해석을 만들었어요");render()}catch(e){toast(errMsg(e));b.disabled=false}};
   if(!missing.length&&!old.length)return h("span",{class:"chip good"},"해석 준비됨 ✓");
   if(!sample)return h("span",{class:"muted small"},(missing.length?"해석 없는 문장 "+missing.length+"개":"해석 개선 가능 "+old.length+"문장")+" — Claude 앱의 듣기 탭에서 만들 수 있어요");
   const out=h("div",{class:"row",style:"flex-wrap:wrap;gap:6px"});
