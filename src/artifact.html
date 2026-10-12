@@ -657,7 +657,11 @@ const EDGE_FRAME=/Edg\//.test(navigator.userAgent)&&window.top!==window.self;
 function pickVoice(){let vs=ttsVoices();let want=null;try{want=localStorage.getItem("opic30_voice")}catch(e){}
   if(EDGE_FRAME){const loc=vs.filter(v=>v.localService&&!/online/i.test(v.name));if(loc.length)vs=loc}
   const sorted=[...vs].sort((a,b)=>vQuality(b)-vQuality(a)||(/en[-_]US/i.test(b.lang)?1:0)-(/en[-_]US/i.test(a.lang)?1:0));
-  return vs.find(v=>vId(v)===want)||vs.find(v=>v.name===want)||sorted[0]||null}
+  // default voice: Tessa (best available variant); applied once over an older saved choice
+  const tessa=[...vs].filter(v=>/tessa/i.test(v.name)).sort((a,b)=>vQuality(b)-vQuality(a))[0]||null;
+  let mig=null;try{mig=localStorage.getItem("opic30_voice_def")}catch(e){}
+  if(tessa&&mig!=="tessa"){try{localStorage.setItem("opic30_voice_def","tessa");localStorage.setItem("opic30_voice",vId(tessa))}catch(e){}return tessa}
+  return vs.find(v=>vId(v)===want)||vs.find(v=>v.name===want)||tessa||sorted[0]||null}
 if(tts.ok){speechSynthesis.onvoiceschanged=()=>{tts.voice=pickVoice();if(view==="listen"||view==="settings")render()};tts.voice=pickVoice()}
 function koVoice(){if(!tts.ok)return null;const vs=speechSynthesis.getVoices().filter(v=>/^ko/i.test(v.lang));return vs.sort((a,b)=>vQuality(b)-vQuality(a))[0]||null}
 function setVoice(id){tts.voice=ttsVoices().find(v=>vId(v)===id)||tts.voice;try{localStorage.setItem("opic30_voice",id)}catch(e){}}
