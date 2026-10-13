@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261012-231531-04723a">
+<html lang="ko" data-build="20261013-104726-200fe1">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -392,7 +392,10 @@ let claudePushT=null,claudeErr=false;
 function claudeParts(){const o=structuredClone(S);const trans=o.trans||{};const scripts={scripts:o.scripts||{},samples:o.samples||{}};delete o.trans;delete o.scripts;delete o.samples;if(o.log&&o.log.length>400)o.log=o.log.slice(-400);if(o.log){const keep=o.log.length-40;o.log=o.log.map((l,i)=>i<keep&&(l.a||l.model||l.pq)?(()=>{const c=Object.assign({},l);delete c.a;delete c.model;delete c.pq;delete c.str;return c})():l)}return {main:o,scripts,trans:{t:trans}}}
 function claudePush(){if(!docRef)return;clearTimeout(claudePushT);claudePushT=setTimeout(async()=>{try{const parts=claudeParts();await Promise.all([docRef.main.set(parts.main),docRef.scripts.set(parts.scripts),docRef.trans.set(parts.trans)]);claudeErr=false;claudeSavedAt=Date.now();const el=$("#csave");if(el)el.textContent=claudeStatus()}catch(e){if(!claudeErr){claudeErr=true;toast("Claude 계정 저장 실패: "+(e.code||e.message||e))}}},800)}
 let claudeSavedAt=0;function claudeStatus(){return claudeSavedAt?"Claude 계정에 저장됨 · "+new Date(claudeSavedAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}):"Claude 계정 저장 대기 중"}
-function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;const key=l=>l.date+"|"+l.kind+"|"+l.title+"|"+(l.score??"");const seen=new Set(S.log.map(key));for(const l of (o.log||[]))if(!seen.has(key(l))){S.log.push(l);seen.add(key(l))}S.log.sort((a,b)=>a.date<b.date?-1:1);
+const logKey=l=>l.date+"|"+l.kind+"|"+l.title+"|"+(l.score??"");
+function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;const key=logKey;
+  if(Array.isArray(o.del)&&o.del.length){const d=new Set(S.del||[]);o.del.forEach(k=>d.add(k));S.del=[...d].slice(-3000)}const dead=new Set(S.del||[]);if(dead.size)S.log=S.log.filter(l=>!dead.has(key(l)));
+  const seen=new Set([...S.log.map(key),...dead]);for(const l of (o.log||[]))if(!seen.has(key(l))){S.log.push(l);seen.add(key(l))}S.log.sort((a,b)=>a.date<b.date?-1:1);
   // newer wins (exact time when known); a record sent from Claude also wins a tie, since scripts are made there
   const stamp=x=>x?(x.ts||(x.date?Date.parse(x.date):0)||0):0;const newer=(v,cur)=>!cur||stamp(v)>stamp(cur)||(!fromCloud&&stamp(v)===stamp(cur)&&JSON.stringify(v)!==JSON.stringify(cur));
   for(const [k,v] of Object.entries(o.scripts||{}))if(newer(v,S.scripts[k]))S.scripts[k]=v;
@@ -413,8 +416,8 @@ function syncPayload(){if(!S.syncedAt||S.syncFull)return fullPayload();
   let trans={};if((S.transAllAt||0)>since)trans=S.trans||{};else{const sents=new Set();const add=t=>splitSent(t).forEach(x=>sents.add(x));
     for(const sc of [...Object.values(scripts),...Object.values(samples)])for(const x of (sc.scripts||[]))add(x&&x.answer);for(const m of Object.values(models))add(m);
     for(const x of sents)if(S.trans[x])trans[x]=S.trans[x]}
-  return {delta:true,log:S.log.filter(l=>(l.ts||Date.parse(l.date)||0)>since),scripts,samples,models,trans,custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,updatedAt:S.updatedAt}}
-function fullPayload(){return {log:S.log,scripts:S.scripts,samples:S.samples||{},models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,updatedAt:S.updatedAt}}
+  return {delta:true,del:S.del||[],log:S.log.filter(l=>(l.ts||Date.parse(l.date)||0)>since),scripts,samples,models,trans,custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,updatedAt:S.updatedAt}}
+function fullPayload(){return {del:S.del||[],log:S.log,scripts:S.scripts,samples:S.samples||{},models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,updatedAt:S.updatedAt}}
 function packStateSync(){return "r"+b64u(new TextEncoder().encode(JSON.stringify(syncPayload())).buffer)}
 const SYNC_LIM=180000;
 async function packJSON(obj){const bytes=new TextEncoder().encode(JSON.stringify(obj));
@@ -838,11 +841,15 @@ function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);if(sub&&sub.history)
 function histFill(l){if(!l||l.kind!=="practice"||l.q)return l;const en=(l.title||"").split(" · ")[0];const t=TOPICS.find(x=>x.en===en);if(!t)return l;
   const qs=t.qs.filter(x=>x.t===l.qt);if(qs.length!==1)return l;const q=qs[0];const model=(S.models||{})[q.q]||"";
   return Object.assign({},l,{q:q.q,tid:t.id,model:l.model||model,modelLatest:!l.model&&!!model,recovered:true})}
+function histDelete(list){const keys=new Set(list.map(logKey));S.del=[...new Set([...(S.del||[]),...keys])].slice(-3000);S.log=S.log.filter(l=>!keys.has(logKey(l)));
+  if(cloud.ref)for(const l of list)if(l.ts)cloud.ref.collection("meta").doc("h_"+l.ts).delete().catch(()=>{});
+  save();toast("기록 "+list.length+"건을 지웠어요");render()}
 function vHistory(m){const KIND={practice:"연습",mock:"모의시험",chat:"대화"};const f=sub.f||"all";const id=l=>l.ts||l.date+l.title;
   const all=S.log.filter(l=>l.kind!=="card"&&(f==="all"||l.kind===f)).slice().reverse();
   const tabs=h("div",{class:"segs"},...[["all","전체"],["practice","연습"],["mock","모의시험"],["chat","대화"]].map(([k,l])=>h("button",{class:"seg"+(f===k?" on":""),onclick:()=>{sub=Object.assign({},sub,{f:k,open:null});render()}},l)));
   const row=l0=>{const open=sub.open!=null&&String(sub.open)===String(id(l0));
-    const head=h("div",{class:"li",role:"button",style:"cursor:pointer",onclick:()=>{sub=Object.assign({},sub,{open:open?null:id(l0)});render()}},h("span",{class:"d"},l0.date.slice(5)),h("span",{class:"grow"},h("span",{class:"muted small"},(KIND[l0.kind]||l0.kind)+" · "),l0.title,l0.secs?h("span",{class:"muted small"}," · "+fmt(l0.secs)):null),l0.level?lvChip(l0.level):null,h("span",{class:"muted"},open?"▴":"▾"));
+    const sel=sub.sel;const picked=sel&&sel.has(id(l0));
+    const head=h("div",{class:"li",role:"button",style:"cursor:pointer"+(picked?";border-color:var(--bad)":""),onclick:()=>{if(sel){picked?sel.delete(id(l0)):sel.add(id(l0));render();return}sub=Object.assign({},sub,{open:open?null:id(l0)});render()}},sel?h("input",{type:"checkbox",checked:picked,style:"margin:0;accent-color:var(--bad)",onclick:e=>e.stopPropagation(),onchange:()=>{picked?sel.delete(id(l0)):sel.add(id(l0));render()}}):null,h("span",{class:"d"},l0.date.slice(5)),h("span",{class:"grow"},h("span",{class:"muted small"},(KIND[l0.kind]||l0.kind)+" · "),l0.title,l0.secs?h("span",{class:"muted small"}," · "+fmt(l0.secs)):null),l0.level?lvChip(l0.level):null,h("span",{class:"muted"},open?"▴":"▾"));
     if(!open)return head;
     // details that were moved to the account archive are fetched when the record is opened
     let l=histFill(hasDet(l0)?l0:(HIST[l0.ts]||l0));
@@ -858,9 +865,10 @@ function vHistory(m){const KIND={practice:"연습",mock:"모의시험",chat:"대
       l.model?h("div",{},h("p",{class:"eyebrow"},"모범답안"+(l.modelLatest?" · 이 질문의 최근 모범답안":"")),h("div",{class:"model"},l.model),h("div",{class:"row",style:"margin-top:6px"},spkBtn(l.model),h("button",{class:"btn sm",onclick:()=>go("listen",{text:l.model,title:l.title})},"쉐도잉"))):null,
       (l.pq||[]).length?h("details",{},h("summary",{},"문항별 피드백 ("+l.pq.length+")"),...l.pq.map((x,i)=>h("div",{style:"margin-top:8px"},h("p",{class:"small",style:"font-weight:600"},(i+1)+". "+(x.q||"")+(x.l?" · "+x.l:"")),x.a?h("p",{class:"muted small"},x.a):null,x.c?h("p",{class:"small"},x.c):null,x.b?h("p",{class:"small",style:"color:var(--accent)"},"→ "+x.b):null))):null,
       l.recovered&&!l.a?h("p",{class:"muted small"},"예전 기록이라 내 답변·총평은 저장돼 있지 않아요."):!hasDet(l)&&!fx.length?h("p",{class:"muted small"},HIST["_"+l0.ts]&&!HIST[l0.ts]&&cloud.ref?"세부 내용을 불러오는 중이거나, 세부 내용이 저장되기 전에 만든 기록이에요.":"세부 내용이 저장되기 전에 만든 기록이라 점수만 남아 있어요."):null,
-      t&&q?h("div",{class:"row"},h("button",{class:"btn sm primary",onclick:()=>go("practice",{topic:t,q,kind:QT[q.t]})},"이 질문 다시 연습")):null);
+      h("div",{class:"row"},t&&q?h("button",{class:"btn sm primary",onclick:()=>go("practice",{topic:t,q,kind:QT[q.t]})},"이 질문 다시 연습"):null,(()=>{const b=h("button",{class:"btn sm ghost",style:"color:var(--bad);margin-left:auto",onclick:()=>{if(b.dataset.ok){histDelete([l0])}else{b.dataset.ok=1;b.textContent="한 번 더 누르면 삭제";setTimeout(()=>{if(b.isConnected){delete b.dataset.ok;b.textContent="🗑 이 기록 삭제"}},3000)}}},"🗑 이 기록 삭제");return b})()));
     return h("div",{},head,det)};
   put(m,h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("today")},"← 오늘"),h("p",{class:"eyebrow",style:"margin-top:10px"},"History"),h("h1",{},"내 기록")),tabs,
+    h("div",{class:"row"},sub.sel?h("span",{class:"small"},sub.sel.size+"개 선택"):null,sub.sel?(()=>{const b=h("button",{class:"btn sm",style:"color:var(--bad)",disabled:!sub.sel.size,onclick:()=>{if(!b.dataset.ok){b.dataset.ok=1;b.textContent="정말 "+sub.sel.size+"개 삭제?";return}const ids=sub.sel;histDelete(S.log.filter(l=>ids.has(id(l))));sub=Object.assign({},sub,{sel:null})}},"선택한 기록 삭제");return b})():null,h("button",{class:"btn sm ghost",onclick:()=>{sub=Object.assign({},sub,{sel:sub.sel?null:new Set(),open:null});render()}},sub.sel?"선택 취소":"여러 개 선택해서 삭제")),
     window.claude?.use?h("p",{class:"muted small"},"Claude에서는 최근 40개 기록의 세부 내용만 보관돼요. 웹 앱(웹으로 통합 후)에서는 모든 기록의 세부 내용을 볼 수 있어요."):null,
     all.length?h("div",{class:"list"},...all.slice(0,sub.n||40).map(row),all.length>(sub.n||40)?h("button",{class:"btn",onclick:()=>{sub=Object.assign({},sub,{n:(sub.n||40)+40});render()}},"더 보기"):null):h("p",{class:"muted small"},"아직 기록이 없어요."))}
 function planItem(done,title,progress,min,onclick){return h("div",{class:"item"+(done?" done":""),onclick,role:"button",tabindex:"0"},h("span",{class:"box",html:done?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-11"/></svg>':""}),h("span",{class:"t grow"},title," ",h("span",{class:"muted small mono"},progress)),h("span",{class:"min"},min))}
