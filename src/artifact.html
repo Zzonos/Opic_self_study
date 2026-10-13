@@ -638,7 +638,9 @@ const TTS_DEFAULT="https://oss-tts.zzono717.workers.dev";let TTS_URL=TTS_DEFAULT
 const clipJob={on:false,done:0,total:0,err:0,last:""};
 function clipSentences(){const out={};const add=t=>{for(const sn of splitSent(t)){out[txtHash(sn)]=sn}};
   for(const st of [S.samples||{},S.scripts||{}])for(const sc of Object.values(st))for(const x of (sc&&sc.scripts||[]))add(x&&x.answer||"");
-  for(const m of Object.values(S.models||{}))add(m);return out}
+  for(const m of Object.values(S.models||{}))add(m);
+  // my own expression cards (added from feedback) have no studio recording: record them as whole phrases
+  for(const c of (S.custom||[])){const t=String(c&&c.en||"").replace(/___/g,"something").trim();if(/[a-z]/i.test(t))out[txtHash(t)]=t}return out}
 function clipMissing(){const all=clipSentences();return Object.entries(all).filter(([h,sn])=>!CLIPS.idx.has(h)||(transOf(sn)&&!koFresh(h,sn)))}
 function isMp3(u8){return u8&&u8.length>500&&((u8[0]===0x49&&u8[1]===0x44&&u8[2]===0x33)||(u8[0]===0xFF&&(u8[1]&0xE0)===0xE0))}
 async function ttsSrvDiag(log){const u=TTS_URL;log("주소: "+(u||"(비어 있음)")+" · 앱 위치: "+location.origin);
