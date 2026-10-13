@@ -53,10 +53,11 @@ async function openSocket() {
 
 async function synthesize(text, voice, rate) {
   let resp = await openSocket();
-  if (!resp.webSocket && resp.status === 403) {
-    // clock skew correction (same as edge-tts): use the server's Date header and retry once
-    const d = Date.parse(resp.headers.get("Date") || "");
-    if (!isNaN(d)) { clockSkew += (d - Date.now()) / 1000; resp = await openSocket(); }
+  // Microsoft refuses some requests from Cloudflare with 403: fix clock skew once, then simply try again a few times
+  for (let k = 0; k < 5 && !resp.webSocket && resp.status === 403; k++) {
+    if (k === 0) { const d = Date.parse(resp.headers.get("Date") || ""); if (!isNaN(d)) clockSkew += (d - Date.now()) / 1000; }
+    await new Promise(r => setTimeout(r, 150 * (k + 1)));
+    resp = await openSocket();
   }
   const ws = resp.webSocket;
   if (!ws) throw new Error("websocket upgrade failed: " + resp.status + " " + (await resp.text()).slice(0, 200));
