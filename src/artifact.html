@@ -538,7 +538,9 @@ const h=(tag,attrs={},...kids)=>{const e=document.createElement(tag);for(const[k
 const put=(el,...k)=>el.append(...k.flat().filter(x=>x!=null&&x!==false));
 let toastT;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),2200)}
 const fmt=s=>String(Math.floor(s/60)).padStart(1,"0")+":"+String(s%60).padStart(2,"0");
-const lvIdx=l=>{const i=LEVELS.indexOf(String(l||"").toUpperCase().replace(/\s/g,""));return i<0?3:i};
+// AI levels sometimes come back as "IM 2", "IM2+", "IM1-IM2", "Intermediate Mid 2": read the first real level; unknown stays unknown (-1) instead of silently becoming IL
+const lvNorm=l=>{const t=String(l||"").toUpperCase().replace(/INTERMEDIATE\s*MID\s*/g,"IM").replace(/INTERMEDIATE\s*HIGH/g,"IH").replace(/INTERMEDIATE\s*LOW/g,"IL").replace(/ADVANCED\s*LOW/g,"AL").replace(/NOVICE\s*(LOW|MID|HIGH)/g,(m,a)=>"N"+a[0]).replace(/IM\s*([123])/g,"IM$1");const m=t.match(/(?:^|[^A-Z])(IM[123]|NL|NM|NH|IL|IH|AL)(?![A-Z])/);return m?m[1]:""};
+const lvIdx=l=>{const i=LEVELS.indexOf(lvNorm(l));return i<0?3:i};
 const lvChip=l=>{const i=lvIdx(l);return h("span",{class:"chip "+(i>=tgtIdx()?"good":i>=tgtIdx()-2?"warn":"bad")},LEVELS[i])};
 const pick=(a,n)=>{const c=[...a];const o=[];while(c.length&&o.length<n)o.push(c.splice(Math.floor(Math.random()*c.length),1)[0]);return o};
 const topicById=id=>TOPICS.find(t=>t.id===id);
@@ -856,6 +858,7 @@ function vHistory(m){const KIND={practice:"연습",mock:"모의시험",chat:"대
     const det=h("div",{class:"card",style:"margin:-4px 0 6px;gap:12px"},
       l.q?h("div",{},h("p",{class:"eyebrow"},"질문"),h("div",{class:"row",style:"align-items:flex-start;flex-wrap:nowrap"},h("p",{class:"small grow",style:"font-weight:600"},l.q),spkBtn(l.q,null,q?"q_"+t.id+"_"+t.qs.indexOf(q):null))):null,
       l.a?h("div",{},h("p",{class:"eyebrow"},"내 답변"),h("div",{class:"model"},l.a)):null,
+      l.level?h("p",{class:"muted small"},"AI 판정 레벨: "+(l.lvRaw||l.level)+(lvNorm(l.lvRaw||l.level)!==String(l.lvRaw||l.level).trim()?" → "+LEVELS[lvIdx(l.lvRaw||l.level)]+"로 기록":"")+(l.score!=null?" · "+l.score+"점":"")):null,
       l.sum?h("div",{},h("p",{class:"eyebrow"},"총평"),h("p",{class:"small"},l.sum)):null,
       (l.str||[]).length?h("div",{},h("p",{class:"eyebrow"},"잘한 점"),...l.str.map(x=>h("p",{class:"small"},"✓ "+x))):null,
       fx.length?h("div",{},h("p",{class:"eyebrow"},l.kind==="mock"?"개선 포인트":"고칠 부분"),...fx.map(x=>x.o||x.b?h("div",{class:"fix"},x.o?h("span",{class:"o"},x.o):null,x.b?h("span",{class:"b"},x.b):null,x.w?h("span",{class:"w"},x.w):null):h("p",{class:"small"},"• "+x.w))):null,
@@ -924,7 +927,7 @@ function vAnswer(m,s){
     fbBox.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"Claude가 평가 중… (10–40초)")));
     try{const prog=fbBox.querySelector(".thinking span");const r=await evaluate(q.q,a,secs||Math.round(a.split(/\s+/).length/2.3),({text})=>{if(prog)prog.textContent="Claude가 평가 작성 중… "+(text||"").length+"자"});
       renderFeedback(fbBox,r,q.q,a);if(r.model_target){S.models=S.models||{};S.models[q.q]=r.model_target;S.modelsAt=S.modelsAt||{};S.modelsAt[q.q]=Date.now()}
-      S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",qt:q.t,tid:topic.id,q:q.q,a,sum:r.summary||"",str:(r.strengths||[]).slice(0,3),model:r.model_target||"",title:topic.en+" · "+(s.kind||""),level:r.level,score:r.score,secs:secs||0,fixes:(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}))});S.today.practice++;save();
+      S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",qt:q.t,tid:topic.id,q:q.q,a,sum:r.summary||"",str:(r.strengths||[]).slice(0,3),model:r.model_target||"",title:topic.en+" · "+(s.kind||""),level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:secs||0,fixes:(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}))});S.today.practice++;save();
       const nextRp=s.rp&&s.step<13?h("button",{class:"btn primary",onclick:()=>{const st=s.step+1;go("practice",{topic,q:{t:"rp",q:s.rp["q"+st]},kind:"롤플레이 "+st+"번 · "+(st===12?"문제 해결":"관련 경험"),rp:s.rp,step:st})}},"다음: "+(s.step+1)+"번 →"):null;
       put(fbBox,h("div",{class:"row"},nextRp,h("button",{class:"btn",onclick:()=>{ta.value="";ta._timed=false;startBtn.textContent="말하기 시작";fbBox.replaceChildren();secs=0;tEl.textContent="0:00";bar.firstChild.style.width="0";evalBtn.disabled=false}},"같은 질문 다시"),h("button",{class:"btn",onclick:()=>go("practice")},"다른 질문")));
     }catch(e){console.warn("evaluate failed",e);fbBox.replaceChildren(h("p",{class:"small",style:"color:var(--bad)"},errMsg(e)),e?.message?h("p",{class:"muted small mono",style:"word-break:break-all"},String(e.message).slice(0,200)):null,(e.code!=="not_granted"&&e.code!=="sampling_disabled")?h("button",{class:"btn sm",onclick:()=>{evalBtn.disabled=false;evalBtn.click()}},"다시 시도"):null);if(e.code!=="not_granted"&&e.code!=="sampling_disabled")evalBtn.disabled=false}
@@ -1115,7 +1118,7 @@ async function vChatSummary(m){
   if(chat.summary==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"대화 평가 중…")));put(m,h("h1",{},"대화 정리"),box);
     const tr=chat.ui.filter(u=>u.who==="ai"||u.who==="me").map(u=>(u.who==="ai"?"Partner: ":"Learner: ")+u.text).join("\n");
     try{const r=await sample.json(`${RUBRIC()}\n\nThis is a transcript of a practice conversation (${chat.sc.en}). Rate ONLY the learner's turns.\n\n${tr}\n\nReply with ONLY JSON: {"level":"IM2","score":60,"summary":"한국어 총평 2-3문장","fixes":[{"original":"...","better":"...","why":"한국어"}],"expressions":[{"en":"useful natural expression the learner could have used","ko":"뜻"}],"next":"다음 대화에서 시도할 한 가지 (한국어)"}\nGive 3-5 fixes and 4-6 expressions.`,{cache:false});
-      chat.summary=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"chat",qt:"chat",sum:r.summary||"",title:"대화 · "+chat.sc.ko+" · "+chat.n+"턴",level:r.level,score:r.score,secs:chat.n*45,fixes:[...(chat.ui.filter(u=>u.who==="fix").map(u=>({o:u.fix.original,b:u.fix.better,w:u.fix.why}))),...(r.fixes||[]).map(f=>({o:f.original,b:f.better,w:f.why}))].slice(0,8)});S.today.practice++;save();render()}
+      chat.summary=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"chat",qt:"chat",sum:r.summary||"",title:"대화 · "+chat.sc.ko+" · "+chat.n+"턴",level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:chat.n*45,fixes:[...(chat.ui.filter(u=>u.who==="fix").map(u=>({o:u.fix.original,b:u.fix.better,w:u.fix.why}))),...(r.fixes||[]).map(f=>({o:f.original,b:f.better,w:f.why}))].slice(0,8)});S.today.practice++;save();render()}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("button",{class:"btn",onclick:()=>{chat=null;render()}},"닫기"))}return}
   const r=chat.summary;
   put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation review · "+chat.sc.ko),h("h1",{},"대화 정리")),
@@ -1156,7 +1159,7 @@ async function vMockResult(m){
   if(mock.result==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"15문항 채점 중… (30–90초)")));
     put(m,h("h1",{},"채점 중"),box);
     if(!sample){box.replaceChildren(h("p",{},ERR.not_granted),h("button",{class:"btn",onclick:()=>{mock=null;render()}},"닫기"));return}
-    try{const r=await evalMock(mock.items,null);mock.result=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"mock",qt:"mock",sum:r.summary||"",pq:(r.per_question||[]).map((x,i)=>({q:(mock.items[i]||{}).q||"",a:((mock.items[i]||{}).a||"").slice(0,600),l:x.level,c:x.comment,b:x.better})),title:"모의시험 15문항",level:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0),fixes:(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)})),perq:(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}))});save();render()}
+    try{const r=await evalMock(mock.items,null);mock.result=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"mock",qt:"mock",sum:r.summary||"",pq:(r.per_question||[]).map((x,i)=>({q:(mock.items[i]||{}).q||"",a:((mock.items[i]||{}).a||"").slice(0,600),l:x.level,c:x.comment,b:x.better})),title:"모의시험 15문항",level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0),fixes:(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)})),perq:(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}))});save();render()}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{render()}},"다시 시도"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"닫기")))}
     return}
   const r=mock.result;
