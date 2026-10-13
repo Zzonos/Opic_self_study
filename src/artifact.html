@@ -899,6 +899,9 @@ function vAnswer(m,s){
   const ta=h("textarea",{id:"ans_"+topic.id,placeholder:"여기에 말한 내용을 받아쓰기로 입력하세요. (휴대폰: 키보드의 마이크 키 / Windows: Win+H / Mac: 🎤 키 또는 Fn 두 번)"});
   const startBtn=h("button",{class:"btn primary",onclick:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작";}else{if(startBtn.textContent==="다시 시작"){ta.value="";ta.dispatchEvent(new Event("input"));fbBox.replaceChildren();evalBtn.disabled=false;secs=0}ta._timed=true;timerStart(tEl,bar.firstChild);startBtn.textContent="답변 끝";ta.focus()}}},"말하기 시작");autoTimer(ta,startBtn);
   const evalBtn=h("button",{class:"btn primary",disabled:!sample,onclick:async()=>{
+    if(mic&&mic._isOn&&mic._isOn()){evalBtn.disabled=true;evalBtn.textContent="녹음 마무리 중…";await mic._finish();evalBtn.textContent="AI 평가 받기";evalBtn.disabled=false}
+    // keyboard dictation may still be writing the last words: end it (blur) and wait until the text stops changing
+    if(document.activeElement===ta||ta._lastInput&&Date.now()-ta._lastInput<1500){evalBtn.disabled=true;evalBtn.textContent="받아쓰기 마무리 중…";ta.blur();let last=ta.value,stable=0;for(let k=0;k<15&&stable<4;k++){await new Promise(r=>setTimeout(r,200));if(ta.value===last)stable++;else{stable=0;last=ta.value}}evalBtn.textContent="AI 평가 받기";evalBtn.disabled=false}
     const a=ta.value.trim();if(a.length<20){toast("답변을 좀 더 입력해 주세요 (20자 이상)");return}
     if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}
     evalBtn.disabled=true;stopBtn.hidden=false;ctl=new AbortController();
@@ -912,11 +915,12 @@ function vAnswer(m,s){
     finally{stopBtn.hidden=true}
   }},"AI 평가 받기");
   const stopBtn=h("button",{class:"btn",hidden:true,onclick:()=>ctl?.abort()},"중지");
+  const mic=micBtn(ta,{onFinal:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}}});ta.addEventListener("input",()=>{ta._lastInput=Date.now()});
   const scr=S.scripts[topic.id];const sIdx=topic.qs?topic.qs.indexOf(q):-1;const myScript=scr&&sIdx>=0?scr.scripts?.[sIdx]?.answer:null;
   put(m,
     h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("practice",topic.qs?{topic,q:null}:null)},"← 뒤로"),h("p",{class:"eyebrow",style:"margin-top:10px"},topic.en+" · "+(s.kind||"")),h("div",{class:"row",style:"flex-wrap:nowrap;align-items:flex-start"},h("p",{class:"q grow"},q.q),spkBtn(q.q,null,qKey(topic,q,s)))),
     h("div",{class:"card"},h("div",{class:"row"},tEl,h("div",{class:"grow"},bar,h("p",{class:"muted small",style:"margin-top:4px"},"권장 1:00–2:00. 질문을 되받고 → 2–3가지 디테일 → 한 줄 마무리.")),startBtn),
-      ta,h("div",{class:"row"},micBtn(ta,{onFinal:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}}})||micLink(),sample?evalBtn:null,stopBtn,sample?null:h("button",{class:"btn",onclick:()=>{const a=ta.value.trim();if(!a){toast("먼저 답변을 말하거나 입력하세요");return}navigator.clipboard?.writeText("[OPIc 연습 평가 요청]\nQ: "+q.q+"\nA: "+a).catch(()=>{});window.open(ART_URL,"_blank");toast("답변을 복사했어요. Claude에서 붙여넣어 평가하세요")}},"Claude에서 평가"),h("span",{class:"muted small"},SR_OK?"마이크로 말하면 바로 글자로 바뀌어요":sample?"":""))),
+      ta,h("div",{class:"row"},mic||micLink(),sample?evalBtn:null,stopBtn,sample?null:window.claude?.use?aiGate():h("button",{class:"btn",onclick:()=>{const a=ta.value.trim();if(!a){toast("먼저 답변을 말하거나 입력하세요");return}navigator.clipboard?.writeText("[OPIc 연습 평가 요청]\nQ: "+q.q+"\nA: "+a).catch(()=>{});window.open(ART_URL,"_blank");toast("답변을 복사했어요. Claude에서 붙여넣어 평가하세요")}},"Claude에서 평가"),h("span",{class:"muted small"},SR_OK?"마이크로 말하면 바로 글자로 바뀌어요":sample?"":""))),
     myScript?h("details",{class:"card"},h("summary",{},"내 스크립트 보기"),h("div",{class:"model"},myScript)):null,
     fbBox);
 }
@@ -1481,12 +1485,22 @@ function offlineCard(){if(!WEB)return null;const urls=[];for(const t of Object.k
     h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{const sw=navigator.serviceWorker?.controller;if(!sw){toast("잠시 후 다시 시도해 주세요 (오프라인 기능 준비 중)");return}st.textContent="오프라인 저장 중 0/"+urls.length;sw.postMessage({type:"prefetch",urls})}},"전체 음성 오프라인 저장"),st))}
 // Web Speech API (web build only): real microphone → text
 let rec=null;
-function micBtn(ta,{onFinal=null,label="🎤 말하기"}={}){if(!SR_OK)return null;const b=h("button",{class:"btn primary"},label);let on=false;
+function wrapSample(s){const w=(...a)=>s(...a);w.json=async(...a)=>{const r=await s.json(...a);return r==null?r:JSON.parse(JSON.stringify(r))};if(s.limits)w.limits=(...a)=>s.limits(...a);return w}
+function aiGate(){const box=h("span",{class:"row",style:"gap:6px"});const note=h("span",{class:"muted small"},"AI 기능 확인 중…");
+  const btn=h("button",{class:"btn",onclick:async()=>{try{const P=await claude.use("permissions");if(!P){note.textContent="이 기기의 Claude 앱에서는 AI 평가를 쓸 수 없어요. 브라우저에서 claude.ai로 열어 주세요";return}
+      let st=await P.state("sample");if(st==="prompt"){const r=await P.request(["sample"]);st=r.sample||st}
+      if(st==="granted"){const sm=await claude.use("sample");if(sm){sample=wrapSample(sm);toast("AI 기능을 켰어요");render();return}}
+      if(st==="denied"){note.textContent="AI 사용이 거절돼 있어요. 권한 화면에서 허용해 주세요";try{await P.manage()}catch(e){}return}
+      note.textContent="이 기기의 Claude 앱에서는 AI 평가를 쓸 수 없어요 ("+st+"). 브라우저에서 claude.ai로 열거나 iPhone·PC Claude 앱을 이용해 주세요"}catch(e){note.textContent="확인 실패: "+(e.code||e.message||e)}}},"AI 사용 허용");
+  (async()=>{try{const P=await claude.use("permissions");const st=P?await P.state("sample"):"unavailable";note.textContent=st==="prompt"?"버튼을 눌러 AI 사용을 허용해 주세요":st==="denied"?"AI 사용이 거절돼 있어요 — 버튼을 눌러 권한을 바꿔 주세요":st==="granted"?"AI 연결 중… 잠시 후 다시 열어 주세요":"이 기기의 Claude 앱에서는 AI 기능을 쓸 수 없어요 — 브라우저에서 claude.ai로 열어 주세요"}catch(e){note.textContent=""}})();
+  box.append(btn,note);return box}
+function micBtn(ta,{onFinal=null,label="🎤 말하기"}={}){if(!SR_OK)return null;const b=h("button",{class:"btn primary"},label);let on=false;let waitEnd=null;
+  b._isOn=()=>on;b._finish=()=>new Promise(res=>{if(!on){res();return}waitEnd=res;try{rec?.stop()}catch(e){}setTimeout(()=>{if(waitEnd===res){waitEnd=null;if(on)stop();res()}},2500)});
   const stop=()=>{on=false;b.textContent=label;b.classList.remove("rec");try{rec?.stop()}catch(e){}rec=null};
   b.onclick=()=>{ttsStop();if(on){stop();return}const R=window.SpeechRecognition||window.webkitSpeechRecognition;rec=new R();rec.lang="en-US";rec.continuous=true;rec.interimResults=true;let base=ta.value?ta.value.trim()+" ":"";let fin="";
     rec.onresult=e=>{let interim="";fin="";for(let i=0;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t+" ";else interim+=t}ta.value=base+fin+interim;ta.dispatchEvent(new Event("input"))};
     rec.onerror=e=>{if(e.error==="not-allowed")toast("마이크 권한을 허용해 주세요 (설정 → Safari → 마이크)");stop()};
-    rec.onend=()=>{if(on){stop();ta.value=(base+fin).trim();ta.dispatchEvent(new Event("input"));onFinal&&onFinal(ta.value)}};
+    rec.onend=()=>{if(on){stop();ta.value=(base+fin).trim();ta.dispatchEvent(new Event("input"));onFinal&&onFinal(ta.value)}if(waitEnd){const w=waitEnd;waitEnd=null;w()}};
     try{rec.start();on=true;b.textContent="■ 말하기 끝";b.classList.add("rec")}catch(e){toast("음성 인식을 시작할 수 없어요");stop()}};
   return b}
 // web build: auto-refresh when a newer version is deployed (home-screen apps cache the old page)
@@ -1497,7 +1511,7 @@ loadLocal();cloudInit();render();setTimeout(prepSyncCode,500);setTimeout(()=>{if
   const [u,d,s]=await Promise.all([claude.use("user"),claude.use("db"),claude.use("sample")]);
   if(!u){gated=true;render();return}
   // results from the platform are frozen: hand the app plain mutable copies
-  if(s){const w=(...a)=>s(...a);w.json=async(...a)=>{const r=await s.json(...a);return r==null?r:JSON.parse(JSON.stringify(r))};if(s.limits)w.limits=(...a)=>s.limits(...a);sample=w}else sample=s;
+  sample=s?wrapSample(s):s;
   if(u&&d){try{uid=await u.id();db=d;const col=db.collection("data/users/"+uid);const refs={main:col.doc("main"),scripts:col.doc("scripts"),trans:col.doc("trans")};
     const [m,sc,tr]=await Promise.all([refs.main.get(),refs.scripts.get(),refs.trans.get()]);
     if(m.exists){const remote=JSON.parse(JSON.stringify(Object.assign({},m.data(),sc.exists?sc.data():{},{trans:(tr.exists&&tr.data().t)||{}})));/* db data is frozen: work on a copy */
