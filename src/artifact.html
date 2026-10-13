@@ -370,9 +370,21 @@ function save(){S.updatedAt=Date.now();setTimeout(prepSyncCode,50);try{localStor
   if(cloud.ref)cloudPush(false)}
 // Claude account store: three documents (256 KiB cap per document) under the viewer's private path
 let claudePushT=null,claudeErr=false;
-function claudeParts(){const o=structuredClone(S);const trans=o.trans||{};const scripts={scripts:o.scripts||{},samples:o.samples||{}};delete o.trans;delete o.scripts;delete o.samples;if(o.log&&o.log.length>400)o.log=o.log.slice(-400);if(o.log){const keep=o.log.length-40;o.log=o.log.map((l,i)=>i<keep&&(l.a||l.model||l.pq)?(()=>{const c=Object.assign({},l);delete c.a;delete c.model;delete c.pq;delete c.str;return c})():l)}return {main:o,scripts,trans:{t:trans}}}
-function claudePush(){if(!docRef)return;clearTimeout(claudePushT);claudePushT=setTimeout(async()=>{try{const parts=claudeParts();await Promise.all([docRef.main.set(parts.main),docRef.scripts.set(parts.scripts),docRef.trans.set(parts.trans)]);claudeErr=false;claudeSavedAt=Date.now();const el=$("#csave");if(el)el.textContent=claudeStatus()}catch(e){if(!claudeErr){claudeErr=true;toast("Claude 계정 저장 실패: "+(e.code||e.message||e))}}},800)}
-let claudeSavedAt=0;function claudeStatus(){return claudeSavedAt?"Claude 계정에 저장됨 · "+new Date(claudeSavedAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}):"Claude 계정 저장 대기 중"}
+function claudeState(){const o=JSON.parse(JSON.stringify(S));if(o.log&&o.log.length>400)o.log=o.log.slice(-400);
+  if(o.log){const keep=o.log.length-40;o.log=o.log.map((l,i)=>i<keep&&(l.a||l.model||l.pq)?(()=>{const c=Object.assign({},l);delete c.a;delete c.model;delete c.pq;delete c.str;return c})():l)}return o}
+const CL_CHUNK=60000;// characters per document (worst case ~180 KB of UTF-8, under the 256 KiB cap)
+async function claudeLoad(col){const meta=await col.doc("meta").get();
+  if(meta.exists&&meta.data().n){const n=meta.data().n;const parts=await Promise.all(Array.from({length:n},(_,i)=>col.doc("c"+i).get()));const str=parts.map(p=>p.exists?(p.data().s||""):"").join("");try{return JSON.parse(str)}catch(e){}}
+  const [m,sc,tr]=await Promise.all([col.doc("main").get(),col.doc("scripts").get(),col.doc("trans").get()]);if(!m.exists)return null;
+  return JSON.parse(JSON.stringify(Object.assign({},m.data(),sc.exists?sc.data():{},{trans:(tr.exists&&tr.data().t)||{}})))}
+let claudeBusy=Promise.resolve();
+async function claudeSave(col){const str=JSON.stringify(claudeState());const n=Math.max(1,Math.ceil(str.length/CL_CHUNK));
+  for(let i=0;i<n;i++)await col.doc("c"+i).set({s:str.slice(i*CL_CHUNK,(i+1)*CL_CHUNK)});
+  await col.doc("meta").set({n,updatedAt:S.updatedAt||0,v:2,t:Date.now()})}
+let claudeCanWrite=true;
+function claudePush(){if(!docRef||!claudeCanWrite)return;clearTimeout(claudePushT);claudePushT=setTimeout(()=>{claudeBusy=claudeBusy.then(async()=>{try{await claudeSave(docRef);claudeErr=false;claudeSavedAt=Date.now();const el=$("#csave");if(el)el.textContent=claudeStatus()}catch(e){if(!claudeErr){claudeErr=true;
+      toast(e&&e.code==="invalid_argument"&&window.__oss_notOwner?"이 계정은 이 페이지에 '보기' 권한으로 초대돼 Claude에 저장할 수 없어요. 소유자에게 '편집' 권한으로 초대해 달라고 하세요":"Claude 계정 저장 실패: "+(e.code||e.message||e))}}})},800)}
+let claudeSavedAt=0;function claudeStatus(){if(!claudeCanWrite)return "보기 권한이라 Claude에 저장되지 않아요 (이 기기에만 저장) — 소유자에게 편집 권한을 요청하세요";return claudeSavedAt?"Claude 계정에 저장됨 · "+new Date(claudeSavedAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}):"Claude 계정 저장 대기 중"}
 const logKey=l=>l.date+"|"+l.kind+"|"+l.title+"|"+(l.score??"");
 function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;const key=logKey;
   if(Array.isArray(o.del)&&o.del.length){const d=new Set(S.del||[]);o.del.forEach(k=>d.add(k));S.del=[...d].slice(-3000)}const dead=new Set(S.del||[]);if(dead.size)S.log=S.log.filter(l=>!dead.has(key(l)));
@@ -471,7 +483,7 @@ async function cloudAttach(u){cloud.user=u;cloud.ref=firebase.firestore().collec
 function cloudApply(d){if(!d)return;if((d.updatedAt||0)===cloud.lastPush)return;try{const before=JSON.stringify(S);mergeState(JSON.parse(d.state||"{}"),true);if(JSON.stringify(S)!==before){render();toast("계정의 새 기록을 반영했어요");if((S.updatedAt||0)>(d.updatedAt||0))cloudPush(false)}}catch(e){}}
 // foreground refresh: the realtime listener can be asleep after the app was in the background
 async function cloudRefresh(){try{if(cloud.ref){const snap=await cloud.ref.get({source:"server"});if(snap.exists)cloudApply(snap.data())}
-  if(docRef){const [m,sc,tr]=await Promise.all([docRef.main.get(),docRef.scripts.get(),docRef.trans.get()]);if(m.exists){const remote=JSON.parse(JSON.stringify(Object.assign({},m.data(),sc.exists?sc.data():{},{trans:(tr.exists&&tr.data().t)||{}})));/* db data is frozen: work on a copy */if((remote.updatedAt||0)>(S.updatedAt||0)){mergeState(remote,true);render();toast("다른 기기의 기록을 반영했어요")}}}}catch(e){}}
+  if(docRef){const remote=await claudeLoad(docRef);if(remote&&(remote.updatedAt||0)>(S.updatedAt||0)){mergeState(remote,true);render();toast("다른 기기의 기록을 반영했어요")}}}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")cloudRefresh()});window.addEventListener("pageshow",e=>{if(e.persisted)cloudRefresh()});
 async function cloudPull(first){if(!cloud.ref)return;const snap=await cloud.ref.get();if(snap.exists){const d=snap.data();let remote={};try{remote=JSON.parse(d.state||"{}")}catch(e){}mergeState(remote,true);if(first)toast("계정 기록을 불러왔어요")}await cloudPush(true)}
 const HIST={};const hasDet=l=>!!(l&&(l.a||l.model||(l.pq&&l.pq.length)));
@@ -1512,12 +1524,13 @@ loadLocal();cloudInit();render();setTimeout(prepSyncCode,500);setTimeout(()=>{if
   if(!u){gated=true;render();return}
   // results from the platform are frozen: hand the app plain mutable copies
   sample=s?wrapSample(s):s;
-  if(u&&d){try{uid=await u.id();db=d;const col=db.collection("data/users/"+uid);const refs={main:col.doc("main"),scripts:col.doc("scripts"),trans:col.doc("trans")};
-    const [m,sc,tr]=await Promise.all([refs.main.get(),refs.scripts.get(),refs.trans.get()]);
-    if(m.exists){const remote=JSON.parse(JSON.stringify(Object.assign({},m.data(),sc.exists?sc.data():{},{trans:(tr.exists&&tr.data().t)||{}})));/* db data is frozen: work on a copy */
+  if(u&&d){try{uid=await u.id();db=d;const col=db.collection("data/users/"+uid);
+    try{window.__oss_notOwner=!(await u.isOwner());const cw=await u.can?.("data.write");if(cw===false){claudeCanWrite=false}}catch(e){}
+    const remote=await claudeLoad(col);const m={exists:!!remote};
+    if(remote){/* db data is frozen: claudeLoad returns a plain copy */
       if((remote.updatedAt||0)>(S.updatedAt||0)){S=Object.assign(structuredClone(DEF),remote);try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}else if((S.updatedAt||0)>(remote.updatedAt||0)){mergeState(remote,true)}
       claudeSavedAt=remote.updatedAt||0}
-    docRef=refs;if(!m.exists&&S.updatedAt)claudePush()}catch(e){docRef=null;toast("Claude 계정 저장소 연결 실패: "+(e.code||e.message||e))}}
+    docRef=col;if(!m.exists&&S.updatedAt)claudePush()}catch(e){docRef=null;toast("Claude 계정 저장소 연결 실패: "+(e.code||e.message||e))}}
   render();setTimeout(applyPendingSync,300);
 })();
 </script>
