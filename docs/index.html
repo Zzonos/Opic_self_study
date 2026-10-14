@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261014-191553-9d3df3">
+<html lang="ko" data-build="20261014-222413-daa62b">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -580,15 +580,17 @@ async function evaluate(question,answer,secs,onText){
   const prompt=`${RUBRIC()}
 
 Question: "${question}"
-Learner profile: ${profileText()}
 Speaking time: about ${secs} seconds (ideal 60-120 seconds).
-Learner's answer (voice-dictated):
+Learner's answer (voice-dictated) — this single answer is the ONLY thing you rate:
 """
 ${answer}
 """
+Background profile (NOT part of the answer; use it only to fill in small missing details of the model answers, never to replace the learner's story): ${profileText()}
+
+Rules: evaluate this answer alone. Every comment, strength and fix must refer to what is actually in the answer above — places, people and events exactly as the learner said them. Do not mention places, trips or details that appear only in the profile. The model answers must tell the SAME story as the learner (same place, same event), just better.
 
 Reply with ONLY one JSON object:
-{"level":"IM2","score":62,"summary":"한국어 총평 2-3문장","strengths":["한국어로 잘한 점 2-3개"],"fixes":[{"original":"learner's phrase","better":"improved phrase","why":"한국어 설명 한 줄"}],"model_target":"A model answer at ${T} level (${spec().words} words): ${spec().desc} First person, natural spoken English, using the learner's own details where possible",${T==="AL"?"":`"model_up":"The same answer upgraded to ${up} level (${TARGET_SPEC[up].words} words)",`}"expressions":[{"en":"useful expression from the model answers","ko":"한국어 뜻"}]}
+{"level":"IM2","score":62,"summary":"한국어 총평 2-3문장","strengths":["한국어로 잘한 점 2-3개"],"fixes":[{"original":"learner's phrase","better":"improved phrase","why":"한국어 설명 한 줄"}],"model_target":"A model answer at ${T} level (${spec().words} words): ${spec().desc} First person, natural spoken English, keeping the learner's own story and details from the answer",${T==="AL"?"":`"model_up":"The same answer upgraded to ${up} level (${TARGET_SPEC[up].words} words)",`}"expressions":[{"en":"useful expression from the model answers","ko":"한국어 뜻"}]}
 Give 3-5 fixes and 4-6 expressions. "score" is 0-100 within the overall scale (IM3 starts around 65, IH around 78, AL around 90).`;
   const r=await sample.json(prompt,{...(typeof onText==="function"?{onText}:{}),cache:false});if(r){r.model_target=r.model_target||r.model_im3;r.model_up=r.model_up||r.model_ih;r.target=T;r.up=T==="AL"?null:up}return r;
 }
@@ -622,7 +624,7 @@ async function evalMock(items,onText){
   const prompt=`${RUBRIC()}
 
 This is a full 15-question OPIc mock test. Rate the overall level as a real OPIc rater would (the level is driven by the weakest consistent performance, not the best single answer). Then give short per-question feedback.
-Learner profile: ${profileText()}
+Background profile (NOT part of the answers; never mention places or events that appear only here — comment only on what each answer actually says): ${profileText()}
 
 ${body}
 
