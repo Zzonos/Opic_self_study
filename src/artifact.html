@@ -1276,7 +1276,7 @@ function buildSegs(it){const o=player.opts;const segs=[];const src=audSrc(it.key
   const koSeg=(text,key)=>{const f=koSrc(key);return f?{t:"file",src:f,rate:koR(),text:"",ko:text}:{t:"ko",text,en:key?undefined:it.en}};
   const P=()=>pause>=0.1?silenceSegs(pause):[];
   if(src||it.kind==="Q"||it.kind==="C"){// one recorded sentence/question: [EN → pause] × n, translation once (after the first or before the last)
-    const en=src?{t:"file",src,rate:tts.rate,text:it.en,ko:it.ko||""}:{t:"en",text:it.en,ko:""};
+    const en=src?{t:"file",src,rate:tts.rate,text:it.en,ko:it.ko||""}:{t:"en",text:it.en,ko:it.ko||""};
     for(let r=0;r<n;r++){if(koBefore(r)&&it.ko)segs.push(koSeg(it.ko,it.key));segs.push({...en});if(koAfter(r)&&it.ko)segs.push(koSeg(it.ko,it.key));segs.push(...P())}}
   else{// scripts / model answers (no per-item clip): text-keyed clips if rendered, else device voice
     const list=sents.length?sents:[it.en];
@@ -1352,7 +1352,7 @@ const MI={prev:'<svg viewBox="0 0 24 24"><path d="M6 5v14"/><path d="M19 5 9 12l
 function renderMini(){const m=$("#mini");if(!player.on){m.hidden=true;return}m.hidden=false;const it=player.items[player.i]||{};
   m.replaceChildren(h("span",{class:"now"},(player.paused?"⏸ ":"▶ ")+(it.label||"")+" — "+(it.en||"")),h("button",{onclick:playerPrev,"aria-label":"이전",title:"이전",html:MI.prev}),h("button",{onclick:playerPause,"aria-label":player.paused?"재생":"일시정지",title:player.paused?"재생":"일시정지",html:player.paused?MI.play:MI.pause}),h("button",{onclick:playerNext,"aria-label":"다음",title:"다음",html:MI.next}),h("button",{onclick:playerStop,"aria-label":"끄기",title:"끄기",html:MI.stop}))}
 function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[player.i]||{};const seg=player.cur||{};
-  const en=(seg.t==="file"&&seg.text)||seg.t==="en"?(seg.text||it.en):it.en;const ko=seg.t==="ko"?seg.text:(seg.ko||"");
+  const en=(seg.t==="file"&&seg.text)||seg.t==="en"?(seg.text||it.en):it.en;const ko=seg.t==="ko"?seg.text:(seg.ko||it.ko||"");
   const silent=seg.t==="wait"||(seg.t==="file"&&/silence_/.test(seg.src||""));const pauseLeft=silent?player.segs.slice(player.si).reduce((a,x)=>(x.t==="wait")?a+x.ms/1000:(x.t==="file"&&/silence_/.test(x.src))?a+(+x.src.match(/_(\d+)/)[1]):a,0):0;
   const head=h("span",{class:"eyebrow"},({Q:"질문",A:"답변",C:"표현",T:"내 자료"}[it.kind]||"")+" · "+(it.label||"")+" · "+(player.i+1)+"/"+player.items.length+(audSrc(it.key)||(seg.t==="file"&&!/silence_/.test(seg.src||""))?" · 🎧":""));
   if(it.kind==="A"){// scripts: show the whole text, highlight the sentence being read; translations below, current one highlighted
