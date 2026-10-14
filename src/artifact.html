@@ -394,7 +394,7 @@ function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;const key=log
   for(const [k,v] of Object.entries(o.scripts||{}))if(newer(v,S.scripts[k]))S.scripts[k]=v;
   S.samples=S.samples||{};for(const [k,v] of Object.entries(o.samples||{}))if(newer(v,S.samples[k]))S.samples[k]=v;
   Object.assign(S.models=S.models||{},o.models||{});Object.assign(S.trans=S.trans||{},o.trans||{});Object.assign(S.cards,o.cards||{});
-  for(const c of (o.custom||[]))if(!S.custom.some(x=>x.en===c.en))S.custom.push(c);for(const t of (o.texts||[]))if(!S.texts.some(x=>x.id===t.id||x.text===t.text))S.texts.push(t);
+  for(const c of (o.custom||[])){const cur=S.custom.find(x=>x.en===c.en);if(!cur)S.custom.push(c);else if(c.ko&&(!cur.ko||(cur.koSrc==="mt"&&c.koSrc!=="mt"))){cur.ko=c.ko;if(c.koSrc)cur.koSrc=c.koSrc;else delete cur.koSrc}}for(const t of (o.texts||[]))if(!S.texts.some(x=>x.id===t.id||x.text===t.text))S.texts.push(t);
   if(o.profile){const newer=(o.updatedAt||0)>(S.updatedAt||0);for(const [k,v] of Object.entries(o.profile)){const cur=S.profile[k];const empty=cur==null||cur===""||(Array.isArray(cur)&&!cur.length);if(newer||empty||(k==="survey"&&!fromCloud&&Array.isArray(v)&&v.length))S.profile[k]=v}}if(o.analysis&&(o.analysis.ts||0)>(S.analysis?.ts||0))S.analysis=o.analysis;if(o.today&&o.today.date===todayStr()){for(const k of ["cards","script","practice"])S.today[k]=Math.max(S.today[k]||0,o.today[k]||0)}if((o.updatedAt||0)>(S.updatedAt||0))S.updatedAt=o.updatedAt;if(!fromCloud)save();else{try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}
 function ensureToday(){if(S.today.date!==todayStr()){S.today={date:todayStr(),cards:0,script:0,practice:0}}}
 
@@ -485,7 +485,7 @@ function cloudApply(d){if(!d)return;if((d.updatedAt||0)===cloud.lastPush)return;
 async function cloudRefresh(){try{if(cloud.ref){const snap=await cloud.ref.get({source:"server"});if(snap.exists)cloudApply(snap.data())}
   if(docRef){const remote=await claudeLoad(docRef);if(remote&&(remote.updatedAt||0)>(S.updatedAt||0)){mergeState(remote,true);render();toast("다른 기기의 기록을 반영했어요")}}}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")cloudRefresh()});window.addEventListener("pageshow",e=>{if(e.persisted)cloudRefresh()});
-async function cloudPull(first){if(!cloud.ref)return;const snap=await cloud.ref.get();if(snap.exists){const d=snap.data();let remote={};try{remote=JSON.parse(d.state||"{}")}catch(e){}mergeState(remote,true);if(first)toast("계정 기록을 불러왔어요")}await cloudPush(true);setTimeout(()=>clipSync(false),3000)}
+async function cloudPull(first){if(!cloud.ref)return;const snap=await cloud.ref.get();if(snap.exists){const d=snap.data();let remote={};try{remote=JSON.parse(d.state||"{}")}catch(e){}mergeState(remote,true);if(first)toast("계정 기록을 불러왔어요")}await cloudPush(true);setTimeout(()=>fillCardKo().then(()=>clipSync(false)),3000)}
 const HIST={};const hasDet=l=>!!(l&&(l.a||l.model||(l.pq&&l.pq.length)));
 async function histArchive(){if(!cloud.ref)return;for(const l of S.log){if(!l.ts||l.ar||!hasDet(l))continue;try{await cloud.ref.collection("meta").doc("h_"+l.ts).set({l:JSON.stringify(l),t:l.ts});l.ar=true;HIST[l.ts]=l}catch(e){break}}}
 function histLoad(ts){if(HIST[ts]||!cloud.ref)return Promise.resolve(HIST[ts]||null);return cloud.ref.collection("meta").doc("h_"+ts).get().then(d=>{if(!d.exists)return null;const l=JSON.parse(d.data().l||"null");HIST[ts]=l;return l}).catch(()=>null)}
@@ -957,7 +957,7 @@ function renderFeedback(box,r,q,a){
     r.expressions?.length?h("div",{class:"card"},h("h3",{},"챙겨갈 표현"),h("div",{class:"kx"},...r.expressions.map(x=>h("div",{},h("span",{class:"en"},x.en),h("span",{class:"ko"},x.ko)))),h("button",{class:"btn sm",onclick:()=>{addCards(r.expressions,q);}},"표현카드에 추가")):null);
 }
 function copy(t){navigator.clipboard?.writeText(t||"").then(()=>toast("복사했어요")).catch(()=>toast("복사가 막혀 있어요. 직접 선택해 복사해 주세요"))}
-function addCards(list,src){let n=0;for(const x of list){if(!x?.en)continue;if(S.custom.some(c=>c.en===x.en))continue;S.custom.push({id:"u"+Date.now()+"_"+n,c:"custom",en:x.en,ko:x.ko||"",src:(src||"").slice(0,60)});n++}save();if(n)setTimeout(()=>clipSync(false),3000);toast(n?n+"장 추가했어요":"이미 있는 표현이에요")}
+function addCards(list,src){let n=0;for(const x of list){if(!x?.en)continue;if(S.custom.some(c=>c.en===x.en))continue;S.custom.push({id:"u"+Date.now()+"_"+n,c:"custom",en:x.en,ko:x.ko||"",...(x.why?{why:x.why}:{}),src:(src||"").slice(0,60)});n++}save();if(n){setTimeout(()=>fillCardKo().then(()=>clipSync(false)),1500)}toast(n?n+"장 추가했어요":"이미 있는 표현이에요")}
 
 /* ---- ANALYSIS (예상 등급·추세) ---- */
 const QTN={desc:"묘사",routine:"습관·루틴",exp:"경험",compare:"비교·변화",rp:"롤플레이",adv:"고난도",intro:"자기소개",chat:"AI 대화",mock:"모의시험"};
@@ -1062,7 +1062,7 @@ let chatWait=4;try{chatWait=+(localStorage.getItem("opic30_cwait")||4)}catch(e){
 function chatRules(sc){return `${sc.persona}
 The learner is Korean, preparing for the OPIc speaking test, target level ${tgt()}. Their profile: ${profileText()}.
 Style: natural spoken American English, 1-3 sentences per turn, ${spec().chat}, and ALWAYS end with a question so the conversation keeps going. Stay in character; do not lecture.
-Correction: look at the learner's LAST message only. If it has a clear grammar mistake, wrong word, or an unnatural phrase, give "fix": {"original": their sentence(s) with the issue, "better": a corrected natural version keeping their meaning, "why": a one-line explanation in Korean}. If their message was fine, set "fix": null. Ignore spelling and punctuation (voice dictation). Never correct more than one thing per turn.
+Correction: look at the learner's LAST message only. If it has a clear grammar mistake, wrong word, or an unnatural phrase, give "fix": {"original": their sentence(s) with the issue, "better": a corrected natural version keeping their meaning, "why": a one-line explanation in Korean, "ko": a natural Korean translation of "better"}. If their message was fine, set "fix": null. Ignore spelling and punctuation (voice dictation). Never correct more than one thing per turn.
 Reply with ONLY a JSON object: {"reply":"your in-character reply","reply_ko":"reply의 한국어 뜻 (짧게)","fix":null}`}
 function vChat(m){
   if(!chat){put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation practice"),h("h1",{},"AI와 대화")),aiNote(),
@@ -1078,7 +1078,7 @@ function vChat(m){
   const sc=chat.sc;const bub=h("div",{class:"bubbles",id:"bubbles"});
   const render1=(u)=>{if(u.who==="ai"){const b=h("div",{class:"bb ai"},u.text,u.ko?h("span",{class:"ko",hidden:true},u.ko):null);b.append(h("div",{class:"row",style:"margin-top:6px;gap:6px"},spkBtn(u.text),h("button",{class:"btn sm ghost",onclick:e=>{const k=b.querySelector(".ko");if(k)k.hidden=!k.hidden}},"해석")));return b}
     if(u.who==="me")return h("div",{class:"bb me"},u.text);
-    if(u.who==="fix")return h("div",{class:"fixc"},h("span",{class:"eyebrow"},"이렇게 말하면 더 자연스러워요"),h("span",{class:"o"},u.fix.original),h("span",{class:"b"},u.fix.better),h("span",{class:"w"},u.fix.why),h("button",{class:"btn sm",style:"align-self:flex-start;margin-top:4px",onclick:()=>{addCards([{en:u.fix.better,ko:u.fix.why}],sc.ko)}},"표현카드에 추가"));
+    if(u.who==="fix")return h("div",{class:"fixc"},h("span",{class:"eyebrow"},"이렇게 말하면 더 자연스러워요"),h("span",{class:"o"},u.fix.original),h("span",{class:"b"},u.fix.better),h("span",{class:"w"},u.fix.why),h("button",{class:"btn sm",style:"align-self:flex-start;margin-top:4px",onclick:()=>{addCards([{en:u.fix.better,ko:u.fix.ko||"",why:u.fix.why||""}],sc.ko)}},"표현카드에 추가"));
     if(u.who==="wait")return h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")))};
   chat.ui.forEach(u=>bub.append(render1(u)));
   const ta=h("textarea",{id:"chat_in",style:"min-height:64px",placeholder:"입력하거나 받아쓰기로 말하세요 — "+DICT_HINT});
@@ -1225,6 +1225,15 @@ ${body}`,{cache:false});
     const arr=r&&Array.isArray(r.answers)?r.answers:Array.isArray(r)?r:[];
     batch.forEach((g,k)=>{const tr=arr[k];if(!Array.isArray(tr)||tr.length!==g.sents.length){audLog.push("번역 줄 수 불일치 → 건너뜀");return}g.sents.forEach((en,m)=>{if((force?want.has(en):!S.trans[en]||want.has(en))&&typeof tr[m]==="string"&&tr[m].trim())S.trans[en]=tr[m].trim()})});
     done+=n;onProgress&&onProgress(Math.min(done,total),total);save()}}
+// my expression cards without a translation: Claude mode → AI translation; web → machine translation (upgraded by AI later)
+async function fillCardKo(){if(fillCardKo.on)return;const ai=!!sample;const miss=(S.custom||[]).filter(c=>c&&/[a-z]/i.test(c.en||"")&&(!String(c.ko||"").trim()||(ai&&c.koSrc==="mt")));if(!miss.length)return;
+  if(!ai&&!(WEB&&navigator.onLine))return;fillCardKo.on=true;let n=0;
+  try{if(ai){for(let i=0;i<miss.length;i+=30){const b=miss.slice(i,i+30);let r=null;
+      try{r=await sample.json(`Translate each English expression below into natural Korean for a Korean OPIc learner's flashcards. Use 해요체 for full sentences and a short natural meaning for phrases. Keep "___" as ___.\n\n${b.map((c,k)=>(k+1)+". "+c.en).join("\n")}\n\nReply with ONLY JSON: {"ko":["...", ...]} — exactly ${b.length} strings, same order.`)}catch(e){break}
+      const arr=r&&Array.isArray(r.ko)?r.ko:null;if(!arr||arr.length!==b.length)continue;b.forEach((c,k)=>{const t=String(arr[k]||"").trim();if(t){c.ko=t;delete c.koSrc;n++}})}}
+    else{for(const c of miss.slice(0,60)){try{const r=await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&q="+encodeURIComponent(c.en.replace(/___/g,"something")));if(!r.ok)break;const j=await r.json();const t=(j&&j[0]||[]).map(x=>x&&x[0]||"").join("").trim();if(t){c.ko=t;c.koSrc="mt";n++}}catch(e){break}}}}
+  finally{fillCardKo.on=false}
+  if(n){save();if(view==="cards")render();if(player.on)for(const it of player.items){if(it.kind==="C"&&!it.ko){const c=S.custom.find(x=>x.en.replace(/___/g,"something")===it.en);if(c&&c.ko)it.ko=c.ko}}toast("내 표현 "+n+"개 해석을 채웠어요")}}
 function transOf(sent){if(S.trans[sent])return S.trans[sent];for(const c of (S.custom||[]))if(c&&c.ko&&String(c.en||"").replace(/___/g,"something").trim()===sent)return c.ko;return ""}
 
 /* ============ BACKGROUND AUDIO SESSION ============ */
@@ -1300,7 +1309,7 @@ function buildSegs(it){const o=player.opts;const segs=[];const src=audSrc(it.key
 // while a natural-voice clip is being fetched, keep the audio session alive with silence (iOS suspends a silent background page)
 // and give up after a timeout so playback never stalls on one sentence
 const SLOW={};const slow=t=>t&&Date.now()-(SLOW[t]||0)<180e3;
-function fillWait(p,tok,ms=12000,key){Promise.resolve(p).then(u=>{if(u&&key)delete SLOW[key]},()=>{});let done=false;const fill=()=>{if(done||!player.on||player.paused||tok!==player.tok)return;audPlay("audio/silence_1.mp3",{rate:1,onend:fill,onerror:()=>{}})};const ft=setTimeout(fill,250);
+function fillWait(p,tok,ms=9000,key){Promise.resolve(p).then(u=>{if(!key)return;if(u)delete SLOW[key];else SLOW[key]=Date.now()},()=>{if(key)SLOW[key]=Date.now()});let done=false;const fill=()=>{if(done||!player.on||player.paused||tok!==player.tok)return;audPlay("audio/silence_1.mp3",{rate:1,onend:fill,onerror:()=>{}})};const ft=setTimeout(fill,250);
   return Promise.race([Promise.resolve(p).catch(()=>null),new Promise(r=>setTimeout(()=>{audLog.push("음성 준비 지연 → 건너뜀");if(key)SLOW[key]=Date.now();r(null)},ms))]).finally(()=>{done=true;clearTimeout(ft)})}
 // fetch the next item's audio ahead of time so background playback does not wait on the network
 function prefetchItem(it){if(!it||!WEB)return;try{for(const x of buildSegs(it).slice(0,10)){
@@ -1326,10 +1335,10 @@ function playerStep(){if(!player.on||player.paused)return;const it=player.items[
   // speech synthesis segments (fallback / Korean): cannot run while the page is in the background on iPhone → skip
   {const up=seg.noUp?null:seg.t==="en"&&seg.text?txtSrc(seg.text):seg.t==="ko"&&seg.en?txtSrc(seg.en,"ko"):null;if(up){const isKo=seg.t==="ko";if(isKo){seg.ko=seg.text;seg.text=""}seg.t="file";seg.src=up;seg.rate=isKo?koR():tts.rate;playerStep();return}}
   // English without a recording: synthesize it on demand with the natural voice (web), device voice only as a last resort
-  if(seg.t==="en"&&!seg.noUp&&!slow(seg.text)&&WEB&&TTS_URL&&navigator.onLine&&AUD.tag!=="off"&&/[a-z]/i.test(seg.text||"")){player.busy=true;fillWait(natUrl(seg.text),tok,12000,seg.text).then(u=>{player.busy=false;if(!player.on||player.paused||tok!==player.tok)return;if(!u){seg.noUp=true;playerStep();return}
+  if(seg.t==="en"&&!seg.noUp&&!slow(seg.text)&&WEB&&TTS_URL&&navigator.onLine&&AUD.tag!=="off"&&/[a-z]/i.test(seg.text||"")){player.busy=true;fillWait(natUrl(seg.text),tok,9000,seg.text).then(u=>{player.busy=false;if(!player.on||player.paused||tok!==player.tok)return;if(!u){seg.noUp=true;playerStep();return}
       audPlay(u,{rate:seg.rate||tts.rate,onend:after,onerror:()=>{if(!player.on||tok!==player.tok)return;seg.noUp=true;playerStep()}})});
     {const nx=player.segs[player.si+1];if(nx&&nx.t==="en"&&nx.text&&!nx.noUp)natUrl(nx.text)}return}
-  if(seg.t==="ko"&&!seg.noUp&&!slow(seg.text)&&WEB&&TTS_URL&&navigator.onLine&&seg.text){player.busy=true;fillWait(natFetch(seg.text,"ko"),tok,12000,seg.text).then(u=>{player.busy=false;if(!player.on||player.paused||tok!==player.tok)return;if(!u){seg.noUp=true;playerStep();return}
+  if(seg.t==="ko"&&!seg.noUp&&!slow(seg.text)&&WEB&&TTS_URL&&navigator.onLine&&seg.text){player.busy=true;fillWait(natFetch(seg.text,"ko"),tok,9000,seg.text).then(u=>{player.busy=false;if(!player.on||player.paused||tok!==player.tok)return;if(!u){seg.noUp=true;playerStep();return}
       audPlay(u,{rate:koR(),onend:after,onerror:()=>{if(!player.on||tok!==player.tok)return;seg.noUp=true;playerStep()}})});return}
   if(!tts.ok||document.hidden){after();return}
   const u=new SpeechSynthesisUtterance(seg.t==="ko"?seg.text:ttsText(seg.text));
@@ -1552,6 +1561,6 @@ loadLocal();cloudInit();render();setTimeout(prepSyncCode,500);setTimeout(()=>{if
       if((remote.updatedAt||0)>(S.updatedAt||0)){S=Object.assign(structuredClone(DEF),remote);try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}else if((S.updatedAt||0)>(remote.updatedAt||0)){mergeState(remote,true)}
       claudeSavedAt=remote.updatedAt||0}
     docRef=col;if(!m.exists&&S.updatedAt)claudePush()}catch(e){docRef=null;toast("Claude 계정 저장소 연결 실패: "+(e.code||e.message||e))}}
-  render();setTimeout(applyPendingSync,300);
+  render();setTimeout(applyPendingSync,300);setTimeout(()=>fillCardKo(),5000);
 })();
 </script>
