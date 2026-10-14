@@ -10,7 +10,7 @@ const CHROMIUM_FULL_VERSION = "143.0.3650.75"; // keep in sync with edge-tts con
 const WSS_HOST = "speech.platform.bing.com";
 const VOICES = {
   m: ["en-US-AndrewMultilingualNeural", "-8%"],
-  f: ["en-US-AvaMultilingualNeural", "-8%"],
+  f: ["en-US-EmmaMultilingualNeural", "-8%"], // Ava Multilingual stopped answering on 2026-10-14
   ko: ["ko-KR-SunHiNeural", "-5%"],
 };
 const MAX_CHARS = 1200;
