@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261014-123020-cf4659">
+<html lang="ko" data-build="20261014-124355-ed690d">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -674,7 +674,7 @@ catch(x){const m=String(x.message||x);log("③ 음성 생성 ✗ — "+m);if(/40
 async function ttsFetch(text,tag){let err;for(let k=0;k<6;k++){try{return await ttsFetch1(text,tag)}catch(e){err=e;if(!/ 403|429|50[234]/.test(String(e.message||e)))throw e;await new Promise(r=>setTimeout(r,400*(k+1)))}}throw err}
 async function ttsFetch1(text,tag){const r=await fetch(TTS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,tag})});if(!r.ok)throw new Error("tts "+r.status+" "+(await r.text()).slice(0,400));const u8=new Uint8Array(await r.arrayBuffer());if(!isMp3(u8))throw new Error("tts 응답이 mp3가 아님 ("+u8.length+"B)");return u8}
 async function clipSync(force){if(clipJob.on||!WEB||!cloud.ref||!TTS_URL||!navigator.onLine)return;let todo=clipMissing();if(!todo.length)return;{const want=new Map();let i=0;const its=player.on?[...player.items.slice(player.i),...player.items.slice(0,player.i)]:[];for(const it of its)for(const sn of splitSent(it.en||""))if(!want.has(txtHash(sn)))want.set(txtHash(sn),i++);todo.sort((a,b)=>(want.has(a[0])?want.get(a[0]):1e9)-(want.has(b[0])?want.get(b[0]):1e9))}
-  clipJob.on=true;clipJob.done=0;clipJob.total=todo.length;clipJob.err=0;clipJob.last="";const upd=()=>{const el=$("#clipst");if(el)el.replaceChildren(clipStatus())};upd();
+  clipJob.on=true;clipJob.lastRun=Date.now();clipJob.lastErr="";clipJob.done=0;clipJob.total=todo.length;clipJob.err=0;clipJob.last="";const upd=()=>{const el=$("#clipst");if(el)el.replaceChildren(clipStatus())};upd();
   const col=cloud.ref.collection("clips");const idxRef=cloud.ref.collection("meta").doc("clipidx");
   for(const [h,sn] of todo){if(!player||!cloud.ref)break;try{const ko=transOf(sn);const doc={h,en:sn,t:Date.now()};const has=CLIPS.idx.has(h);
       for(const tag of (has?["ko"]:["m","f","ko"])){const text=tag==="ko"?ko:sn;if(!text)continue;const bytes=await ttsFetch(text,tag);doc[tag]=firebase.firestore.Blob.fromUint8Array(bytes);
@@ -688,8 +688,8 @@ function clipStatus(){const miss=clipMissing().length;const n=clipSentences();co
   if(!TTS_URL)return h("span",{class:"muted small"},"음성 서버 주소가 없어 기기 음성으로 읽어요 (설정 → 음성 서버)");
   if(!cloud.ref)return h("span",{class:"muted small"},"로그인하면 스크립트 문장을 자연스러운 음성으로 자동 녹음해요");
   if(clipJob.on)return h("span",{class:"small",style:"color:var(--accent)"},"🎙 자동 녹음 중 "+clipJob.done+"/"+clipJob.total+(clipJob.err?" (실패 "+clipJob.err+")":"")+" · "+clipJob.last);
-  if(miss)return h("span",{class:"row",style:"flex-wrap:wrap"},h("span",{class:"small"},"🎙 자연스러운 음성 녹음 안 된 문장 "+miss+"/"+total),h("button",{class:"btn sm",onclick:()=>clipSync(true)},"지금 녹음"),clipJob.lastErr?h("span",{class:"small",style:"color:var(--bad);width:100%"},/403/.test(clipJob.lastErr)?"음성 서비스(Microsoft)가 잠시 요청을 거절하고 있어요. "+(clipJob.retryAt?new Date(clipJob.retryAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})+"에 자동으로 다시 시도해요. ":"")+"녹음 안 된 문장은 그동안 기기 음성으로 읽어요.":"마지막 오류: "+clipJob.lastErr):null);
-  return h("span",{class:"chip good"},"스크립트 "+total+"문장 모두 자연스러운 음성 준비됨")}
+  if(miss)return h("span",{class:"row",style:"flex-wrap:wrap"},h("span",{class:"small"},"🎙 자연스러운 음성 녹음 안 된 문장 "+miss+"/"+total+(clipJob.retryAt&&clipJob.retryAt>Date.now()?" · 대기 중":clipJob.lastRun?" · 마지막 시도 "+new Date(clipJob.lastRun).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}):"")),h("button",{class:"btn sm",onclick:()=>clipSync(true)},"지금 녹음"),clipJob.lastErr?h("span",{class:"small",style:"color:var(--bad);width:100%"},/403/.test(clipJob.lastErr)?"음성 서비스(Microsoft)가 잠시 요청을 거절하고 있어요. "+(clipJob.retryAt?new Date(clipJob.retryAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})+"에 자동으로 다시 시도해요. ":"")+"녹음 안 된 문장은 그동안 기기 음성으로 읽어요.":"마지막 오류: "+clipJob.lastErr):null);
+  return h("span",{class:"chip good"},"스크립트·내 표현 "+total+"문장 모두 자연스러운 음성 준비됨")}
 const txtSrc=(text,lang="en")=>{const t=lang==="ko"?"ko":AUD.tag;if(t==="off")return null;const h=txtHash(text);/* text = the English sentence, also for its Korean clip */
   if(AUD.txt[t]&&AUD.txt[t][h])return "audio/s/"+t+"/"+h+".mp3";
   if(CLIPS.idx.has(h)&&!(CLIPS.bad&&CLIPS.bad.has(h))&&(t!=="ko"||koFresh(h,text)))return "fs:"+t+"/"+h;return null};
@@ -765,7 +765,7 @@ function natUrl(sn){const f=txtSrc(sn);if(f&&!/^fs:/.test(f))return Promise.reso
 function natFetch(sn,lang){const tag=lang==="ko"?"ko":AUD.tag==="f"?"f":"m";const k=tag+"/"+(tag==="ko"?"k"+koHash(sn):txtHash(sn));if(NAT.urls[k])return Promise.resolve(NAT.urls[k]);if(NAT.busy[k])return NAT.busy[k];
   NAT.busy[k]=(async()=>{try{const cache=await (self.caches?caches.open("oss-clips").catch(()=>null):null);const ck="/tts/"+k;
     if(cache){const hit=await cache.match(ck);if(hit){const u=URL.createObjectURL(await hit.blob());NAT.urls[k]=u;return u}}
-    if(!WEB||!TTS_URL)return null;const bytes=await ttsFetch1(sn,tag).catch(e=>/ 403|50[234]/.test(String(e.message||e))?ttsFetch1(sn,tag):Promise.reject(e));const blob=new Blob([bytes],{type:"audio/mpeg"});if(cache)cache.put(ck,new Response(blob)).catch(()=>{});
+    if(!WEB||!TTS_URL)return null;const again=e=>/ 403|429|50[234]/.test(String(e.message||e))?new Promise(r=>setTimeout(r,300)).then(()=>ttsFetch1(sn,tag)):Promise.reject(e);const bytes=await ttsFetch1(sn,tag).catch(again).catch(again);const blob=new Blob([bytes],{type:"audio/mpeg"});if(cache)cache.put(ck,new Response(blob)).catch(()=>{});
     const u=URL.createObjectURL(blob);NAT.urls[k]=u;return u}catch(e){audLog.push("즉석 음성 실패: "+(e.message||e));return null}finally{delete NAT.busy[k]}})();return NAT.busy[k]}
 function natSpeak(text,{btn,rate,onend,fallback}){const ss=splitSent(text);const cur={u:null,btn,nat:true};tts.cur=cur;if(btn){btn.classList.add("on");btn.innerHTML=STOP_ICON}
   const done=()=>{if(tts.cur!==cur)return;if(btn){btn.classList.remove("on");btn.innerHTML=SPK_ICON}tts.cur=null;onend&&onend()};
@@ -1335,8 +1335,25 @@ function prefetchItem(it){if(!it||!WEB)return;try{for(const x of buildSegs(it).s
   if(x.t==="file"&&/^fs:/.test(x.src)){const [t2,h2]=x.src.slice(3).split("/");clipUrl(t2,h2)}
   else if(x.t==="en"&&x.text&&!x.noUp&&TTS_URL&&navigator.onLine&&AUD.tag!=="off")natUrl(x.text).catch(()=>{});
   else if(x.t==="ko"&&x.text&&TTS_URL&&navigator.onLine){const f=x.en&&txtSrc(x.en,"ko");if(f&&/^fs:/.test(f)){const [t2,h2]=f.slice(3).split("/");clipUrl(t2,h2)}else if(!f)natFetch(x.text,"ko").catch(()=>{})}}}catch(e){}}
+const natHas=sn=>!!NAT.urls[(AUD.tag==="f"?"f":"m")+"/"+txtHash(sn)];
+function playerSkipItem(){player.skipN=(player.skipN||0)+1;audLog.push("녹음 안 된 문장 → 항목 건너뜀");
+  player.loop=0;player.i=(player.i+1)%player.items.length;player.si=0;
+  // nothing in the list can be played right now: keep the audio session alive with 20s of silence, then try again
+  if(player.skipN>=player.items.length){player.skipN=0;if((+player.opts.repeat)!==0)player.i=(player.i+player.items.length-1)%player.items.length;player.segs=silenceSegs(20);audLog.push("재생 가능한 항목 없음 → 20초 대기")}else player.segs=[];
+  if(view==="listen")updateNow();renderMini();playerStep()}
 function playerStep(){if(!player.on||player.paused)return;const it=player.items[player.i];if(!it){playerStop();return}
-  if(!player.segs.length){player.segs=buildSegs(it);player.si=0;setTimeout(()=>prefetchItem(player.items[(player.i+1)%player.items.length]),1500);renderMini();mediaSession();if(view==="listen")updateNow()}
+  if(!player.segs.length){player.segs=buildSegs(it);player.si=0;setTimeout(()=>prefetchItem(player.items[(player.i+1)%player.items.length]),1500);
+    // English sentences without a recording: fetch them all first. If they cannot be made, then in the background (no device voice there)
+    // skip the whole item instead of stuttering or playing only its Korean; in the foreground the device voice reads them.
+    const need=(WEB&&TTS_URL&&AUD.tag!=="off")?[...new Set(player.segs.filter(x=>x.t==="en"&&!x.noUp&&/[a-z]/i.test(x.text||"")&&!txtSrc(x.text)&&!natHas(x.text)).map(x=>x.text))]:[];
+    if(need.length){const tok=player.tok=(player.tok||0)+1;
+      const fail=()=>{need.forEach(t=>{if(!natHas(t))SLOW[t]=SLOW[t]||Date.now()});if(!clipJob.on&&(!clipJob.retryAt||Date.now()>clipJob.retryAt))setTimeout(()=>clipSync(false),500);
+        // keep trying to make them in the background; when they arrive the item is played again a few items later
+        need.forEach(t=>natUrl(t).then(u=>{if(u)delete SLOW[t]},()=>{}));
+        if(document.hidden){if((it._retry||0)<3&&player.items.length>1){const at=Math.min(player.items.length,player.i+4);player.items.splice(at,0,{...it,_retry:(it._retry||0)+1})}playerSkipItem();return}playerStep()};
+      if(need.some(t=>slow(t))||!navigator.onLine){fail();return}
+      player.busy=true;fillWait(Promise.all(need.map(t=>natUrl(t).catch(()=>null))).then(a=>a.every(Boolean)||null),tok,8000).then(ok=>{player.busy=false;if(!player.on||player.paused||tok!==player.tok)return;if(!ok){fail();return}player.skipN=0;playerStep()});return}
+    player.skipN=0;renderMini();mediaSession();if(view==="listen")updateNow()}
   if(player.si>=player.segs.length){if((+player.opts.repeat)===0){player.loop=(player.loop||0)+1;player.segs=[];player.si=0;playerStep();return}player.loop=0;player.i=(player.i+1)%player.items.length;player.segs=[];player.si=0;if(player.i===0)player.items=buildPlaylist();playerStep();return}
   try{localStorage.setItem("opic30_pos",JSON.stringify({ts:Date.now(),mode:player.opts.mode,i:player.i,si:player.si,items:player.items}))}catch(e){}
   const seg=player.segs[player.si];const tok=player.tok=(player.tok||0)+1;
@@ -1423,7 +1440,7 @@ function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem
     h("div",{class:"cks"},ck("q","시험 질문 (80+)"),ck("cards","표현카드 ("+(CARDS.length+S.custom.length)+")"),ck("shuffle","섞기")),
     ...common,
     h("div",{class:"note"},"시험 질문과 표현카드는 영어·한국어 해석 모두 녹음 파일이라 화면을 꺼도, 다른 앱을 써도 이어지고 잠금화면·이어폰 버튼으로 조작돼요. 빈칸(___)이 있는 표현은 화면에 실제 예문이 함께 표시됩니다.")];
-  const clipLine=(WEB&&o.mode!=="sent")?h("div",{id:"clipst",class:"note",style:"align-items:center;margin:0"},clipStatus()):null;
+  const clipLine=WEB?h("div",{id:"clipst",class:"note",style:"align-items:center;margin:0"},clipStatus()):null;
   const scriptOpts=[h("p",{class:"eyebrow"},"주제 선택 · 스크립트 탭에서 만든 내 스크립트 "+nScripts+"개"),
     sts.length?topicPick:h("p",{class:"muted small"},"저장된 스크립트가 아직 없어요. 스크립트 탭에서 주제별로 만들면 여기에 나타납니다."),
     h("div",{class:"cks"},ck("withQ","질문도 같이 듣기"),ck("shuffle","섞기")),
