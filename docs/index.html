@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261016-000216-833d07">
+<html lang="ko" data-build="20261016-000427-96abad">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -935,7 +935,7 @@ function vHistory(m){const KIND={practice:"연습",mock:"모의시험",chat:"대
     const det=h("div",{class:"card",style:"margin:-4px 0 6px;gap:12px"},
       l.q?h("div",{},h("p",{class:"eyebrow"},"질문"),h("div",{class:"row",style:"align-items:flex-start;flex-wrap:nowrap"},h("p",{class:"small grow",style:"font-weight:600"},l.q),spkBtn(l.q,null,q?"q_"+t.id+"_"+t.qs.indexOf(q):null))):null,
       l.a?h("div",{},h("p",{class:"eyebrow"},"내 답변"),h("div",{class:"model"},l.a)):null,
-      l.level?h("p",{class:"muted small"},"AI 판정 레벨: "+(l.lvRaw||l.level)+(lvNorm(l.lvRaw||l.level)!==String(l.lvRaw||l.level).trim()?" → "+LEVELS[lvIdx(l.lvRaw||l.level)]+"로 기록":"")+(l.score!=null?" · "+l.score+"점":"")):null,
+      l.level?h("p",{class:"muted small"},"AI 판정 레벨: "+(l.lvRaw||l.level)+(lvNorm(l.lvRaw||l.level)!==String(l.lvRaw||l.level).trim()?" → "+LEVELS[lvIdx(l.lvRaw||l.level)]+"로 기록":"")+(l.score!=null?" · "+l.score+"점":"")):null,tierLine(l.tier),
       l.sum?h("div",{},h("p",{class:"eyebrow"},"총평"),h("p",{class:"small"},l.sum)):null,
       (l.str||[]).length?h("div",{},h("p",{class:"eyebrow"},"잘한 점"),...l.str.map(x=>h("p",{class:"small"},"✓ "+x))):null,
       fx.length?h("div",{},h("p",{class:"eyebrow"},l.kind==="mock"?"개선 포인트":"고칠 부분"),...fx.map(x=>x.o||x.b?h("div",{class:"fix"},x.o?h("span",{class:"o"},x.o):null,x.b?h("span",{class:"b"},x.b):null,x.w?h("span",{class:"w"},x.w):null):h("p",{class:"small"},"• "+x.w))):null,
@@ -1004,7 +1004,7 @@ function vAnswer(m,s){
     fbBox.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"Claude가 평가 중… (10–40초)")));
     try{const prog=fbBox.querySelector(".thinking span");const r=await evaluate(q.q,a,secs||Math.round(a.split(/\s+/).length/2.3),({text})=>{if(prog)prog.textContent="Claude가 평가 작성 중… "+(text||"").length+"자"});
       renderFeedback(fbBox,r,q.q,a);if(r.model_target){S.models=S.models||{};S.models[q.q]=r.model_target;S.modelsAt=S.modelsAt||{};S.modelsAt[q.q]=Date.now()}
-      S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",qt:q.t,tid:topic.id,q:q.q,a,sum:r.summary||"",str:(r.strengths||[]).slice(0,3),model:r.model_target||"",title:topic.en+" · "+(s.kind||""),level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:secs||0,fixes:(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}))});S.today.practice++;save();
+      S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",tier:r._tier,qt:q.t,tid:topic.id,q:q.q,a,sum:r.summary||"",str:(r.strengths||[]).slice(0,3),model:r.model_target||"",title:topic.en+" · "+(s.kind||""),level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:secs||0,fixes:(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}))});S.today.practice++;save();
       const nextRp=s.rp&&s.step<13?h("button",{class:"btn primary",onclick:()=>{const st=s.step+1;go("practice",{topic,q:{t:"rp",q:s.rp["q"+st]},kind:"롤플레이 "+st+"번 · "+(st===12?"문제 해결":"관련 경험"),rp:s.rp,step:st})}},"다음: "+(s.step+1)+"번 →"):null;
       put(fbBox,h("div",{class:"row"},nextRp,h("button",{class:"btn",onclick:()=>{ta.value="";ta._timed=false;startBtn.textContent="말하기 시작";fbBox.replaceChildren();secs=0;tEl.textContent="0:00";bar.firstChild.style.width="0";evalBtn.disabled=false}},"같은 질문 다시"),h("button",{class:"btn",onclick:()=>go("practice")},"다른 질문")));
     }catch(e){console.warn("evaluate failed",e);fbBox.replaceChildren(h("p",{class:"small",style:"color:var(--bad)"},errMsg(e)),e?.message?h("p",{class:"muted small mono",style:"word-break:break-all"},String(e.message).slice(0,200)):null,(e.code!=="not_granted"&&e.code!=="sampling_disabled")?h("button",{class:"btn sm",onclick:()=>{evalBtn.disabled=false;evalBtn.click()}},"다시 시도"):null);if(e.code!=="not_granted"&&e.code!=="sampling_disabled")evalBtn.disabled=false}
@@ -1020,9 +1020,9 @@ function vAnswer(m,s){
     myScript?h("details",{class:"card"},h("summary",{},"내 스크립트 보기"),h("div",{class:"model"},myScript)):null,
     fbBox);
 }
-function renderFeedback(box,r,q,a){
+function renderFeedback(box0,r,q,a){const box={replaceChildren:(...k)=>box0.replaceChildren(...k.filter(x=>x!=null&&x!==false))};
   box.replaceChildren(
-    h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level||"?"),h("span",{class:"muted mono"},(r.score??"")+" / 100"),lvIdx(r.level)>=tgtIdx()?h("span",{class:"chip good"},"목표 달성"):h("span",{class:"chip warn"},"목표 "+tgt()+"까지 "+(tgtIdx()-lvIdx(r.level))+"단계")),h("p",{},r.summary||""),
+    h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level||"?"),h("span",{class:"muted mono"},(r.score??"")+" / 100"),lvIdx(r.level)>=tgtIdx()?h("span",{class:"chip good"},"목표 달성"):h("span",{class:"chip warn"},"목표 "+tgt()+"까지 "+(tgtIdx()-lvIdx(r.level))+"단계")),h("p",{},r.summary||""),tierLine(r._tier),
       r.strengths?.length?h("div",{},h("p",{class:"eyebrow"},"잘한 점"),h("ul",{style:"margin:4px 0 0;padding-left:18px"},...r.strengths.map(s=>h("li",{},s)))):null),
     r.fixes?.length?h("div",{class:"card"},h("h3",{},"고칠 표현"),...r.fixes.map(f=>h("div",{class:"fix"},h("span",{class:"o"},f.original),h("span",{class:"b"},f.better),h("span",{class:"w"},f.why)))):null,
     (()=>{const mt=r.model_target||r.model_im3||"";const T=r.target||"IM3";return h("div",{class:"card"},h("h3",{},"모범답안 · "+T),h("div",{class:"model"},mt),h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>copy(mt)},"복사"),h("button",{class:"btn sm",onclick:()=>go("listen",{text:mt,title:"모범답안 · "+T})},"쉐도잉"),spkBtn(mt)))})(),
@@ -1082,6 +1082,7 @@ function coachCard(a){const cached=S.analysis;const fresh=cached&&(Date.now()-(c
   const sec=(t,...k)=>h("div",{style:"display:flex;flex-direction:column;gap:6px"},h("p",{class:"eyebrow"},t),...k);
   const show=r=>{const old=!r.headline&&!r.gap;box.replaceChildren(...[
     h("p",{class:"muted small"},"분석 "+new Date(r.ts).toLocaleString("ko-KR",{year:"numeric",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})+(()=>{const n=S.log.filter(l=>l.kind!=="card"&&l.level&&(l.ts||0)>r.ts).length;return n?" · 이후 새 기록 "+n+"건 (다시 분석하면 반영돼요)":""})()+(old?" · 예전 형식 — '다시 분석'을 누르면 상세 코칭으로 바뀌어요":"")),
+    tierLine(r._tier),
     r.headline?h("p",{style:"font-weight:700;font-size:16px;line-height:1.45"},r.headline):null,
     r.gap?sec("목표 "+tgt()+"까지 남은 것",h("p",{class:"small"},r.gap)):null,
     (r.strengths||[]).length?sec("지금 잘하고 있는 것",...r.strengths.map(x=>h("p",{class:"small"},"✓ "+x))):null,
@@ -1195,11 +1196,11 @@ async function vChatSummary(m){
   if(chat.summary==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"대화 평가 중…")));put(m,h("h1",{},"대화 정리"),box);
     const tr=chat.ui.filter(u=>u.who==="ai"||u.who==="me").map(u=>(u.who==="ai"?"Partner: ":"Learner: ")+u.text).join("\n");
     try{const r=await sample.json(`${RUBRIC()}\n\nThis is a transcript of a practice conversation (${chat.sc.en}). Rate ONLY the learner's turns.\n\n${tr}\n\nReply with ONLY JSON: {"level":"IM2","score":60,"summary":"한국어 총평 2-3문장","fixes":[{"original":"...","better":"...","why":"한국어"}],"expressions":[{"en":"useful natural expression the learner could have used","ko":"뜻"}],"next":"다음 대화에서 시도할 한 가지 (한국어)"}\nGive 3-5 fixes and 4-6 expressions.`,{cache:false});
-      chat.summary=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"chat",qt:"chat",sum:r.summary||"",title:"대화 · "+chat.sc.ko+" · "+chat.n+"턴",level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:chat.n*45,fixes:[...(chat.ui.filter(u=>u.who==="fix").map(u=>({o:u.fix.original,b:u.fix.better,w:u.fix.why}))),...(r.fixes||[]).map(f=>({o:f.original,b:f.better,w:f.why}))].slice(0,8)});S.today.practice++;save();render()}
+      chat.summary=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"chat",tier:r._tier,qt:"chat",sum:r.summary||"",title:"대화 · "+chat.sc.ko+" · "+chat.n+"턴",level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:chat.n*45,fixes:[...(chat.ui.filter(u=>u.who==="fix").map(u=>({o:u.fix.original,b:u.fix.better,w:u.fix.why}))),...(r.fixes||[]).map(f=>({o:f.original,b:f.better,w:f.why}))].slice(0,8)});S.today.practice++;save();render()}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("button",{class:"btn",onclick:()=>{chat=null;render()}},"닫기"))}return}
   const r=chat.summary;
   put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation review · "+chat.sc.ko),h("h1",{},"대화 정리")),
-    h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level||"?"),h("span",{class:"muted mono"},(r.score??"")+" / 100")),h("p",{},r.summary||""),r.next?h("p",{class:"small"},h("b",{},"다음엔: "),r.next):null),
+    h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level||"?"),h("span",{class:"muted mono"},(r.score??"")+" / 100")),h("p",{},r.summary||""),r.next?h("p",{class:"small"},h("b",{},"다음엔: "),r.next):null,tierLine(r._tier)),
     r.fixes?.length?h("div",{class:"card"},h("h3",{},"고칠 표현"),...r.fixes.map(f=>h("div",{class:"fix"},h("span",{class:"o"},f.original),h("span",{class:"b"},f.better),h("span",{class:"w"},f.why)))):null,
     r.expressions?.length?h("div",{class:"card"},h("h3",{},"이렇게 말할 수 있었어요"),h("div",{class:"kx"},...r.expressions.map(x=>h("div",{},h("span",{class:"en"},x.en),h("span",{class:"ko"},x.ko)))),h("button",{class:"btn sm",onclick:()=>addCards(r.expressions,chat.sc.ko)},"표현카드에 추가")):null,
     h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{const sc=chat.sc;chat=null;startChat(sc)}},"같은 상대와 다시"),h("button",{class:"btn",onclick:()=>{chat=null;render()}},"닫기")));
@@ -1271,12 +1272,12 @@ async function vMockResult(m){
   if(mock.result==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"15문항 채점 중… (30–90초)")));
     put(m,h("h1",{},"채점 중"),box);
     if(!sample){box.replaceChildren(h("p",{},ERR.not_granted),h("button",{class:"btn",onclick:()=>{mock=null;render()}},"닫기"));return}
-    try{const r=await evalMock(mock.items,null);mock.result=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"mock",qt:"mock",sum:r.summary||"",pq:(r.per_question||[]).map((x,i)=>({q:(mock.items[i]||{}).q||"",a:((mock.items[i]||{}).a||"").slice(0,600),l:x.level,c:x.comment,b:x.better})),title:"모의시험 "+mock.items.length+"문항 · 난이도 "+mockDiffLabel(),diff:mockDiffLabel(),level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0),fixes:(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)})),perq:(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}))});save();render()}
+    try{const r=await evalMock(mock.items,null);mock.result=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"mock",tier:r._tier,qt:"mock",sum:r.summary||"",pq:(r.per_question||[]).map((x,i)=>({q:(mock.items[i]||{}).q||"",a:((mock.items[i]||{}).a||"").slice(0,600),l:x.level,c:x.comment,b:x.better})),title:"모의시험 "+mock.items.length+"문항 · 난이도 "+mockDiffLabel(),diff:mockDiffLabel(),level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0),fixes:(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)})),perq:(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}))});save();render()}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{render()}},"다시 시도"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"닫기")))}
     return}
   const r=mock.result;
   put(m,h("div",{},h("p",{class:"eyebrow"},"Mock result"),h("h1",{},"모의시험 결과")),
-    h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level),h("span",{class:"muted mono"},(r.score??"")+" / 100"),lvIdx(r.level)>=tgtIdx()?h("span",{class:"chip good"},"목표 달성"):h("span",{class:"chip warn"},"목표 "+tgt())),h("p",{},r.summary||""),
+    h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level),h("span",{class:"muted mono"},(r.score??"")+" / 100"),lvIdx(r.level)>=tgtIdx()?h("span",{class:"chip good"},"목표 달성"):h("span",{class:"chip warn"},"목표 "+tgt())),h("p",{},r.summary||""),tierLine(r._tier),
       r.top_fixes?.length?h("div",{},h("p",{class:"eyebrow"},"가장 먼저 고칠 것"),h("ol",{style:"margin:4px 0 0;padding-left:18px"},...r.top_fixes.map(s=>h("li",{},s)))):null),
     h("div",{class:"card"},h("h3",{},"문항별"),h("div",{class:"list"},...(r.per_question||[]).map(p=>{const it=mock.items[(p.n||1)-1]||{};return h("div",{class:"li",style:"flex-direction:column;align-items:stretch;gap:4px"},h("div",{class:"row"},h("span",{class:"mono small muted"},"Q"+p.n),h("span",{class:"grow small"},it.kind||""),lvChip(p.level)),h("span",{class:"small"},p.comment),p.better?h("span",{class:"small",style:"color:var(--accent)"},"→ "+p.better):null)}))),
     h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{mock=null;render()}},"닫기")));
@@ -1659,12 +1660,14 @@ function parseReply(t){const tryP=x=>{try{return {ok:true,v:JSON.parse(x)}}catch
   const f=/```(?:json)?\s*([\s\S]*?)```/.exec(t||"");if(f){r=tryP(f[1].trim());if(r.ok)return r.v}
   const i=String(t).search(/[\[{]/),j=Math.max(String(t).lastIndexOf("}"),String(t).lastIndexOf("]"));if(i>=0&&j>i){r=tryP(String(t).slice(i,j+1));if(r.ok)return r.v}
   const e=new Error("invalid_json");e.code="invalid_json";e.text=t;throw e}
+const TIER_KO={default:"기본 모델(균형형)",quick:"빠른 모델",complex:"최고 성능 모델"};
+function tierLine(t){if(!t||!t.applied)return null;const low=t.req&&t.applied!==t.req;return h("p",{class:"muted small",style:"margin:6px 0 0"},"🤖 분석 모델: "+(TIER_KO[t.applied]||t.applied)+(low?" — 요청한 "+(TIER_KO[t.req]||t.req)+" 대신 요금제에 맞춰 대체됨":""))}
 function tierCount(req,applied){try{S.usage=S.usage||{};const m=S.usage.tier=S.usage.tier||{};const k=(req||"default")+">"+(applied||req||"default");m[k]=(m[k]||0)+1}catch(e){}}
 function wrapSample(s){const w=(...a)=>s(...a);w.json=async(input,opt)=>{aiCount(input);
     // use the plain call so we learn which model tier actually answered (json() does not report it)
     const want=(opt&&opt.modelTier)||"default";const r=await s(input,opt);tierCount(want,r&&r.modelTierApplied);
     if(r&&r.truncated){const e=new Error("invalid_json");e.code="invalid_json";e.text=r.text;throw e}
-    const v=parseReply(r&&r.text);return v==null?v:JSON.parse(JSON.stringify(v))};if(s.limits)w.limits=(...a)=>s.limits(...a);return w}
+    const v=parseReply(r&&r.text);const out=v==null?v:JSON.parse(JSON.stringify(v));if(out&&typeof out==="object"&&!Array.isArray(out))out._tier={req:want,applied:(r&&r.modelTierApplied)||want};return out};if(s.limits)w.limits=(...a)=>s.limits(...a);return w}
 function aiGate(){const box=h("span",{class:"row",style:"gap:6px"});const note=h("span",{class:"muted small"},"AI 기능 확인 중…");
   const btn=h("button",{class:"btn",onclick:async()=>{try{const P=await claude.use("permissions");if(!P){note.textContent="이 기기의 Claude 앱에서는 AI 평가를 쓸 수 없어요. 브라우저에서 claude.ai로 열어 주세요";return}
       let st=await P.state("sample");if(st==="prompt"){const r=await P.request(["sample"]);st=r.sample||st}
