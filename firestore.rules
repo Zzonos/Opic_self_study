@@ -15,5 +15,11 @@ service cloud.firestore {
       match /clips/{clip} { allow read, write: if request.auth != null && request.auth.uid == uid; }
     }
     match /users/{uid}/meta/{doc} { allow read, write: if request.auth != null && request.auth.uid == uid; }
+    // 계정별 사용량 요약: 각자 자기 것만 쓰고, 관리자(아래 이메일)만 전체를 읽을 수 있어요
+    function isAdmin() { return request.auth != null && request.auth.token.email == "zzono717@gmail.com"; }
+    match /stats/{uid} {
+      allow write: if request.auth != null && request.auth.uid == uid;
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+    }
   }
 }

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261015-164625-3d4f69">
+<html lang="ko" data-build="20261015-205747-4ad917">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -405,7 +405,8 @@ function claudePush(){if(!docRef||!claudeCanWrite)return;clearTimeout(claudePush
       toast(e&&e.code==="invalid_argument"&&window.__oss_notOwner?"이 계정은 이 페이지에 '보기' 권한으로 초대돼 Claude에 저장할 수 없어요. 소유자에게 '편집' 권한으로 초대해 달라고 하세요":"Claude 계정 저장 실패: "+(e.code||e.message||e))}}})},800)}
 let claudeSavedAt=0;function claudeStatus(){if(!claudeCanWrite)return "보기 권한이라 Claude에 저장되지 않아요 (이 기기에만 저장) — 소유자에게 편집 권한을 요청하세요";return claudeSavedAt?"Claude 계정에 저장됨 · "+new Date(claudeSavedAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}):"Claude 계정 저장 대기 중"}
 const logKey=l=>l.date+"|"+l.kind+"|"+l.title+"|"+(l.score??"");
-function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;const key=logKey;
+function mergeUsage(u){if(!u||typeof u!=="object")return;S.usage=S.usage||{};const mx=(a,b)=>{for(const [k,v] of Object.entries(b||{})){if(typeof v==="number")a[k]=Math.max(a[k]||0,v);else if(v&&typeof v==="object"){a[k]=a[k]&&typeof a[k]==="object"?a[k]:{};mx(a[k],v)}}};mx(S.usage,u)}
+function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;mergeUsage(o.usage);const key=logKey;
   if(Array.isArray(o.del)&&o.del.length){const d=new Set(S.del||[]);o.del.forEach(k=>d.add(k));S.del=[...d].slice(-3000)}const dead=new Set(S.del||[]);if(dead.size)S.log=S.log.filter(l=>!dead.has(key(l)));
   const seen=new Set([...S.log.map(key),...dead]);for(const l of (o.log||[]))if(!seen.has(key(l))){S.log.push(l);seen.add(key(l))}S.log.sort((a,b)=>a.date<b.date?-1:1);
   // newer wins (exact time when known); a record sent from Claude also wins a tie, since scripts are made there
@@ -428,8 +429,8 @@ function syncPayload(){if(!S.syncedAt||S.syncFull)return fullPayload();
   let trans={};if((S.transAllAt||0)>since)trans=S.trans||{};else{const sents=new Set();const add=t=>splitSent(t).forEach(x=>sents.add(x));
     for(const sc of [...Object.values(scripts),...Object.values(samples)])for(const x of (sc.scripts||[]))add(x&&x.answer);for(const m of Object.values(models))add(m);
     for(const x of sents)if(S.trans[x])trans[x]=S.trans[x]}
-  return {delta:true,del:S.del||[],log:S.log.filter(l=>(l.ts||Date.parse(l.date)||0)>since),scripts,samples,models,trans,custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,updatedAt:S.updatedAt}}
-function fullPayload(){return {del:S.del||[],log:S.log,scripts:S.scripts,samples:S.samples||{},models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,updatedAt:S.updatedAt}}
+  return {delta:true,del:S.del||[],log:S.log.filter(l=>(l.ts||Date.parse(l.date)||0)>since),scripts,samples,models,trans,custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,usage:S.usage||{},updatedAt:S.updatedAt}}
+function fullPayload(){return {del:S.del||[],log:S.log,scripts:S.scripts,samples:S.samples||{},models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,usage:S.usage||{},updatedAt:S.updatedAt}}
 function packStateSync(){return "r"+b64u(new TextEncoder().encode(JSON.stringify(syncPayload())).buffer)}
 const SYNC_LIM=180000;
 async function packJSON(obj){const bytes=new TextEncoder().encode(JSON.stringify(obj));
@@ -510,8 +511,30 @@ async function histArchive(){if(!cloud.ref)return;for(const l of S.log){if(!l.ts
 function histLoad(ts){if(HIST[ts]||!cloud.ref)return Promise.resolve(HIST[ts]||null);return cloud.ref.collection("meta").doc("h_"+ts).get().then(d=>{if(!d.exists)return null;const l=JSON.parse(d.data().l||"null");HIST[ts]=l;return l}).catch(()=>null)}
 function cloudState(){const o=Object.assign({},S);const keep=S.log.length-40;o.log=S.log.map((l,i)=>i<keep&&l.ar&&hasDet(l)?(()=>{const c=Object.assign({},l);delete c.a;delete c.model;delete c.pq;delete c.str;return c})():l);return JSON.stringify(o)}
 async function cloudPush(now){if(!cloud.ref)return;clearTimeout(cloud.pushT);const doIt=async()=>{try{/* merge what another device saved first, so this push never overwrites it */try{const snap=await cloud.ref.get({source:"server"});if(snap.exists){const d=snap.data();if(d.updatedAt&&d.updatedAt!==cloud.lastPush&&d.state)mergeState(JSON.parse(d.state),true)}}catch(e){}
-    cloud.lastPush=S.updatedAt||Date.now();await histArchive();await cloud.ref.set({state:cloudState(),updatedAt:cloud.lastPush,email:cloud.user?.email||""},{merge:true});const el=$("#syncst");if(el)el.textContent="동기화됨 "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}catch(e){const el=$("#syncst");if(el)el.textContent="동기화 실패: "+(e.code||e.message)}};
+    cloud.lastPush=S.updatedAt||Date.now();await histArchive();await cloud.ref.set({state:cloudState(),updatedAt:cloud.lastPush,email:cloud.user?.email||""},{merge:true});statsPush();const el=$("#syncst");if(el)el.textContent="동기화됨 "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}catch(e){const el=$("#syncst");if(el)el.textContent="동기화 실패: "+(e.code||e.message)}};
   if(now)await doIt();else cloud.pushT=setTimeout(doIt,1500)}
+// per-account usage summary (each user writes only their own; the owner account can read all — see firestore.rules)
+const ADMIN_EMAIL="zzono717@gmail.com";
+function usageStats(){const L=S.log||[];const by=k=>L.filter(l=>l.kind===k).length;const u=S.usage||{};
+  return {email:cloud.user?.email||"",name:S.profile.name||"",target:tgt(),lastSeen:Date.now(),
+    days:new Set(L.map(l=>l.date)).size,firstDay:L.length?L.map(l=>l.date).sort()[0]:"",
+    practice:by("practice"),chat:by("chat"),mock:by("mock"),speakMin:Math.round(L.reduce((a,l)=>a+(+l.secs||0),0)/60),listenMin:Math.round((u.listen||0)/60),
+    scripts:Object.keys(S.scripts||{}).length,cards:(S.custom||[]).length,ai:u.ai||{},
+    stateKB:Math.round(cloudState().length/1024),clips:CLIPS.idx.size,ver:APPV()}}
+let statsAt=0;function statsPush(force){if(!cloud.ref||!cloud.user||(!force&&Date.now()-statsAt<60000))return Promise.resolve();statsAt=Date.now();try{return firebase.firestore().collection("stats").doc(cloud.user.uid).set(usageStats()).catch(()=>{})}catch(e){return Promise.resolve()}}
+function adminCard(){if(!cloud.user||String(cloud.user.email||"").toLowerCase()!==ADMIN_EMAIL)return null;const box=h("div",{class:"small"});
+  const load=async()=>{box.replaceChildren(h("span",{class:"muted"},"불러오는 중…"));try{await statsPush(true);const snap=await firebase.firestore().collection("stats").get();const rows=snap.docs.map(d=>d.data()).sort((a,b)=>(b.lastSeen||0)-(a.lastSeen||0));
+    const tot=k=>rows.reduce((a,r)=>a+(+r[k]||0),0);const mb=r=>((r.stateKB||0)/1024+(r.clips||0)*0.06);const aiT=r=>(r.ai&&r.ai.total)||0;
+    const cell=t=>h("td",{style:"padding:4px 6px;border-bottom:1px solid var(--line);white-space:nowrap"},t);
+    const AIK={eval:"평가",script:"스크립트",chat:"대화",trans:"해석",coach:"코치",mock:"모의",other:"기타"};
+    box.replaceChildren(h("div",{style:"overflow-x:auto"},h("table",{style:"border-collapse:collapse;font-size:12px"},
+      h("tr",{},...["계정","최근 접속","학습일","말하기(분)","듣기(분)","연습","대화","모의","AI 호출","저장(MB)","녹음 문장"].map(x=>cell(h("b",{},x)))),
+      ...rows.map(r=>h("tr",{},cell((r.name?r.name+" · ":"")+r.email),cell(r.lastSeen?new Date(r.lastSeen).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"}):""),cell(r.days||0),cell(r.speakMin||0),cell(r.listenMin||0),cell(r.practice||0),cell(r.chat||0),cell(r.mock||0),cell(aiT(r)),cell(mb(r).toFixed(1)),cell(r.clips||0))),
+      h("tr",{},cell(h("b",{},"합계 "+rows.length+"명")),cell(""),cell(tot("days")),cell(tot("speakMin")),cell(tot("listenMin")),cell(tot("practice")),cell(tot("chat")),cell(tot("mock")),cell(rows.reduce((a,r)=>a+aiT(r),0)),cell(rows.reduce((a,r)=>a+mb(r),0).toFixed(1)),cell(tot("clips"))))),
+      h("p",{class:"muted small"},"AI 호출 내역 — "+(rows.map(r=>(r.name||String(r.email||"").split("@")[0])+": "+(Object.entries(r.ai||{}).filter(([k])=>k!=="total").map(([k,v])=>(AIK[k]||k)+" "+v).join(", ")||"없음")).join(" / "))),
+      h("p",{class:"muted small"},"저장 용량은 기록 크기 + 녹음 문장당 약 60KB(남·여·한국어 음성)로 계산한 추정치예요 (Firebase 무료 한도: 저장 1GB). 각 계정이 웹에 로그인해 동기화할 때 갱신되고, AI 호출 수는 이번 업데이트 이후부터 세며 Claude 모드 기록이 웹으로 통합된 뒤 반영돼요."))}
+    catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},e.code==="permission-denied"?"권한이 없어요. Firebase 콘솔 → Firestore → 규칙에 최신 firestore.rules(통계 규칙 포함)를 붙여넣고 게시하세요.":"불러오기 실패: "+(e.message||e)))}};
+  return h("div",{class:"card"},h("h3",{},"계정별 사용량 (관리자)"),h("p",{class:"muted small"},"이 카드는 관리자 계정("+ADMIN_EMAIL+")에서만 보여요."),h("div",{class:"row"},h("button",{class:"btn sm",onclick:load},"불러오기")),box)}
 function cloudErr(e){const m={"auth/invalid-email":"이메일 형식을 확인해 주세요","auth/user-not-found":"가입되지 않은 이메일이에요","auth/wrong-password":"비밀번호가 틀렸어요","auth/invalid-credential":"이메일 또는 비밀번호가 틀렸어요","auth/email-already-in-use":"이미 가입된 이메일이에요. 로그인해 주세요","auth/weak-password":"비밀번호는 6자 이상이어야 해요","auth/too-many-requests":"시도가 너무 많아요. 잠시 후 다시","auth/network-request-failed":"인터넷 연결을 확인해 주세요","permission-denied":"초대 코드가 틀렸어요"};return m[e?.code]||(e?.message||"오류가 났어요")}
 let INV_CODE="";try{const mm=/^#inv_([A-Za-z0-9_-]{3,40})$/.exec(location.hash);if(mm){INV_CODE=mm[1];history.replaceState(null,"",location.pathname+location.search)}}catch(e){}
 let loginMode=INV_CODE?"signup":"login";
@@ -657,6 +680,8 @@ async function clipUrl(tag,h){const k=tag+"/"+h;if(CLIPS.urls[k])return CLIPS.ur
     const u=URL.createObjectURL(blob);CLIPS.urls[k]=u;return u}catch(e){return null}finally{delete CLIPS.busy[k]}})();return CLIPS.busy[k]}
 const TTS_DEFAULT="https://oss-tts.zzono717.workers.dev";let TTS_URL=TTS_DEFAULT;try{const v=localStorage.getItem("oss_tts_url");if(v!==null)TTS_URL=v}catch(e){}
 const clipJob={on:false,done:0,total:0,err:0,last:""};
+// listening time: count while the player is actually running; persisted every 5 minutes
+let listenTick=0;setInterval(()=>{if(!player.on||player.paused)return;S.usage=S.usage||{};S.usage.listen=(S.usage.listen||0)+30;if(++listenTick%10===0)save()},30000);
 // keep checking for sentences without a natural-voice recording (new cards, new scripts, edited translations)
 setInterval(()=>{if(!clipJob.retryAt||Date.now()>clipJob.retryAt)clipSync(false)},15*60e3);
 function clipSentences(){const out={};const add=t=>{for(const sn of splitSent(t)){out[txtHash(sn)]=sn}};
@@ -1565,7 +1590,7 @@ function vSettings(m){
   const fields=PF.map(([k,l,ph])=>{if(k==="jobDetail")return [h("label",{class:"f"},"직업",job),fld(k,"하는 일 (한 줄)",ph)];if(k==="city")return [fld(k,l,ph),h("label",{class:"f"},"거주 형태",home)];return fld(k,l,ph,["hobby","fav","memory","extra"].includes(k))}).flat();
   const cks=h("div",{class:"cks"},...survey.map(t=>h("label",{},h("input",{type:"checkbox",id:"sv_"+t.id,checked:p.survey.includes(t.id)}),t.ko)));
   put(m,h("div",{},h("p",{class:"eyebrow"},"Profile & survey"),h("h1",{},"설정")),
-    accountCard(),
+    accountCard(),adminCard(),
     (()=>{const form=h("div",{style:"display:contents"},h("label",{class:"f"},"목표 레벨",tsel),h("p",{class:"muted small"},"목표에 따라 모범답안·스크립트·예시의 분량과 난이도, 대화 상대의 질문 수준, 분석의 목표선이 바뀌어요. 목표를 바꾸면 이미 만든 스크립트·예시는 그대로 남고, 다시 만들면 새 목표 기준으로 나옵니다."),h("p",{class:"muted small"},"한국어로 편하게 적으면 돼요. 많이 채울수록 예시 스크립트·모범답안이 실제 내 이야기처럼 나오고, 시험장에서 외운 내용을 그대로 쓸 수 있어요. ("+profileFill()+"/"+(PF.length-1)+" 입력)"),...fields);
       if(window.claude?.use)return h("div",{class:"card"},h("h3",{},"내 프로필"),h("p",{class:"muted small"},"계정별로 저장되며 AI 평가·예시 스크립트·모범답안·대화에 모두 쓰입니다."),form);
       form.hidden=true;const summary=h("p",{class:"small"},"목표 "+tgt()+(profileFill()?" · "+profileText():" · 아직 입력된 프로필이 없어요."));
@@ -1600,7 +1625,9 @@ function offlineCard(){if(!WEB)return null;const urls=[];for(const t of Object.k
     h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{const sw=navigator.serviceWorker?.controller;if(!sw){toast("잠시 후 다시 시도해 주세요 (오프라인 기능 준비 중)");return}st.textContent="오프라인 저장 중 0/"+urls.length;sw.postMessage({type:"prefetch",urls})}},"전체 음성 오프라인 저장"),st))}
 // Web Speech API (web build only): real microphone → text
 let rec=null;
-function wrapSample(s){const w=(...a)=>s(...a);w.json=async(...a)=>{const r=await s.json(...a);return r==null?r:JSON.parse(JSON.stringify(r))};if(s.limits)w.limits=(...a)=>s.limits(...a);return w}
+function aiKind(p){if(Array.isArray(p))return "chat";const t=String(p||"");if(/OPIc mock test/.test(t))return "mock";if(/Learner's answer|Rate ONLY the learner/.test(t))return "eval";if(/answer scripts|example OPIc answers/.test(t))return "script";if(/translat/i.test(t))return "trans";if(/speaking coach/.test(t))return "coach";return "other"}
+function aiCount(p){try{S.usage=S.usage||{};const a=S.usage.ai=S.usage.ai||{};const k=aiKind(p);a[k]=(a[k]||0)+1;a.total=(a.total||0)+1}catch(e){}}
+function wrapSample(s){const w=(...a)=>s(...a);w.json=async(...a)=>{aiCount(a[0]);const r=await s.json(...a);return r==null?r:JSON.parse(JSON.stringify(r))};if(s.limits)w.limits=(...a)=>s.limits(...a);return w}
 function aiGate(){const box=h("span",{class:"row",style:"gap:6px"});const note=h("span",{class:"muted small"},"AI 기능 확인 중…");
   const btn=h("button",{class:"btn",onclick:async()=>{try{const P=await claude.use("permissions");if(!P){note.textContent="이 기기의 Claude 앱에서는 AI 평가를 쓸 수 없어요. 브라우저에서 claude.ai로 열어 주세요";return}
       let st=await P.state("sample");if(st==="prompt"){const r=await P.request(["sample"]);st=r.sample||st}
