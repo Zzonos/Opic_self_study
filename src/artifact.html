@@ -604,7 +604,7 @@ async function evalMock(items,onText){
   const body=items.map((it,i)=>`Q${i+1} (${it.kind}): ${it.q}\nA${i+1} (${it.secs}s): ${it.a||"(no answer)"}`).join("\n\n");
   const prompt=`${RUBRIC()}
 
-This is a full 15-question OPIc mock test. Rate the overall level as a real OPIc rater would (the level is driven by the weakest consistent performance, not the best single answer). Then give short per-question feedback.
+This is a full ${items.length}-question OPIc mock test taken at self-assessment difficulty ${mock?mockDiffLabel():"?"} (scale 1-6; 1-2 = easy 12-question form, 3-4 = standard, 5-6 = hardest form with advanced questions 14-15). Judge only what was demonstrated: easier forms give less evidence of IH/AL-level ability, so do not reward an easy form beyond what the answers show. Rate the overall level as a real OPIc rater would (the level is driven by the weakest consistent performance, not the best single answer). Then give short per-question feedback.
 Background profile (NOT part of the answers; never mention places or events that appear only here — comment only on what each answer actually says): ${profileText()}
 
 ${body}
@@ -1136,18 +1136,52 @@ async function vChatSummary(m){
 
 /* ---- MOCK ---- */
 let mock=null;
-function buildMock(){const mine=TOPICS.filter(t=>t.group==="서베이"&&S.profile.survey.includes(t.id));const sudden=TOPICS.filter(t=>t.group==="돌발");
-  const combos=[...pick(mine,2),...pick(sudden,1)];const items=[{kind:"자기소개",q:TOPICS[0].qs[0].q,key:"q_intro_0"}];
-  for(const t of combos){const order=["desc","routine","exp","compare"];const qs=order.map(o=>t.qs.find(q=>q.t===o)).filter(Boolean).slice(0,3);while(qs.length<3)qs.push(pick(t.qs,1)[0]);qs.forEach(q=>items.push({kind:t.en+" · "+QT[q.t],q:q.q,key:"q_"+t.id+"_"+t.qs.indexOf(q)}))}
-  const rp=pick(ROLEPLAYS,1)[0];items.push({kind:"롤플레이 11 · 질문하기",q:rp.q11,key:rp.id+"_11"},{kind:"롤플레이 12 · 문제 해결",q:rp.q12,key:rp.id+"_12"},{kind:"롤플레이 13 · 경험",q:rp.q13,key:rp.id+"_13"});
-  pick(ADVANCED,2).forEach(q=>items.push({kind:"14–15 · 고난도",q,key:"adv_"+ADVANCED.indexOf(q)}));
-  return items.slice(0,15).map(it=>({...it,a:"",secs:0}))}
+// OPIc self-assessment difficulty (1-6), modelled on the Korean OPIc form structure (community guides / test reviews):
+// 1-2: 12 questions, easy description/routine sets on survey topics; 3-4: 15 questions, survey + unexpected sets, role-play 11-13,
+// 14-15 extra survey/unexpected (4 leans to past experience/comparison); 5-6: same base, harder types, 14-15 advanced issue questions.
+const DIFF_INFO={1:"12문항 · 쉬운 묘사·습관 위주, 짧게 답해도 되는 질문",2:"12문항 · 쉬운 묘사·습관 + 간단한 경험",3:"15문항 · 서베이 2세트 + 돌발 1세트 + 롤플레이 + 14–15 추가 주제",4:"15문항 · 3과 같은 틀, 경험·비교 질문 비중↑",5:"15문항 · 경험·비교 위주 콤보 + 롤플레이 + 14–15 고난도(사회 이슈)",6:"15문항 · 5와 같은 틀, 가장 어려운 유형 위주 + 14–15 고난도"};
+const DIFF_REC={IM3:{def:4,range:"3–4"},IH:{def:5,range:"5 (4–6)"},AL:{def:6,range:"5–6"}};
+const diffDefault=()=>{const v=+S.profile.mockDiff;return v>=1&&v<=6&&S.profile.mockDiffT===tgt()?v:(DIFF_REC[tgt()]||{def:4}).def};
+function buildMock(lv,used){lv=Math.min(6,Math.max(1,+lv||4));used=new Set(used||[]);
+  const free=t=>!used.has(t.id);const take=(list,n)=>{const o=pick(list.filter(free),n);o.forEach(t=>used.add(t.id));return o};
+  const mine=TOPICS.filter(t=>t.group==="서베이"&&S.profile.survey.includes(t.id));const surveyAll=TOPICS.filter(t=>t.group==="서베이");const sudden=TOPICS.filter(t=>t.group==="돌발");
+  const orders={1:["desc","routine","desc"],2:["desc","routine","exp"],3:["desc","routine","exp"],4:["desc","exp","compare"],5:["desc","exp","compare"],6:["exp","compare","exp"]}[lv];
+  const asItem=(t,q,pre)=>({kind:(pre||"")+t.en+" · "+QT[q.t],q:q.q,key:"q_"+t.id+"_"+t.qs.indexOf(q),tid:t.id});
+  // n questions from topic t following the preferred types; unexpected topics have only 2 questions → borrow one from another unused unexpected topic
+  const setOf=(t,ord,n,pre)=>{const qs=[];for(const o of ord){if(qs.length>=n)break;const q=t.qs.find(x=>x.t===o&&!qs.includes(x));if(q)qs.push(q)}
+    while(qs.length<n){const rest=t.qs.filter(x=>!qs.includes(x)&&x.t!=="intro");if(!rest.length)break;const pref=rest.filter(x=>ord.includes(x.t));qs.push(pick(pref.length?pref:rest,1)[0])}
+    const out=qs.map(q=>asItem(t,q,pre));
+    if(out.length<n){const t2=take(t.group==="돌발"?sudden:surveyAll,1)[0];if(t2){const q2=t2.qs.find(x=>x.t==="exp")||t2.qs.find(x=>x.t!=="intro");if(q2)out.push(asItem(t2,q2,pre))}}return out};
+  const surveyPick=n=>{const o=take(mine,n);if(o.length<n)o.push(...take(surveyAll,n-o.length));return o};
+  const items=[{kind:"자기소개",q:TOPICS[0].qs[0].q,key:"q_intro_0"}];
+  const combos=lv<=2?surveyPick(3):[...surveyPick(2),...(take(sudden,1).length?[...used].slice(-1).map(id=>TOPICS.find(t=>t.id===id)):surveyPick(1))];
+  combos.forEach(t=>items.push(...setOf(t,orders,3)));
+  const rp=pick(ROLEPLAYS,1)[0];
+  if(lv<=2)items.push({kind:"롤플레이 · 질문하기",q:rp.q11,key:rp.id+"_11"},{kind:"롤플레이 · 관련 경험",q:rp.q13,key:rp.id+"_13"});
+  else{items.push({kind:"롤플레이 11 · 질문하기",q:rp.q11,key:rp.id+"_11"},{kind:"롤플레이 12 · 문제 해결",q:rp.q12,key:rp.id+"_12"},{kind:"롤플레이 13 · 경험",q:rp.q13,key:rp.id+"_13"});
+    if(lv>=5)pick(ADVANCED,2).forEach(q=>items.push({kind:"14–15 · 고난도",q,key:"adv_"+ADVANCED.indexOf(q)}));
+    else{const t=take(sudden,1)[0]||take(surveyAll,1)[0];items.push(...setOf(t,lv===4?["exp","compare","desc"]:["desc","exp"],2,"14–15 · "))}}
+  return items.slice(0,lv<=2?12:15).map(it=>({...it,a:"",secs:0}))}
+// after question 7 the real test offers one re-selection: easier / same / harder — rebuild questions 8+
+function mockAdjust(delta){const lv=Math.min(6,Math.max(1,mock.lv+delta));mock.lv2=lv;mock.adjusted=true;
+  if(delta!==0){const keep=mock.items.slice(0,7);const fresh=buildMock(lv,keep.map(x=>x.tid).filter(Boolean));mock.items=[...keep,...fresh.slice(7)]}render()}
+function diffPicker(cur,onPick){const rec=DIFF_REC[tgt()]||{def:4,range:"3–4"};
+  return h("div",{style:"display:flex;flex-direction:column;gap:6px"},...[1,2,3,4,5,6].map(v=>{const recd=Object.entries(DIFF_REC).filter(([k,r])=>r.def===v).map(([k])=>k);
+    return h("label",{class:"li",style:"cursor:pointer;gap:10px;align-items:flex-start"+(v===cur?";border-color:var(--accent)":"")},h("input",{type:"radio",name:"mdiff",checked:v===cur,onchange:()=>onPick(v),style:"margin-top:3px"}),
+      h("div",{class:"grow"},h("b",{},"난이도 "+v),recd.length?h("span",{class:"chip "+(recd.includes(tgt())?"good":"neutral"),style:"margin-left:6px"},recd.join("·")+" 권장"):null,h("p",{class:"muted small",style:"margin:2px 0 0"},DIFF_INFO[v])))}),
+    h("p",{class:"muted small"},"목표 "+tgt()+" 권장: 난이도 "+rec.range+" (실제 시험 후기·강사 가이드 기준. IM3는 3–4에서 안정적으로, IH는 5가 일반적이며 4도 가능하나 거의 완벽해야 하고, AL은 5–6에서 주로 나와요)"))}
+const mockDiffLabel=()=>mock?(mock.lv+(mock.adjusted?"-"+(mock.lv2||mock.lv):"")):"";
 function vMock(m){
-  if(!mock){put(m,h("div",{},h("p",{class:"eyebrow"},"Mock test · 15 questions"),h("h1",{},"모의시험")),aiNote(),
-    h("div",{class:"card"},h("p",{},"실제 시험과 같은 구성으로 15문항을 연속으로 풉니다: 자기소개 1 → 콤보 3세트(9) → 롤플레이 3 → 고난도 2. 문항당 최대 2분, 전체 약 30분."),h("p",{class:"muted small"},"끝나면 Claude가 전체를 한 번에 채점해 종합 레벨과 문항별 피드백을 줍니다. 중간에 나가면 진행 내용은 사라져요."),
-      h("label",{class:"row",style:"cursor:pointer"},h("input",{type:"checkbox",id:"mock_listen",checked:tts.ok}),"실전 듣기 모드 — 질문을 음성으로만 듣고 답하기 (텍스트 숨김, 2회 재생)"),h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{mock={items:buildMock(),i:0,result:null,listen:$("#mock_listen").checked&&tts.ok};render()}},"시험 시작"))),
+  if(!mock){put(m,h("div",{},h("p",{class:"eyebrow"},"Mock test · Self Assessment 1–6"),h("h1",{},"모의시험")),aiNote(),
+    h("div",{class:"card"},h("h3",{},"난이도 선택 (Self Assessment)"),h("p",{class:"muted small"},"실제 오픽처럼 시작 전에 난이도를 고르고, 7번 문항 뒤에 한 번 더 '쉽게 / 비슷하게 / 어렵게'를 고를 수 있어요. 기본값은 목표 레벨에 맞춰져 있어요."),diffPicker(diffDefault(),v=>{S.profile.mockDiff=v;S.profile.mockDiffT=tgt();save();render()})),
+    h("div",{class:"card"},h("p",{},"난이도 "+diffDefault()+" 구성: "+DIFF_INFO[diffDefault()]+". 문항당 최대 2분."),h("p",{class:"muted small"},"끝나면 Claude가 전체를 한 번에 채점해 종합 레벨과 문항별 피드백을 줍니다. 중간에 나가면 진행 내용은 사라져요."),
+      h("label",{class:"row",style:"cursor:pointer"},h("input",{type:"checkbox",id:"mock_listen",checked:tts.ok}),"실전 듣기 모드 — 질문을 음성으로만 듣고 답하기 (텍스트 숨김, 2회 재생)"),h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{mock={lv:diffDefault(),items:buildMock(diffDefault()),i:0,result:null,listen:$("#mock_listen").checked&&tts.ok};render()}},"시험 시작"))),
     S.log.filter(l=>l.kind==="mock").length?h("div",{class:"card"},h("h3",{},"지난 모의시험"),h("div",{class:"list"},...S.log.filter(l=>l.kind==="mock").slice(-5).reverse().map(l=>h("div",{class:"li"},h("span",{class:"d"},l.date),h("span",{class:"grow"},l.title),lvChip(l.level))))):null);return}
   if(mock.result)return vMockResult(m);
+  if(mock.i===7&&!mock.adjusted&&mock.items.length>8){const cur=mock.lv;const b=(d,label,sub)=>h("button",{class:"btn"+(d===0?" primary":""),style:"flex:1;flex-direction:column;min-width:96px",disabled:cur+d<1||cur+d>6,onclick:()=>mockAdjust(d)},h("b",{},label),h("span",{class:"small muted"},cur+d>=1&&cur+d<=6?"난이도 "+(cur+d):"—"));
+    put(m,h("div",{},h("p",{class:"eyebrow"},"7번 문항 완료 · 난이도 재조정"),h("h1",{},"남은 문항 난이도")),
+      h("div",{class:"card"},h("p",{},"실제 시험처럼 여기서 한 번 난이도를 다시 고를 수 있어요. 고른 난이도로 8번 이후 문항이 바뀌어요."),h("div",{class:"row"},b(-1,"쉽게"),b(0,"비슷하게"),b(1,"어렵게")),
+        h("p",{class:"muted small"},"현재 난이도 "+cur+". 목표 "+tgt()+" 권장 "+(DIFF_REC[tgt()]||{}).range+". 실제 시험에서도 이 선택은 결과에 큰 영향이 없고, 컨디션이 나쁠 때 한 단계 내리는 정도로 써요.")));return}
   const it=mock.items[mock.i];const n=mock.items.length;
   const tEl=h("div",{class:"timer"},"0:00");const bar=h("div",{class:"bar"},h("i"));
   const ta=h("textarea",{id:"mock_"+mock.i,placeholder:"받아쓰기로 답변 입력"});ta.value=it.a;
@@ -1157,7 +1191,7 @@ function vMock(m){
   const reveal=h("button",{class:"btn sm ghost",onclick:()=>{hid.hidden=true;qText.hidden=false;reveal.hidden=true}},"질문 텍스트 보기");
   const replay=h("button",{class:"btn sm",onclick:()=>{if(plays>=2){toast("실제 시험에서는 2번까지만 들을 수 있어요");return}plays++;speak(it.q,{key:it.key});replay.textContent="다시 듣기 ("+(2-plays)+"회 남음)"}},"질문 듣기 (2회)");
   if(mock.listen){qText.hidden=true;setTimeout(()=>{plays=1;speak(it.q,{key:it.key});replay.textContent="다시 듣기 (1회 남음)"},300)}else{hid.hidden=true;reveal.hidden=true}
-  put(m,h("div",{},h("p",{class:"eyebrow"},"Question "+(mock.i+1)+" / "+n+" · "+it.kind),nav,qText,hid,h("div",{class:"row",style:"margin-top:8px"},replay,reveal)),
+  put(m,h("div",{},h("p",{class:"eyebrow"},"Question "+(mock.i+1)+" / "+n+" · 난이도 "+mockDiffLabel()+" · "+it.kind),nav,qText,hid,h("div",{class:"row",style:"margin-top:8px"},replay,reveal)),
     h("div",{class:"card"},h("div",{class:"row"},tEl,h("div",{class:"grow"},bar),(()=>{const sb=h("button",{class:"btn primary",onclick:e=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}else{if(sb.textContent==="다시 시작"){ta.value="";it.a="";it.secs=0}ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝";ta.focus()}}},"말하기 시작");autoTimer(ta,sb);return sb})()),ta,SR_OK?h("div",{class:"row"},(micBtn(ta,{label:"🎤 마이크로 답하기"})||micLink("🎤 마이크로 답하기"))):null,
       h("div",{class:"row"},h("button",{class:"btn primary",onclick:next},mock.i<n-1?"다음 문항 →":"제출하고 채점"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"시험 중단"))));
 }
@@ -1165,7 +1199,7 @@ async function vMockResult(m){
   if(mock.result==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"15문항 채점 중… (30–90초)")));
     put(m,h("h1",{},"채점 중"),box);
     if(!sample){box.replaceChildren(h("p",{},ERR.not_granted),h("button",{class:"btn",onclick:()=>{mock=null;render()}},"닫기"));return}
-    try{const r=await evalMock(mock.items,null);mock.result=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"mock",qt:"mock",sum:r.summary||"",pq:(r.per_question||[]).map((x,i)=>({q:(mock.items[i]||{}).q||"",a:((mock.items[i]||{}).a||"").slice(0,600),l:x.level,c:x.comment,b:x.better})),title:"모의시험 15문항",level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0),fixes:(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)})),perq:(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}))});save();render()}
+    try{const r=await evalMock(mock.items,null);mock.result=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"mock",qt:"mock",sum:r.summary||"",pq:(r.per_question||[]).map((x,i)=>({q:(mock.items[i]||{}).q||"",a:((mock.items[i]||{}).a||"").slice(0,600),l:x.level,c:x.comment,b:x.better})),title:"모의시험 "+mock.items.length+"문항 · 난이도 "+mockDiffLabel(),diff:mockDiffLabel(),level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0),fixes:(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)})),perq:(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}))});save();render()}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{render()}},"다시 시도"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"닫기")))}
     return}
   const r=mock.result;
