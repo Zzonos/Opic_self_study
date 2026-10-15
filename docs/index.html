@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261015-164012-e70b67">
+<html lang="ko" data-build="20261015-164625-3d4f69">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1159,7 +1159,8 @@ let mock=null;
 // 1-2: 12 questions, easy description/routine sets on survey topics; 3-4: 15 questions, survey + unexpected sets, role-play 11-13,
 // 14-15 extra survey/unexpected (4 leans to past experience/comparison); 5-6: same base, harder types, 14-15 advanced issue questions.
 const DIFF_INFO={1:"12문항 · 쉬운 묘사·습관 위주, 짧게 답해도 되는 질문",2:"12문항 · 쉬운 묘사·습관 + 간단한 경험",3:"15문항 · 서베이 2세트 + 돌발 1세트 + 롤플레이 + 14–15 추가 주제",4:"15문항 · 3과 같은 틀, 경험·비교 질문 비중↑",5:"15문항 · 경험·비교 위주 콤보 + 롤플레이 + 14–15 고난도(사회 이슈)",6:"15문항 · 5와 같은 틀, 가장 어려운 유형 위주 + 14–15 고난도"};
-const DIFF_REC={IM3:{def:4,range:"3–4"},IH:{def:5,range:"5 (4–6)"},AL:{def:6,range:"5–6"}};
+// user-set: IM3 → 5, IH/AL → 6 (the top step); lower grades one step apart below that
+const DIFF_REC={AL:{def:6,range:"6"},IH:{def:6,range:"6"},IM3:{def:5,range:"5"},IM2:{def:4,range:"4"},IM1:{def:3,range:"3"},IL:{def:2,range:"2"},"NM–NH":{def:1,range:"1"}};
 const diffDefault=()=>{const v=+S.profile.mockDiff;return v>=1&&v<=6&&S.profile.mockDiffT===tgt()?v:(DIFF_REC[tgt()]||{def:4}).def};
 function buildMock(lv,used){lv=Math.min(6,Math.max(1,+lv||4));used=new Set(used||[]);
   const free=t=>!used.has(t.id);const take=(list,n)=>{const o=pick(list.filter(free),n);o.forEach(t=>used.add(t.id));return o};
@@ -1188,7 +1189,7 @@ function diffPicker(cur,onPick){const rec=DIFF_REC[tgt()]||{def:4,range:"3–4"}
   return h("div",{style:"display:flex;flex-direction:column;gap:6px"},...[1,2,3,4,5,6].map(v=>{const recd=Object.entries(DIFF_REC).filter(([k,r])=>r.def===v).map(([k])=>k);
     return h("label",{class:"li",style:"cursor:pointer;gap:10px;align-items:flex-start"+(v===cur?";border-color:var(--accent)":"")},h("input",{type:"radio",name:"mdiff",checked:v===cur,onchange:()=>onPick(v),style:"margin-top:3px"}),
       h("div",{class:"grow"},h("b",{},"난이도 "+v),recd.length?h("span",{class:"chip "+(recd.includes(tgt())?"good":"neutral"),style:"margin-left:6px"},recd.join("·")+" 권장"):null,h("p",{class:"muted small",style:"margin:2px 0 0"},DIFF_INFO[v])))}),
-    h("p",{class:"muted small"},"목표 "+tgt()+" 권장: 난이도 "+rec.range+" (실제 시험 후기·강사 가이드 기준. IM3는 3–4에서 안정적으로, IH는 5가 일반적이며 4도 가능하나 거의 완벽해야 하고, AL은 5–6에서 주로 나와요)"))}
+    h("p",{class:"muted small"},"목표 "+tgt()+" 권장: 난이도 "+rec.range+" · 등급별 권장: AL·IH 6 / IM3 5 / IM2 4 / IM1 3 / IL 2 / NM–NH 1"))}
 const mockDiffLabel=()=>mock?(mock.lv+(mock.adjusted?"-"+(mock.lv2||mock.lv):"")):"";
 function vMock(m){
   if(!mock){put(m,h("div",{},h("p",{class:"eyebrow"},"Mock test · Self Assessment 1–6"),h("h1",{},"모의시험")),aiNote(),
