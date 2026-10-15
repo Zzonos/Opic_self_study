@@ -501,8 +501,30 @@ function usageStats(){const L=S.log||[];const by=k=>L.filter(l=>l.kind===k).leng
     days:new Set(L.map(l=>l.date)).size,firstDay:L.length?L.map(l=>l.date).sort()[0]:"",
     practice:by("practice"),chat:by("chat"),mock:by("mock"),speakMin:Math.round(L.reduce((a,l)=>a+(+l.secs||0),0)/60),listenMin:Math.round((u.listen||0)/60),
     scripts:Object.keys(S.scripts||{}).length,cards:(S.custom||[]).length,ai:u.ai||{},
-    stateKB:Math.round(cloudState().length/1024),clips:CLIPS.idx.size,ver:APPV()}}
+    stateKB:Math.round(cloudState().length/1024),clips:CLIPS.idx.size,ver:APPV(),aiSince:u.aiSince||0,m30:(()=>{const since=Date.now()-30*864e5;const R=L.filter(l=>(l.ts||Date.parse(l.date)||0)>since);const c=R.filter(l=>l.kind==="chat");
+      return {practice:R.filter(l=>l.kind==="practice").length,chat:c.length,chatTurns:c.reduce((a,l)=>a+Math.max(1,Math.round((+l.secs||0)/45)),0),mock:R.filter(l=>l.kind==="mock").length,
+        scripts:Object.values(S.scripts||{}).filter(x=>(x&&x.ts||0)>since).length+Object.values(S.samples||{}).filter(x=>(x&&x.ts||0)>since).length}})()}}
 let statsAt=0;function statsPush(force){if(!cloud.ref||!cloud.user||(!force&&Date.now()-statsAt<60000))return Promise.resolve();statsAt=Date.now();try{return firebase.firestore().collection("stats").doc(cloud.user.uid).set(usageStats()).catch(()=>{})}catch(e){return Promise.resolve()}}
+// API cost estimate: tokens per AI call by feature (measured from this app's prompts / typical replies; Korean text is token-heavy)
+const AI_TOK={eval:[1600,1900],script:[900,3800],chatTurn:[2600,220],chatSum:[3000,1200],mock:[5500,2600],coach:[5000,2600],trans:[2200,2200],other:[900,500]};
+const AI_PRICE={"Haiku 5.5":[0.10,0.50],"Sonnet 5.5":[2,10],"Opus 5.5":[4,20]};const KRW=1400;
+function costBox(rows){let model="Sonnet 5.5";try{model=localStorage.getItem("oss_cost_model")||model}catch(e){}if(!AI_PRICE[model])model="Sonnet 5.5";
+  const box=h("div",{});
+  const draw=()=>{const [pi,po]=AI_PRICE[model];const usd=(k,n)=>n*(AI_TOK[k][0]*pi+AI_TOK[k][1]*po)/1e6;
+    const est=r=>{const m=r.m30||{};const ai=r.ai||{};const days=r.aiSince?Math.max(1,(Date.now()-r.aiSince)/864e5):0;const per30=k=>days>=3?(ai[k]||0)/days*30:0;
+      // learning activity over the last 30 days (works for old records too) + counted extras (translation, coach, other)
+      const parts={평가:usd("eval",m.practice||0),대화:usd("chatTurn",m.chatTurns||0)+usd("chatSum",m.chat||0),모의:usd("mock",m.mock||0),스크립트:usd("script",m.scripts||0),
+        "해석·코치·기타":usd("trans",per30("trans"))+usd("coach",per30("coach"))+usd("other",per30("other"))};
+      return {parts,total:Object.values(parts).reduce((a,b)=>a+b,0)}};
+    const cell=t=>h("td",{style:"padding:4px 6px;border-bottom:1px solid var(--line);white-space:nowrap"},t);const fm=x=>"$"+x.toFixed(2)+" (약 "+Math.round(x*KRW).toLocaleString("ko-KR")+"원)";
+    const es=rows.map(r=>({r,e:est(r)}));const sum=es.reduce((a,x)=>a+x.e.total,0);
+    box.replaceChildren(h("h4",{style:"margin:12px 0 4px"},"API 키로 운영할 때 예상 비용 (한 달)"),
+      h("label",{class:"f"},"모델",h("select",{onchange:e=>{model=e.target.value;try{localStorage.setItem("oss_cost_model",model)}catch(x){}draw()}},...Object.keys(AI_PRICE).map(k=>h("option",{value:k,selected:k===model},k+" — 입력 $"+AI_PRICE[k][0]+" / 출력 $"+AI_PRICE[k][1]+" (100만 토큰당)")))),
+      h("div",{style:"overflow-x:auto"},h("table",{style:"border-collapse:collapse;font-size:12px"},h("tr",{},...["계정","평가","대화","모의","스크립트","해석·코치·기타","월 합계"].map(x=>cell(h("b",{},x)))),
+        ...es.map(({r,e})=>h("tr",{},cell(r.name||String(r.email||"").split("@")[0]),...Object.values(e.parts).map(v=>cell("$"+v.toFixed(2))),cell(h("b",{},fm(e.total))))),
+        h("tr",{},cell(h("b",{},"합계")),cell(""),cell(""),cell(""),cell(""),cell(""),cell(h("b",{},fm(sum)))))),
+      h("p",{class:"muted small"},"최근 30일 학습 기록(연습 평가·대화 턴·모의시험·스크립트 생성)에 기능별 평균 토큰 수를 곱한 추정치예요. 해석·코치는 호출 수를 세기 시작한 뒤 3일이 지나야 반영돼요. 환율 1달러=1,400원 가정, 실제 요금은 답변 길이에 따라 ±30% 정도 달라질 수 있어요. 지금은 Claude 구독 안에서 AI를 쓰므로 실제로 청구되는 금액은 아니에요."))};
+  draw();return box}
 function adminCard(){if(!cloud.user||String(cloud.user.email||"").toLowerCase()!==ADMIN_EMAIL)return null;const box=h("div",{class:"small"});
   const load=async()=>{box.replaceChildren(h("span",{class:"muted"},"불러오는 중…"));try{await statsPush(true);const snap=await firebase.firestore().collection("stats").get();const rows=snap.docs.map(d=>d.data()).sort((a,b)=>(b.lastSeen||0)-(a.lastSeen||0));
     const tot=k=>rows.reduce((a,r)=>a+(+r[k]||0),0);const mb=r=>((r.stateKB||0)/1024+(r.clips||0)*0.06);const aiT=r=>(r.ai&&r.ai.total)||0;
@@ -513,6 +535,7 @@ function adminCard(){if(!cloud.user||String(cloud.user.email||"").toLowerCase()!
       ...rows.map(r=>h("tr",{},cell((r.name?r.name+" · ":"")+r.email),cell(r.lastSeen?new Date(r.lastSeen).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"}):""),cell(r.days||0),cell(r.speakMin||0),cell(r.listenMin||0),cell(r.practice||0),cell(r.chat||0),cell(r.mock||0),cell(aiT(r)),cell(mb(r).toFixed(1)),cell(r.clips||0))),
       h("tr",{},cell(h("b",{},"합계 "+rows.length+"명")),cell(""),cell(tot("days")),cell(tot("speakMin")),cell(tot("listenMin")),cell(tot("practice")),cell(tot("chat")),cell(tot("mock")),cell(rows.reduce((a,r)=>a+aiT(r),0)),cell(rows.reduce((a,r)=>a+mb(r),0).toFixed(1)),cell(tot("clips"))))),
       h("p",{class:"muted small"},"AI 호출 내역 — "+(rows.map(r=>(r.name||String(r.email||"").split("@")[0])+": "+(Object.entries(r.ai||{}).filter(([k])=>k!=="total").map(([k,v])=>(AIK[k]||k)+" "+v).join(", ")||"없음")).join(" / "))),
+      costBox(rows),
       h("p",{class:"muted small"},"저장 용량은 기록 크기 + 녹음 문장당 약 60KB(남·여·한국어 음성)로 계산한 추정치예요 (Firebase 무료 한도: 저장 1GB). 각 계정이 웹에 로그인해 동기화할 때 갱신되고, AI 호출 수는 이번 업데이트 이후부터 세며 Claude 모드 기록이 웹으로 통합된 뒤 반영돼요."))}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},e.code==="permission-denied"?"권한이 없어요. Firebase 콘솔 → Firestore → 규칙에 최신 firestore.rules(통계 규칙 포함)를 붙여넣고 게시하세요.":"불러오기 실패: "+(e.message||e)))}};
   return h("div",{class:"card"},h("h3",{},"관리자모드"),h("p",{class:"muted small"},"계정별 사용량 — 이 카드는 관리자 계정에서만 보여요."),h("div",{class:"row"},h("button",{class:"btn sm",onclick:load},"불러오기")),box)}
@@ -1607,7 +1630,7 @@ function offlineCard(){if(!WEB)return null;const urls=[];for(const t of Object.k
 // Web Speech API (web build only): real microphone → text
 let rec=null;
 function aiKind(p){if(Array.isArray(p))return "chat";const t=String(p||"");if(/OPIc mock test/.test(t))return "mock";if(/Learner's answer|Rate ONLY the learner/.test(t))return "eval";if(/answer scripts|example OPIc answers/.test(t))return "script";if(/translat/i.test(t))return "trans";if(/speaking coach/.test(t))return "coach";return "other"}
-function aiCount(p){try{S.usage=S.usage||{};const a=S.usage.ai=S.usage.ai||{};const k=aiKind(p);a[k]=(a[k]||0)+1;a.total=(a.total||0)+1}catch(e){}}
+function aiCount(p){try{S.usage=S.usage||{};if(!S.usage.aiSince)S.usage.aiSince=Date.now();const a=S.usage.ai=S.usage.ai||{};const k=aiKind(p);a[k]=(a[k]||0)+1;a.total=(a.total||0)+1}catch(e){}}
 function wrapSample(s){const w=(...a)=>s(...a);w.json=async(...a)=>{aiCount(a[0]);const r=await s.json(...a);return r==null?r:JSON.parse(JSON.stringify(r))};if(s.limits)w.limits=(...a)=>s.limits(...a);return w}
 function aiGate(){const box=h("span",{class:"row",style:"gap:6px"});const note=h("span",{class:"muted small"},"AI 기능 확인 중…");
   const btn=h("button",{class:"btn",onclick:async()=>{try{const P=await claude.use("permissions");if(!P){note.textContent="이 기기의 Claude 앱에서는 AI 평가를 쓸 수 없어요. 브라우저에서 claude.ai로 열어 주세요";return}
