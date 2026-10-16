@@ -583,13 +583,13 @@ function apiCard(){if(!WEB||!isAdminUser())return null;const st=h("p",{class:"mu
   const test=h("p",{class:"small",style:"margin:4px 0 0"},"");const az=h("p",{class:"small",style:"margin:4px 0 0"},"");
   const check=async()=>{st.textContent="확인 중…";test.textContent="";const s=await apiStatus();API.status=s;
     st.textContent=s.error?("✗ "+(/ANTHROPIC_API_KEY/.test(s.error)?"Worker에 API 키가 아직 없어요 (Settings → Variables → ANTHROPIC_API_KEY)":/not allowed/.test(s.error)?"이 계정은 허용 목록에 없어요":/HTTP 404|Not Found|OSS TTS relay/.test(s.error)?"Worker 코드가 옛 버전이에요 — 최신 tts-worker.js 로 다시 Deploy":s.error))
-      :("✓ 서버 연결됨 · 이번 달 사용 "+(s.spentUSD==null?"(KV 미연결 — 콘솔 한도로만 관리)":"$"+s.spentUSD.toFixed(2)+" / $"+s.limitUSD.toFixed(2)+" (약 "+Math.round(s.spentUSD*1400).toLocaleString("ko-KR")+"원 / "+Math.round(s.limitUSD*1400).toLocaleString("ko-KR")+"원)")+" · 대화·해석 Haiku 5.5, 평가·모의·코치·스크립트 Sonnet 5.5");
+      :("✓ 서버 연결됨 · 이번 달 사용 "+(s.spentUSD==null?"(KV 미연결 — 콘솔 한도로만 관리)":"$"+s.spentUSD.toFixed(2)+" / $"+s.limitUSD.toFixed(2)+" (약 "+Math.round(s.spentUSD*1400).toLocaleString("ko-KR")+"원 / "+Math.round(s.limitUSD*1400).toLocaleString("ko-KR")+"원)")+" · 대화·해석 Haiku 5.5, 평가·모의·코치·스크립트 Sonnet 5.5"+" · 서버 "+TTS_URL.replace(/^https?:\/\//,"")+(s.diag?" · 키 "+s.diag.keyHint+" · Azure 키 "+(s.diag.azureKey?"있음":"없음")+" ("+s.diag.azureRegion+")":" · (Worker 진단 정보 없음 — 최신 코드 아님)"));
     if(s.error)return;test.textContent="Claude 테스트 호출 중…";
     try{const r=await apiCall('Reply with only the word OK.',{modelTier:"quick"});test.textContent="✓ Claude 응답 정상 ("+(API_MODEL_KO[r.modelTierApplied.slice(4)]||r.modelTierApplied)+": "+r.text.trim().slice(0,20)+")";test.style.color="var(--good)"}
     catch(e){const m=String(e.message||e);test.style.color="var(--bad)";test.textContent="✗ Claude 호출 실패 — "+(/credit balance/i.test(m)?"크레딧 잔액이 없어요. 콘솔 Billing에서 충전했는지, 그 키가 충전한 조직(워크스페이스)의 키인지 확인하세요 · ":/invalid x-api-key|authentication/i.test(m)?"API 키가 올바르지 않아요. Worker의 ANTHROPIC_API_KEY 값을 다시 붙여넣으세요 · ":/not_found|model/i.test(m)?"모델 이름 문제: ":"")+m.slice(0,240)}
     az.textContent="Azure 음성 확인 중…";az.style.color="";
     if(azOff()){az.textContent="⏸ Azure 음성: 이번 달 무료 한도 소진/오류로 꺼짐 — 기기 음성 인식 사용 중 (다음 달 자동 재개)";return}
-    try{AZ.tok=null;const t=await azToken();az.style.color="var(--good)";az.textContent="✓ Azure 음성 연결됨 ("+t.region+(t.direct?", 직접 연결":"")+") — 연습 말하기에서 🎙 말하기 (Azure) 버튼으로 발음 평가까지 받아요"}
+    try{AZ.tok=null;const t=await azToken();az.style.color="var(--good)";az.textContent="✓ Azure 음성 연결됨 ("+(t.region||"지역 정보 없음")+(t.direct?", 직접 연결":"")+") — 연습 말하기에서 🎙 말하기 (Azure) 버튼으로 발음 평가까지 받아요"}
     catch(e){const m=String(e.message||e);az.style.color="var(--bad)";az.textContent="✗ Azure 음성 — "+(/AZURE_SPEECH_KEY/.test(m)?"Worker에 AZURE_SPEECH_KEY가 아직 없어요":/azure 401/.test(m)?"Azure 키가 올바르지 않아요":m.slice(0,160))}};
   const sw=h("input",{type:"checkbox",checked:API.on,onchange:e=>{API.on=e.target.checked;try{localStorage.setItem("oss_api_mode",API.on?"1":"0")}catch(x){}apiApply();toast(API.on?"API 모드를 켰어요 — 웹에서 AI 기능을 바로 써요":"API 모드를 껐어요");if(API.on)check()}});
   if(API.on)setTimeout(check,50);

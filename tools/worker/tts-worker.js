@@ -275,7 +275,8 @@ async function aiRoute(req, env, ctx, h, url) {
   if (g.err) return J({ error: g.err[1] }, g.err[0]);
   if (!env.ANTHROPIC_API_KEY) return J({ error: "ANTHROPIC_API_KEY is not set on the worker" }, 500);
   const used = await spent(env);
-  if (req.method === "GET" && url.pathname === "/ai/status") return J({ ok: true, email: g.email, spentUSD: used, limitUSD: limitUSD(env), kv: !!env.OSS_KV, models: MODELS, route: ROUTE });
+  if (req.method === "GET" && url.pathname === "/ai/status") { const k = String(env.ANTHROPIC_API_KEY || ""); return J({ ok: true, email: g.email, spentUSD: used, limitUSD: limitUSD(env), kv: !!env.OSS_KV, models: MODELS, route: ROUTE,
+    diag: { build: "2026-10-17b", keyHint: k ? k.slice(0, 10) + "…" + k.slice(-4) + " (" + k.length + "자)" : "없음", azureKey: !!env.AZURE_SPEECH_KEY, azureRegion: env.AZURE_SPEECH_REGION || "(기본 koreacentral)" } }); }
   // Anthropic refuses requests coming from Cloudflare Workers ("Request not allowed"), so the verified owner's browser
   // calls the API directly: hand it the key (owner only, under budget) and record usage it reports back
   if (req.method === "GET" && url.pathname === "/ai/key") {
