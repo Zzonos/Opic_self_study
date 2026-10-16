@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261016-000427-96abad">
+<html lang="ko" data-build="20261016-164826-a22837">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1298,7 +1298,7 @@ function vScriptTopic(m,t){
   const box=h("div",{style:"display:flex;flex-direction:column;gap:14px"});let ctl=null;
   const gen=async(btn)=>{if(!sample){toast(ERR.not_granted);return}btn.disabled=true;ctl=new AbortController();const stop=h("button",{class:"btn sm",onclick:()=>ctl.abort()},"중지");
     box.replaceChildren(h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"스크립트 작성 중… (20–60초)")),stop));
-    try{const r=await genScript(t,null);S.scripts[t.id]={...r,date:todayStr(),ts:Date.now()};save();show()}catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)))}finally{btn.disabled=false}};
+    try{const r=await genScript(t,null);S.scripts[t.id]={...r,date:todayStr(),ts:Date.now()};save();show();setTimeout(()=>fillTrans(),500)}catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)))}finally{btn.disabled=false}};
   const show=()=>{const sc=S.scripts[t.id];if(!sc){box.replaceChildren(h("div",{class:"card"},h("p",{class:"muted"},"아직 스크립트가 없어요. 프로필을 설정에서 채운 뒤 생성하면 더 나다운 답변이 나옵니다."),h("div",{class:"row"},h("button",{class:"btn primary",onclick:e=>gen(e.target)},"AI로 스크립트 만들기"))));return}
     box.replaceChildren(h("div",{class:"row"},h("span",{class:"chip neutral"},sc.date+" 생성"),h("button",{class:"btn sm",onclick:()=>{S.today.script++;save();toast("오늘 스크립트 학습 체크!")}},"오늘 학습 완료 체크"),h("button",{class:"btn sm ghost",onclick:e=>gen(e.target)},"다시 생성")),
       ...t.qs.map((q,i)=>{const s=sc.scripts?.[i];return h("div",{class:"card"},h("span",{class:"chip neutral",style:"align-self:flex-start"},QT[q.t]),h("p",{class:"q",style:"font-size:16px"},q.q),h("div",{class:"model"},s?.answer||"—"),h("div",{class:"row"},spkBtn(s?.answer||""),h("button",{class:"btn sm",onclick:()=>go("listen",{text:s?.answer,title:t.en+" · "+QT[q.t]})},"쉐도잉"),h("button",{class:"btn sm",onclick:()=>copy(s?.answer)},"복사"),h("button",{class:"btn sm",onclick:()=>go("practice",{topic:t,q,kind:QT[q.t]})},"말하기 연습")))}),
@@ -1317,7 +1317,7 @@ async function translateSents(sents,onProgress,force){if(!sample)throw{code:"not
   // translate whole answers (with their question) so each sentence is rendered in context, not in isolation
   const groups=[];const seen=new Set();for(const g of transSources()){if(!g.sents.some(x=>want.has(x)))continue;const key=g.sents.join(" ");if(seen.has(key))continue;seen.add(key);groups.push(g)}
   const orphan=[...want].filter(x=>!groups.some(g=>g.sents.includes(x)));if(orphan.length)groups.push({q:"",sents:orphan});
-  let done=0;const total=groups.reduce((a,g)=>a+g.sents.length,0);
+  let done=0;const total=groups.reduce((a,g)=>a+g.sents.length,0);const retry=[];
   for(let i=0;i<groups.length;){const batch=[];let n=0;while(i<groups.length&&(n===0||n+groups[i].sents.length<=36)){batch.push(groups[i]);n+=groups[i].sents.length;i++}
     const body=batch.map((g,k)=>`### Answer ${k+1}${g.q?"\nQuestion: "+g.q:""}\n`+g.sents.map((x,m)=>`${m+1}. ${x}`).join("\n")).join("\n\n");
     const r=await sample.json(`You are a professional English→Korean translator making study subtitles for a Korean OPIc learner.
@@ -1332,8 +1332,13 @@ Reply with ONLY a JSON object: {"answers":[["번역1","번역2",...], ...]} — 
 
 ${body}`,{cache:false});
     const arr=r&&Array.isArray(r.answers)?r.answers:Array.isArray(r)?r:[];
-    batch.forEach((g,k)=>{const tr=arr[k];if(!Array.isArray(tr)||tr.length!==g.sents.length){audLog.push("번역 줄 수 불일치 → 건너뜀");return}g.sents.forEach((en,m)=>{if((force?want.has(en):!S.trans[en]||want.has(en))&&typeof tr[m]==="string"&&tr[m].trim())S.trans[en]=tr[m].trim()})});
-    done+=n;onProgress&&onProgress(Math.min(done,total),total);save()}}
+    batch.forEach((g,k)=>{const tr=arr[k];if(!Array.isArray(tr)||tr.length!==g.sents.length){audLog.push("번역 줄 수 불일치 → 다시 시도");if(batch.length>1||!g._retry)retry.push(g);return}g.sents.forEach((en,m)=>{if((force?want.has(en):!S.trans[en]||want.has(en))&&typeof tr[m]==="string"&&tr[m].trim())S.trans[en]=tr[m].trim()})});
+    done+=n;onProgress&&onProgress(Math.min(done,total),total);save();
+    // an answer whose line count came back wrong is asked again on its own, once
+    if(i>=groups.length&&retry.length){for(const g of retry.splice(0))if(!g._retry){g._retry=true;groups.push(g)}}}}
+// sentences of scripts / examples / model answers that have no Korean translation yet (Claude mode, quietly, capped per run)
+async function fillTrans(){if(!sample||fillTrans.on)return;const miss=[...new Set(transSources().flatMap(g=>g.sents).filter(x=>!S.trans[x]))].slice(0,150);if(!miss.length)return;
+  fillTrans.on=true;const before=Object.keys(S.trans).length;try{await translateSents(miss,null)}catch(e){}finally{fillTrans.on=false}const n=Object.keys(S.trans).length-before;if(n>0){save();toast("해석 "+n+"문장을 새로 만들었어요");if(view==="scripts"||view==="listen")render()}}
 // my expression cards without a translation: Claude mode → AI translation; web → machine translation (upgraded by AI later)
 async function fillCardKo(){if(fillCardKo.on)return;const ai=!!sample;const miss=(S.custom||[]).filter(c=>c&&/[a-z]/i.test(c.en||"")&&(!String(c.ko||"").trim()||(ai&&c.koSrc==="mt")));if(!miss.length)return;
   if(!ai&&!(WEB&&navigator.onLine))return;fillCardKo.on=true;let n=0;
@@ -1701,7 +1706,7 @@ loadLocal();cloudInit();render();setTimeout(prepSyncCode,500);setTimeout(()=>{if
       if((remote.updatedAt||0)>(S.updatedAt||0)){S=Object.assign(structuredClone(DEF),remote);try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}else if((S.updatedAt||0)>(remote.updatedAt||0)){mergeState(remote,true)}
       claudeSavedAt=remote.updatedAt||0}
     docRef=col;if(!m.exists&&S.updatedAt)claudePush()}catch(e){docRef=null;toast("Claude 계정 저장소 연결 실패: "+(e.code||e.message||e))}}
-  render();setTimeout(applyPendingSync,300);setTimeout(()=>fillCardKo(),5000);
+  render();setTimeout(applyPendingSync,300);setTimeout(()=>fillCardKo().then(()=>fillTrans()),5000);
 })();
 </script>
 
