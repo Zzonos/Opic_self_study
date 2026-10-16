@@ -9,6 +9,8 @@
    GET  /ai/status  + Authorization → 이번 달 사용액·한도
    GET  /ai/key     + Authorization → (관리자·한도 이내일 때만) 브라우저가 Anthropic을 직접 부를 키
    POST /ai/usage   + Authorization {model,inT,outT} → 사용량 기록 (월 한도 계산용)
+   GET  /speech/token + Authorization → Azure 음성 임시 토큰(10분) {token, region}
+     설정: AZURE_SPEECH_KEY (Secret), AZURE_SPEECH_REGION (Text, 예: koreacentral)
    설정 (Worker → Settings → Variables and Secrets):
      ANTHROPIC_API_KEY  (Secret, 필수)   Anthropic 콘솔에서 발급한 API 키
      API_EMAILS         (Text, 선택)     허용 이메일, 쉼표로 구분. 기본 zzono717@gmail.com
@@ -318,6 +320,22 @@ export default {
     const h = cors(origin);
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: h });
     const url = new URL(req.url);
+    if (url.pathname === "/speech/token") {
+      if (!ALLOW_ORIGINS.includes(origin)) return new Response("forbidden origin", { status: 403, headers: h });
+      const J = (o, st = 200) => new Response(JSON.stringify(o), { status: st, headers: { ...h, "Content-Type": "application/json", "Cache-Control": "no-store" } });
+      const g = await gate(req, env || {});
+      if (g.err) return J({ error: g.err[1] }, g.err[0]);
+      const key = env && env.AZURE_SPEECH_KEY, region = (env && env.AZURE_SPEECH_REGION) || "koreacentral";
+      if (!key) return J({ error: "AZURE_SPEECH_KEY is not set on the worker" }, 500);
+      try {
+        const r = await fetch(`https://${region}.api.cognitive.microsoft.com/sts/v1.0/issueToken`, { method: "POST", headers: { "Ocp-Apim-Subscription-Key": key, "Content-Length": "0" } });
+        const t = await r.text();
+        if (r.ok && t) return J({ token: t, region });
+        if (r.status === 401) return J({ error: "azure " + r.status + ": " + t.slice(0, 200) }, 502);
+      } catch (e) { }
+      // token service unreachable from here: let the owner's browser use the key directly
+      return J({ key, region, direct: true });
+    }
     if (url.pathname === "/ai" || url.pathname.startsWith("/ai/")) {
       if (!ALLOW_ORIGINS.includes(origin)) return new Response("forbidden origin", { status: 403, headers: h });
       try { return await aiRoute(req, env || {}, ctx || { waitUntil() { } }, h, url); } catch (e) { return new Response(JSON.stringify({ error: String(e.message || e) }), { status: 500, headers: { ...h, "Content-Type": "application/json" } }); }

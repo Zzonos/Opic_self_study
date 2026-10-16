@@ -580,17 +580,67 @@ const modeLabel=()=>window.claude?.use?"클로드 모드":(API.on&&sample)?"API 
 function apiApply(){if(window.claude?.use)return;const want=API.on&&isAdminUser()&&!!TTS_URL;const was=!!sample;sample=want?wrapSample(apiCall):null;if(was!==!!sample)render()}
 async function apiStatus(){try{const u=firebase.auth().currentUser;if(!u)return {error:"로그인 필요"};const r=await fetch(TTS_URL+"/ai/status",{headers:{Authorization:"Bearer "+(await u.getIdToken())}});const j=await r.json().catch(()=>({}));return r.ok?j:{error:j.error||("HTTP "+r.status)}}catch(e){return {error:String(e.message||e)}}}
 function apiCard(){if(!WEB||!isAdminUser())return null;const st=h("p",{class:"muted small"},"");
-  const test=h("p",{class:"small",style:"margin:4px 0 0"},"");
+  const test=h("p",{class:"small",style:"margin:4px 0 0"},"");const az=h("p",{class:"small",style:"margin:4px 0 0"},"");
   const check=async()=>{st.textContent="확인 중…";test.textContent="";const s=await apiStatus();API.status=s;
     st.textContent=s.error?("✗ "+(/ANTHROPIC_API_KEY/.test(s.error)?"Worker에 API 키가 아직 없어요 (Settings → Variables → ANTHROPIC_API_KEY)":/not allowed/.test(s.error)?"이 계정은 허용 목록에 없어요":/HTTP 404|Not Found|OSS TTS relay/.test(s.error)?"Worker 코드가 옛 버전이에요 — 최신 tts-worker.js 로 다시 Deploy":s.error))
       :("✓ 서버 연결됨 · 이번 달 사용 "+(s.spentUSD==null?"(KV 미연결 — 콘솔 한도로만 관리)":"$"+s.spentUSD.toFixed(2)+" / $"+s.limitUSD.toFixed(2)+" (약 "+Math.round(s.spentUSD*1400).toLocaleString("ko-KR")+"원 / "+Math.round(s.limitUSD*1400).toLocaleString("ko-KR")+"원)")+" · 대화·해석 Haiku 5.5, 평가·모의·코치·스크립트 Sonnet 5.5");
     if(s.error)return;test.textContent="Claude 테스트 호출 중…";
     try{const r=await apiCall('Reply with only the word OK.',{modelTier:"quick"});test.textContent="✓ Claude 응답 정상 ("+(API_MODEL_KO[r.modelTierApplied.slice(4)]||r.modelTierApplied)+": "+r.text.trim().slice(0,20)+")";test.style.color="var(--good)"}
-    catch(e){const m=String(e.message||e);test.style.color="var(--bad)";test.textContent="✗ Claude 호출 실패 — "+(/credit balance/i.test(m)?"크레딧 잔액이 없어요. 콘솔 Billing에서 충전했는지, 그 키가 충전한 조직(워크스페이스)의 키인지 확인하세요 · ":/invalid x-api-key|authentication/i.test(m)?"API 키가 올바르지 않아요. Worker의 ANTHROPIC_API_KEY 값을 다시 붙여넣으세요 · ":/not_found|model/i.test(m)?"모델 이름 문제: ":"")+m.slice(0,240)}};
+    catch(e){const m=String(e.message||e);test.style.color="var(--bad)";test.textContent="✗ Claude 호출 실패 — "+(/credit balance/i.test(m)?"크레딧 잔액이 없어요. 콘솔 Billing에서 충전했는지, 그 키가 충전한 조직(워크스페이스)의 키인지 확인하세요 · ":/invalid x-api-key|authentication/i.test(m)?"API 키가 올바르지 않아요. Worker의 ANTHROPIC_API_KEY 값을 다시 붙여넣으세요 · ":/not_found|model/i.test(m)?"모델 이름 문제: ":"")+m.slice(0,240)}
+    az.textContent="Azure 음성 확인 중…";az.style.color="";
+    if(azOff()){az.textContent="⏸ Azure 음성: 이번 달 무료 한도 소진/오류로 꺼짐 — 기기 음성 인식 사용 중 (다음 달 자동 재개)";return}
+    try{AZ.tok=null;const t=await azToken();az.style.color="var(--good)";az.textContent="✓ Azure 음성 연결됨 ("+t.region+(t.direct?", 직접 연결":"")+") — 연습 말하기에서 🎙 말하기 (Azure) 버튼으로 발음 평가까지 받아요"}
+    catch(e){const m=String(e.message||e);az.style.color="var(--bad)";az.textContent="✗ Azure 음성 — "+(/AZURE_SPEECH_KEY/.test(m)?"Worker에 AZURE_SPEECH_KEY가 아직 없어요":/azure 401/.test(m)?"Azure 키가 올바르지 않아요":m.slice(0,160))}};
   const sw=h("input",{type:"checkbox",checked:API.on,onchange:e=>{API.on=e.target.checked;try{localStorage.setItem("oss_api_mode",API.on?"1":"0")}catch(x){}apiApply();toast(API.on?"API 모드를 켰어요 — 웹에서 AI 기능을 바로 써요":"API 모드를 껐어요");if(API.on)check()}});
   if(API.on)setTimeout(check,50);
   return h("div",{class:"card"},h("h3",{},"API 모드"),h("p",{class:"muted small"},"이 계정 전용. 켜면 평가·스크립트·대화·해석·코치·모의시험 등 AI 기능을 웹 앱에서 바로 써요 (내 Anthropic API 키, 음성 서버를 거쳐 호출). 기록은 이 계정에 바로 저장돼요."),
-    h("label",{class:"row",style:"cursor:pointer"},sw,"API 모드 사용"),h("div",{class:"row"},h("button",{class:"btn sm",onclick:check},"연결 확인")),st,test)}
+    h("label",{class:"row",style:"cursor:pointer"},sw,"API 모드 사용"),h("div",{class:"row"},h("button",{class:"btn sm",onclick:check},"연결 확인")),st,test,az)}
+/* ============ AZURE SPEECH (API mode): verbatim recognition + pronunciation assessment ============ */
+const AZ={tok:null,at:0,region:"",direct:false,sdk:null};
+const azMonth=()=>new Date(Date.now()+9*3600e3).toISOString().slice(0,7);
+// free tier used up (or key problem) → switch Azure off until next month, device recognition takes over
+const azOff=()=>{try{return localStorage.getItem("oss_az_off")===azMonth()}catch(e){return false}};
+function azDisable(why){try{localStorage.setItem("oss_az_off",azMonth())}catch(e){}toast("Azure 음성 인식을 이번 달은 끕니다 ("+why+") — 기기 음성 인식으로 계속해요");render()}
+const azOn=()=>WEB&&API.on&&!!sample&&isAdminUser()&&!azOff()&&!!navigator.mediaDevices;
+function azSdk(){if(AZ.sdk)return AZ.sdk;AZ.sdk=new Promise((res,rej)=>{if(window.SpeechSDK)return res(window.SpeechSDK);const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.48.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js";s.onload=()=>window.SpeechSDK?res(window.SpeechSDK):rej(new Error("sdk"));s.onerror=()=>{AZ.sdk=null;rej(new Error("SDK를 불러오지 못했어요"))};document.head.appendChild(s)});return AZ.sdk}
+async function azToken(){if(AZ.tok&&Date.now()-AZ.at<8*60e3)return AZ;const u=firebase.auth().currentUser;if(!u)throw new Error("로그인 필요");
+  const r=await fetch(TTS_URL+"/speech/token",{headers:{Authorization:"Bearer "+(await u.getIdToken())},cache:"no-store"});const j=await r.json().catch(()=>({}));
+  if(!r.ok){const e=new Error(j.error||("HTTP "+r.status));e.status=r.status;throw e}
+  AZ.tok=j.token||j.key;AZ.direct=!!j.direct;AZ.region=j.region;AZ.at=Date.now();return AZ}
+async function azConfig(silenceMs){const sdk=await azSdk();const a=await azToken();
+  const cfg=a.direct?sdk.SpeechConfig.fromSubscription(a.tok,a.region):sdk.SpeechConfig.fromAuthorizationToken(a.tok,a.region);
+  cfg.speechRecognitionLanguage="en-US";cfg.outputFormat=sdk.OutputFormat.Detailed;
+  // learners pause while thinking: wait longer before closing a phrase
+  cfg.setProperty(sdk.PropertyId.Speech_SegmentationSilenceTimeoutMs,String(silenceMs||1800));
+  return {sdk,cfg}}
+// summary of the phrase-level pronunciation results (duration-weighted)
+function azSummary(segs){let w=0;const acc={a:0,f:0,p:0,c:0,pr:0};const words=[];let txt=[];
+  for(const s of segs){const pa=s.pa||{};const d=Math.max(1,s.dur||1);w+=d;acc.a+=d*(pa.AccuracyScore||0);acc.f+=d*(pa.FluencyScore||0);acc.p+=d*(pa.ProsodyScore||0);acc.pr+=d*(pa.PronScore||0);
+    for(const x of (s.words||[])){const q=(x.PronunciationAssessment||{});if(q.ErrorType==="Mispronunciation"||(q.AccuracyScore!=null&&q.AccuracyScore<60))words.push({w:x.Word,s:Math.round(q.AccuracyScore||0)})}txt.push(s.text)}
+  if(!w)return null;const r=k=>Math.round(acc[k]/w);
+  const seen=new Set();const low=words.filter(x=>{const k=x.w.toLowerCase();if(seen.has(k))return false;seen.add(k);return true}).sort((a,b)=>a.s-b.s).slice(0,10);
+  return {acc:r("a"),flu:r("f"),pros:r("p"),pron:r("pr"),low,n:segs.length}}
+// drop-in replacement for micBtn(): same _isOn/_finish interface, plus _pron() for the scores
+function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)"}={}){const b=h("button",{class:"btn primary"},label);let rec=null,on=false,base="",fin="",segs=[],waitEnd=null,failed=false;
+  b._isOn=()=>on;b._pron=()=>azSummary(segs);b._reset=()=>{segs=[]};
+  const stop=()=>new Promise(res=>{if(!rec){on=false;b.textContent=label;b.classList.remove("rec");return res()}const r=rec;rec=null;try{r.stopContinuousRecognitionAsync(()=>{try{r.close()}catch(e){}res()},()=>res())}catch(e){res()}on=false;b.textContent=label;b.classList.remove("rec")});
+  b._finish=async()=>{if(!on)return;await stop();ta.value=(base+fin).trim();ta.dispatchEvent(new Event("input"));onFinal&&onFinal(ta.value)};
+  b.onclick=async()=>{ttsStop();if(on){await b._finish();return}
+    b.disabled=true;b.textContent="연결 중…";
+    try{const {sdk,cfg}=await azConfig(2000);const audio=sdk.AudioConfig.fromDefaultMicrophoneInput();rec=new sdk.SpeechRecognizer(cfg,audio);
+      const pa=new sdk.PronunciationAssessmentConfig("",sdk.PronunciationAssessmentGradingSystem.HundredMark,sdk.PronunciationAssessmentGranularity.Word,false);try{pa.enableProsodyAssessment=true}catch(e){}pa.applyTo(rec);
+      base=ta.value?ta.value.trim()+" ":"";fin="";if(!base)segs=[];
+      rec.recognizing=(s,e)=>{ta.value=base+fin+(e.result.text||"");ta.dispatchEvent(new Event("input"))};
+      rec.recognized=(s,e)=>{if(e.result.reason!==sdk.ResultReason.RecognizedSpeech||!e.result.text)return;fin+=e.result.text+" ";ta.value=base+fin;ta.dispatchEvent(new Event("input"));
+        try{const j=JSON.parse(e.result.properties.getProperty(sdk.PropertyId.SpeechServiceResponse_JsonResult));const nb=(j.NBest||[])[0]||{};segs.push({text:e.result.text,dur:(j.Duration||0)/1e7,pa:nb.PronunciationAssessment||{},words:nb.Words||[]})}catch(x){}};
+      rec.canceled=(s,e)=>{if(e.reason!==sdk.CancellationReason.Error)return;const d=String(e.errorDetails||"");audLog.push("azure canceled "+e.errorCode+" "+d.slice(0,80));
+        if(/quota|429|1007|exceed/i.test(d)||e.errorCode===sdk.CancellationErrorCode.TooManyRequests)azDisable("무료 한도 소진");else if(/401|403|auth/i.test(d)||e.errorCode===sdk.CancellationErrorCode.AuthenticationFailure){AZ.tok=null;toast("Azure 인증 오류 — 다시 눌러 주세요")}else toast("Azure 연결이 끊겼어요: "+d.slice(0,60));stop()};
+      rec.startContinuousRecognitionAsync(()=>{on=true;b.disabled=false;b.textContent="■ 말하기 끝";b.classList.add("rec")},err=>{b.disabled=false;b.textContent=label;toast("마이크를 시작할 수 없어요: "+String(err).slice(0,60));rec=null})}
+    catch(e){b.disabled=false;b.textContent=label;rec=null;const m=String(e.message||e);if(e.status===500&&/AZURE_SPEECH_KEY/.test(m))toast("Worker에 Azure 키가 아직 없어요");else if(/azure 401/.test(m))azDisable("키 오류");else toast("Azure 연결 실패: "+m.slice(0,80))}};
+  return b}
+function pronCard(p){if(!p)return null;const bar=(l,v)=>h("div",{class:"row",style:"gap:8px;align-items:center"},h("span",{class:"small",style:"width:64px"},l),h("div",{class:"bar grow"},h("i",{style:"width:"+Math.max(0,Math.min(100,v||0))+"%"})),h("b",{class:"small mono",style:"width:30px;text-align:right"},v==null?"-":v));
+  return h("div",{class:"card"},h("h3",{},"발음 평가 (Azure)"),bar("종합",p.pron),bar("정확도",p.acc),bar("유창성",p.flu),bar("억양",p.pros),
+    p.low&&p.low.length?h("p",{class:"small",style:"margin:6px 0 0"},h("b",{},"다시 연습할 단어: "),p.low.map(x=>x.w+" ("+x.s+")").join(", ")):h("p",{class:"muted small"},"눈에 띄게 틀린 단어는 없었어요."))}
 function cloudErr(e){const m={"auth/invalid-email":"이메일 형식을 확인해 주세요","auth/user-not-found":"가입되지 않은 이메일이에요","auth/wrong-password":"비밀번호가 틀렸어요","auth/invalid-credential":"이메일 또는 비밀번호가 틀렸어요","auth/email-already-in-use":"이미 가입된 이메일이에요. 로그인해 주세요","auth/weak-password":"비밀번호는 6자 이상이어야 해요","auth/too-many-requests":"시도가 너무 많아요. 잠시 후 다시","auth/network-request-failed":"인터넷 연결을 확인해 주세요","permission-denied":"초대 코드가 틀렸어요"};return m[e?.code]||(e?.message||"오류가 났어요")}
 let INV_CODE="";try{const mm=/^#inv_([A-Za-z0-9_-]{3,40})$/.exec(location.hash);if(mm){INV_CODE=mm[1];history.replaceState(null,"",location.pathname+location.search)}}catch(e){}
 let loginMode=INV_CODE?"signup":"login";
@@ -654,7 +704,7 @@ const RUBRIC=()=>`You are an OPIc (ACTFL) rater. The learner is Korean; target l
 Rating guide: IL = short sentences, lists; IM1-2 = full sentences, basic connectors, some past tense errors; IM3 = paragraph-length answers with a clear structure (intro-body-ending), fluent connectors, mostly accurate past tense, personal details; IH = handles complications and unexpected questions, varied vocabulary, past/present/future controlled; AL = narrates in all time frames consistently, supports opinions, native-like idioms.
 Judge primarily on: structure, amount of detail, tense control, connectors/fillers, vocabulary range, and task completion. Ignore spelling and punctuation (the answer was dictated by voice). Explanations for the learner are in Korean (존댓말, 간결하게); example sentences are in English.`;
 
-async function evaluate(question,answer,secs,onText){
+async function evaluate(question,answer,secs,onText,pron){
   const T=tgt();const up=LEVELS[Math.min(8,tgtIdx()+1)];
   const prompt=`${RUBRIC()}
 
@@ -664,7 +714,8 @@ Learner's answer (voice-dictated) — this single answer is the ONLY thing you r
 """
 ${answer}
 """
-Background profile (NOT part of the answer; use it only to fill in small missing details of the model answers, never to replace the learner's story): ${profileText()}
+${pron?`Pronunciation assessment of the recording (Azure, 0-100): overall ${pron.pron}, accuracy ${pron.acc}, fluency ${pron.flu}, prosody/intonation ${pron.prosody??pron.pros}${pron.low&&pron.low.length?`; mispronounced words: ${pron.low.map(x=>x.w+" ("+x.s+")").join(", ")}`:""}. The transcript above is verbatim speech recognition (fillers and grammar mistakes kept). Mention pronunciation briefly in the summary (Korean) and, if useful, add one fix about it.
+`:""}Background profile (NOT part of the answer; use it only to fill in small missing details of the model answers, never to replace the learner's story): ${profileText()}
 
 Rules: evaluate this answer alone. Every comment, strength and fix must refer to what is actually in the answer above — places, people and events exactly as the learner said them. Do not mention places, trips or details that appear only in the profile. The model answers must tell the SAME story as the learner (same place, same event), just better.
 
@@ -964,7 +1015,7 @@ function vHistory(m){const KIND={practice:"연습",mock:"모의시험",chat:"대
     const det=h("div",{class:"card",style:"margin:-4px 0 6px;gap:12px"},
       l.q?h("div",{},h("p",{class:"eyebrow"},"질문"),h("div",{class:"row",style:"align-items:flex-start;flex-wrap:nowrap"},h("p",{class:"small grow",style:"font-weight:600"},l.q),spkBtn(l.q,null,q?"q_"+t.id+"_"+t.qs.indexOf(q):null))):null,
       l.a?h("div",{},h("p",{class:"eyebrow"},"내 답변"),h("div",{class:"model"},l.a)):null,
-      l.level?h("p",{class:"muted small"},"AI 판정 레벨: "+(l.lvRaw||l.level)+(lvNorm(l.lvRaw||l.level)!==String(l.lvRaw||l.level).trim()?" → "+LEVELS[lvIdx(l.lvRaw||l.level)]+"로 기록":"")+(l.score!=null?" · "+l.score+"점":"")):null,tierLine(l.tier),
+      l.level?h("p",{class:"muted small"},"AI 판정 레벨: "+(l.lvRaw||l.level)+(lvNorm(l.lvRaw||l.level)!==String(l.lvRaw||l.level).trim()?" → "+LEVELS[lvIdx(l.lvRaw||l.level)]+"로 기록":"")+(l.score!=null?" · "+l.score+"점":"")):null,tierLine(l.tier),l.pron?h("p",{class:"muted small"},"🎙 발음(Azure) 종합 "+l.pron.pron+" · 정확도 "+l.pron.acc+" · 유창성 "+l.pron.flu+" · 억양 "+l.pron.pros+(l.pron.low&&l.pron.low.length?" · 연습 단어: "+l.pron.low.slice(0,6).map(x=>x.w).join(", "):"")):null,
       l.sum?h("div",{},h("p",{class:"eyebrow"},"총평"),h("p",{class:"small"},l.sum)):null,
       (l.str||[]).length?h("div",{},h("p",{class:"eyebrow"},"잘한 점"),...l.str.map(x=>h("p",{class:"small"},"✓ "+x))):null,
       fx.length?h("div",{},h("p",{class:"eyebrow"},l.kind==="mock"?"개선 포인트":"고칠 부분"),...fx.map(x=>x.o||x.b?h("div",{class:"fix"},x.o?h("span",{class:"o"},x.o):null,x.b?h("span",{class:"b"},x.b):null,x.w?h("span",{class:"w"},x.w):null):h("p",{class:"small"},"• "+x.w))):null,
@@ -1022,7 +1073,7 @@ function vAnswer(m,s){
   const {topic,q}=s;let secs=0;let fbBox=h("div",{class:"fb"});let ctl=null;
   const tEl=h("div",{class:"timer"},"0:00");const bar=h("div",{class:"bar"},h("i"));
   const ta=h("textarea",{id:"ans_"+topic.id,placeholder:"여기에 말한 내용을 받아쓰기로 입력하세요. (휴대폰: 키보드의 마이크 키 / Windows: Win+H / Mac: 🎤 키 또는 Fn 두 번)"});
-  const startBtn=h("button",{class:"btn primary",onclick:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작";}else{if(startBtn.textContent==="다시 시작"){ta.value="";ta.dispatchEvent(new Event("input"));fbBox.replaceChildren();evalBtn.disabled=false;secs=0}ta._timed=true;timerStart(tEl,bar.firstChild);startBtn.textContent="답변 끝";ta.focus()}}},"말하기 시작");autoTimer(ta,startBtn);
+  const startBtn=h("button",{class:"btn primary",onclick:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작";}else{if(startBtn.textContent==="다시 시작"){ta.value="";ta.dispatchEvent(new Event("input"));fbBox.replaceChildren();evalBtn.disabled=false;secs=0;try{mic&&mic._reset&&mic._reset()}catch(e){}}ta._timed=true;timerStart(tEl,bar.firstChild);startBtn.textContent="답변 끝";ta.focus()}}},"말하기 시작");autoTimer(ta,startBtn);
   const evalBtn=h("button",{class:"btn primary",disabled:!sample,onclick:async()=>{
     if(mic&&mic._isOn&&mic._isOn()){evalBtn.disabled=true;evalBtn.textContent="녹음 마무리 중…";await mic._finish();evalBtn.textContent="AI 평가 받기";evalBtn.disabled=false}
     // keyboard dictation may still be writing the last words: end it (blur) and wait until the text stops changing
@@ -1031,16 +1082,16 @@ function vAnswer(m,s){
     if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}
     evalBtn.disabled=true;stopBtn.hidden=false;ctl=new AbortController();
     fbBox.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"Claude가 평가 중… (10–40초)")));
-    try{const prog=fbBox.querySelector(".thinking span");const r=await evaluate(q.q,a,secs||Math.round(a.split(/\s+/).length/2.3),({text})=>{if(prog)prog.textContent="Claude가 평가 작성 중… "+(text||"").length+"자"});
-      renderFeedback(fbBox,r,q.q,a);if(r.model_target){S.models=S.models||{};S.models[q.q]=r.model_target;S.modelsAt=S.modelsAt||{};S.modelsAt[q.q]=Date.now()}
-      S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",tier:r._tier,qt:q.t,tid:topic.id,q:q.q,a,sum:r.summary||"",str:(r.strengths||[]).slice(0,3),model:r.model_target||"",title:topic.en+" · "+(s.kind||""),level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:secs||0,fixes:(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}))});S.today.practice++;save();
+    try{const prog=fbBox.querySelector(".thinking span");const pron=mic&&mic._pron?mic._pron():null;const r=await evaluate(q.q,a,secs||Math.round(a.split(/\s+/).length/2.3),({text})=>{if(prog)prog.textContent="Claude가 평가 작성 중… "+(text||"").length+"자"},pron);
+      renderFeedback(fbBox,r,q.q,a);if(pron){const pc=pronCard(pron);const first=fbBox.firstChild;if(pc)first?first.after(pc):fbBox.append(pc)}if(r.model_target){S.models=S.models||{};S.models[q.q]=r.model_target;S.modelsAt=S.modelsAt||{};S.modelsAt[q.q]=Date.now()}
+      S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",tier:r._tier,...(pron?{pron}:{}),qt:q.t,tid:topic.id,q:q.q,a,sum:r.summary||"",str:(r.strengths||[]).slice(0,3),model:r.model_target||"",title:topic.en+" · "+(s.kind||""),level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:secs||0,fixes:(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}))});S.today.practice++;save();
       const nextRp=s.rp&&s.step<13?h("button",{class:"btn primary",onclick:()=>{const st=s.step+1;go("practice",{topic,q:{t:"rp",q:s.rp["q"+st]},kind:"롤플레이 "+st+"번 · "+(st===12?"문제 해결":"관련 경험"),rp:s.rp,step:st})}},"다음: "+(s.step+1)+"번 →"):null;
       put(fbBox,h("div",{class:"row"},nextRp,h("button",{class:"btn",onclick:()=>{ta.value="";ta._timed=false;startBtn.textContent="말하기 시작";fbBox.replaceChildren();secs=0;tEl.textContent="0:00";bar.firstChild.style.width="0";evalBtn.disabled=false}},"같은 질문 다시"),h("button",{class:"btn",onclick:()=>go("practice")},"다른 질문")));
     }catch(e){console.warn("evaluate failed",e);fbBox.replaceChildren(h("p",{class:"small",style:"color:var(--bad)"},errMsg(e)),e?.message?h("p",{class:"muted small mono",style:"word-break:break-all"},String(e.message).slice(0,200)):null,(e.code!=="not_granted"&&e.code!=="sampling_disabled")?h("button",{class:"btn sm",onclick:()=>{evalBtn.disabled=false;evalBtn.click()}},"다시 시도"):null);if(e.code!=="not_granted"&&e.code!=="sampling_disabled")evalBtn.disabled=false}
     finally{stopBtn.hidden=true}
   }},"AI 평가 받기");
   const stopBtn=h("button",{class:"btn",hidden:true,onclick:()=>ctl?.abort()},"중지");
-  const mic=micBtn(ta,{onFinal:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}}});ta.addEventListener("input",()=>{ta._lastInput=Date.now()});
+  const mic=(azOn()?azMicBtn:micBtn)(ta,{onFinal:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}}});ta.addEventListener("input",()=>{ta._lastInput=Date.now()});
   const scr=S.scripts[topic.id];const sIdx=topic.qs?topic.qs.indexOf(q):-1;const myScript=scr&&sIdx>=0?scr.scripts?.[sIdx]?.answer:null;
   put(m,
     h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("practice",topic.qs?{topic,q:null}:null)},"← 뒤로"),h("p",{class:"eyebrow",style:"margin-top:10px"},topic.en+" · "+(s.kind||"")),h("div",{class:"row",style:"flex-wrap:nowrap;align-items:flex-start"},h("p",{class:"q grow"},q.q),spkBtn(q.q,null,qKey(topic,q,s)))),
