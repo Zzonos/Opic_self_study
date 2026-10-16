@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261017-003424-1d8f7a">
+<html lang="ko" data-build="20261017-003641-c7b26c">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1250,6 +1250,9 @@ function vChat(m){
     S.log.filter(l=>l.kind==="chat").length?h("div",{class:"card"},h("h3",{},"지난 대화"),h("div",{class:"list"},...S.log.filter(l=>l.kind==="chat").slice(-5).reverse().map(l=>h("div",{class:"li"},h("span",{class:"d"},l.date.slice(5)),h("span",{class:"grow"},l.title),lvChip(l.level))))):null);return}
   if(chat.summary)return vChatSummary(m);
   const sc=chat.sc;const bub=h("div",{class:"bubbles",id:"bubbles"});
+  // keep the newest message visible above the sticky input box (and the bottom nav on phones)
+  const toEnd=()=>requestAnimationFrame(()=>{const last=bub.lastElementChild;if(!last)return;const ci=document.querySelector(".chatin");let pad=12;
+    if(ci){const cs=getComputedStyle(ci);pad+=ci.getBoundingClientRect().height+(parseFloat(cs.bottom)||0)}last.style.scrollMarginBottom=pad+"px";try{last.scrollIntoView({block:"end",behavior:"smooth"})}catch(e){last.scrollIntoView(false)}});
   const render1=(u)=>{if(u.who==="ai"){const b=h("div",{class:"bb ai"},u.text,u.ko?h("span",{class:"ko",hidden:true},u.ko):null);b.append(h("div",{class:"row",style:"margin-top:6px;gap:6px"},spkBtn(u.text),h("button",{class:"btn sm ghost",onclick:e=>{const k=b.querySelector(".ko");if(k)k.hidden=!k.hidden}},"해석")));return b}
     if(u.who==="me")return h("div",{class:"bb me"},u.text);
     if(u.who==="fix")return h("div",{class:"fixc"},h("span",{class:"eyebrow"},"이렇게 말하면 더 자연스러워요"),h("span",{class:"o"},u.fix.original),h("span",{class:"b"},u.fix.better),h("span",{class:"w"},u.fix.why),h("button",{class:"btn sm",style:"align-self:flex-start;margin-top:4px",onclick:()=>{addCards([{en:u.fix.better,ko:u.fix.ko||"",why:u.fix.why||""}],sc.ko)}},"표현카드에 추가"));
@@ -1259,16 +1262,16 @@ function vChat(m){
   // Enter sends, Shift+Enter makes a new line (ignored while a Korean/IME word is still being composed)
   ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){e.preventDefault();send()}});
   const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ttsStop();ta.value="";try{micBtn_&&micBtn_._cut&&micBtn_._cut()}catch(e){}chat.busy=true;
-    chat.ui.push({who:"me",text:t});chat.turns.push({role:"user",content:t});bub.append(render1({who:"me",text:t}));const w=render1({who:"wait"});bub.append(w);w.scrollIntoView({block:"end"});
+    chat.ui.push({who:"me",text:t});chat.turns.push({role:"user",content:t});bub.append(render1({who:"me",text:t}));const w=render1({who:"wait"});bub.append(w);toEnd();
     try{const r=await sample.json([{role:"user",content:chatRules(sc)},...chat.turns],{cache:false,modelTier:"quick"});
       w.remove();if(r?.fix?.better&&r.fix.original){chat.ui.push({who:"fix",fix:r.fix});bub.append(render1({who:"fix",fix:r.fix}))}
       const reply=String(r?.reply||"").trim()||"Sorry, could you say that again?";chat.turns.push({role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});bub.append(render1({who:"ai",text:reply,ko:r?.reply_ko||""}));
       // while the reply is read aloud the open mic hears it too: ignore that, then start listening fresh
       if(chat.auto){const micOn=()=>micBtn_&&micBtn_._isOn&&micBtn_._isOn();chat.speaking=true;chat.speakingText=reply;chat.barged=false;let done=false;const fin=()=>{if(done)return;done=true;if(chat.barged)return;chat.speaking=false;if(micOn()){try{micBtn_._cut&&micBtn_._cut()}catch(x){}ta.value="";status.textContent="듣는 중…"}};
         speak(reply,{onend:fin});setTimeout(()=>{if(!done&&!(tts.ok&&speechSynthesis.speaking)&&!(AUD.el&&!AUD.el.paused))fin()},Math.max(8000,reply.length*90))}
-      bub.lastChild.scrollIntoView({block:"end"});chat.n++;const cnt=$("#chat_cnt");if(cnt)cnt.textContent=chatEyebrow(sc);
+      toEnd();chat.n++;const cnt=$("#chat_cnt");if(cnt)cnt.textContent=chatEyebrow(sc);
       if(chat.turns.length>24)chat.turns.splice(0,2);
-    }catch(e){w.remove();bub.append(h("div",{class:"note"},errMsg(e)));chat.turns.pop();chat.ui.pop()}
+    }catch(e){w.remove();bub.append(h("div",{class:"note"},errMsg(e)));toEnd();chat.turns.pop();chat.ui.pop()}
     finally{chat.busy=false;last="";if(chatMode!=="voice")ta.focus()}};
   const hint=async()=>{const k=prompt_ko.value.trim();if(!k)return;hintBtn.disabled=true;try{const r=await sample.json(`Korean learner wants to say this in a casual English conversation: "${k}"\nReply with ONLY JSON: {"en":"natural spoken English, 1-2 sentences, intermediate level","note":"한 줄 한국어 메모 (핵심 표현)"}`,{modelTier:"quick"});ta.value=(ta.value?ta.value+" ":"")+(r?.en||"");hintOut.textContent=r?.note||"";prompt_ko.value=""}catch(e){toast(errMsg(e))}finally{hintBtn.disabled=false}};
   const prompt_ko=h("input",{type:"text",id:"chat_ko",placeholder:"뭐라고 말하지? 한국어로 쓰면 영어로 알려줘요",onkeydown:e=>{if(e.key==="Enter"){e.preventDefault();hint()}}});const hintBtn=h("button",{class:"btn sm",onclick:hint},"영어로");const hintOut=h("span",{class:"muted small"});
@@ -1294,7 +1297,7 @@ function vChat(m){
     bub,
     h("div",{class:"chatin"},h("div",{class:"card",style:"gap:8px"},ta,inputRow,h("div",{class:"row"},h("div",{class:"grow"},prompt_ko),hintBtn),hintOut)));
   if(chat.hide)bub.classList.add("hidetext");
-  setTimeout(()=>{bub.lastElementChild?.scrollIntoView({block:"end"})},50);
+  setTimeout(toEnd,50);
 }
 async function startChat(sc){chat={sc,turns:[],ui:[],n:0,busy:false,auto:true,hide:false,summary:null};render();
   const bub=$("#bubbles");const w=h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")));bub.append(w);
