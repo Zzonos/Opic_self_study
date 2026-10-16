@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261016-232138-992482">
+<html lang="ko" data-build="20261016-232453-a548d0">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -581,6 +581,7 @@ async function apiCall(input,opt={}){const u=firebase.auth().currentUser;if(!u){
   if(!text.trim()){const x=new Error("empty");x.code="upstream_error";throw x}
   return {text,truncated:stop==="max_tokens",modelTierApplied:"api:"+model}}
 // switch the web app's AI between "none" (default) and the API relay
+const modeLabel=()=>window.claude?.use?"클로드 모드":(API.on&&sample)?"API 모드":"웹 모드";
 function apiApply(){if(window.claude?.use)return;const want=API.on&&isAdminUser()&&!!TTS_URL;const was=!!sample;sample=want?wrapSample(apiCall):null;if(was!==!!sample)render()}
 async function apiStatus(){try{const u=firebase.auth().currentUser;if(!u)return {error:"로그인 필요"};const r=await fetch(TTS_URL+"/ai/status",{headers:{Authorization:"Bearer "+(await u.getIdToken())}});const j=await r.json().catch(()=>({}));return r.ok?j:{error:j.error||("HTTP "+r.status)}}catch(e){return {error:String(e.message||e)}}}
 function apiCard(){if(!WEB||!isAdminUser())return null;const st=h("p",{class:"muted small"},"");
@@ -924,7 +925,7 @@ function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);if(sub&&sub.history)
   const streak=calcStreak();const todayMin=S.log.filter(l=>l.date===todayStr()).reduce((a,l)=>a+(l.secs||0),0)/60;
   const t=S.today;const done=[t.cards>=10,t.script>=1,t.practice>=3];
   put(m,
-    h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},todayStr()+" · 목표 "+tgt()),h("h1",{},S.profile.name?`${S.profile.name}님, 오늘의 30분`:"오늘의 30분")),
+    h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},todayStr()+" · 목표 "+tgt()),h("h1",{},S.profile.name?`${S.profile.name}님, 오늘의 30분`:"오늘의 30분",h("span",{class:"muted",style:"font-size:13px;font-weight:500;margin-left:8px;letter-spacing:0;vertical-align:middle"},"("+modeLabel()+")"))),
       h("span",{class:"chip "+(done.every(Boolean)?"good":"neutral")},done.filter(Boolean).length+"/3 완료")),
     aiNote(),webNote(),
     h("div",{class:"stats"},
