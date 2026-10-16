@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261016-164826-a22837">
+<html lang="ko" data-build="20261016-232138-992482">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -494,7 +494,7 @@ try{cloud.skip=localStorage.getItem("oss_skiplogin")==="1"}catch(e){}
 function cloudInit(){if(!window.firebase?.initializeApp||!window.firebase?.auth)return;try{firebase.initializeApp(FB_CONFIG);cloud.ok=true;const auth=firebase.auth();auth.useDeviceLanguage();
   auth.onAuthStateChanged(async u=>{cloud.ready=true;if(cloud.unsub){cloud.unsub();cloud.unsub=null}cloud.user=u;cloud.ref=null;
     if(u&&cloud.signingUp){return} // signup writes the first document itself (with the invite code), then calls cloudAttach
-    if(u)await cloudAttach(u);render()})}catch(e){cloud.ok=false}}
+    if(u)await cloudAttach(u);apiApply();render()})}catch(e){cloud.ok=false}}
 async function cloudAttach(u){cloud.user=u;cloud.ref=firebase.firestore().collection("users").doc(u.uid);try{await cloudPull(true)}catch(e){toast("클라우드 기록을 불러오지 못했어요: "+(e.code||e.message))}clipIdxLoad();
   setTimeout(applyPendingSync,300);
   if(cloud.unsub)cloud.unsub();cloud.unsub=cloud.ref.onSnapshot(snap=>{if(!snap.exists||snap.metadata.hasPendingWrites)return;cloudApply(snap.data())});}
@@ -562,6 +562,35 @@ function adminCard(){if(!cloud.user||String(cloud.user.email||"").toLowerCase()!
       h("p",{class:"muted small"},"저장 용량은 기록 크기 + 녹음 문장당 약 60KB(남·여·한국어 음성)로 계산한 추정치예요 (Firebase 무료 한도: 저장 1GB). 각 계정이 웹에 로그인해 동기화할 때 갱신되고, AI 호출 수는 이번 업데이트 이후부터 세며 Claude 모드 기록이 웹으로 통합된 뒤 반영돼요."))}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},e.code==="permission-denied"?"권한이 없어요. Firebase 콘솔 → Firestore → 규칙에 최신 firestore.rules(통계 규칙 포함)를 붙여넣고 게시하세요.":"불러오기 실패: "+(e.message||e)))}};
   return h("div",{class:"card"},h("h3",{},"관리자모드"),h("p",{class:"muted small"},"계정별 사용량 — 이 카드는 관리자 계정에서만 보여요."),h("div",{class:"row"},h("button",{class:"btn sm",onclick:load},"불러오기")),box)}
+/* ============ API MODE (owner account only: Claude API through the worker) ============ */
+// the worker checks the Firebase login itself; this flag only decides whether the web app uses it
+const API={on:false,status:null};try{API.on=localStorage.getItem("oss_api_mode")==="1"}catch(e){}
+const isAdminUser=()=>!!(cloud.user&&String(cloud.user.email||"").toLowerCase()===ADMIN_EMAIL);
+const API_MODEL_KO={"claude-haiku-5-5":"Claude Haiku 5.5","claude-sonnet-5-5":"Claude Sonnet 5.5","claude-opus-5-5":"Claude Opus 5.5"};
+async function apiCall(input,opt={}){const u=firebase.auth().currentUser;if(!u){const e=new Error("login");e.code="session_expired";throw e}
+  const tok=await u.getIdToken();const kind=aiKind(input);
+  let r;try{r=await fetch(TTS_URL+"/ai",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+tok},body:JSON.stringify({kind,input,tier:opt.modelTier||"default",stream:true}),signal:opt.signal})}
+  catch(e){if(e&&e.name==="AbortError"){const x=new Error("cancelled");x.code="cancelled";throw x}const x=new Error(String(e.message||e));x.code="upstream_error";throw x}
+  if(!r.ok){let m="";try{m=(await r.json()).error||""}catch(e){}const x=new Error(m||("HTTP "+r.status));x.code=r.status===402?"budget":r.status===401?"session_expired":r.status===403?"api_forbidden":r.status===429?"rate_limited":"upstream_error";throw x}
+  const model=r.headers.get("X-Model")||"";const rd=r.body.getReader();const dec=new TextDecoder();let buf="",text="",stop="";
+  for(;;){const {value,done}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
+    while((i=buf.indexOf("\n\n"))>=0){const ev=buf.slice(0,i);buf=buf.slice(i+2);const line=ev.split("\n").find(l=>l.startsWith("data:"));if(!line)continue;let d;try{d=JSON.parse(line.slice(5))}catch(e){continue}
+      if(d.type==="content_block_delta"&&d.delta&&d.delta.type==="text_delta"){text+=d.delta.text;if(typeof opt.onText==="function")try{opt.onText({text,delta:d.delta.text})}catch(e){}}
+      else if(d.type==="message_delta"&&d.delta&&d.delta.stop_reason)stop=d.delta.stop_reason;
+      else if(d.type==="error"){const x=new Error((d.error&&d.error.message)||"stream error");x.code="upstream_error";throw x}}}
+  if(!text.trim()){const x=new Error("empty");x.code="upstream_error";throw x}
+  return {text,truncated:stop==="max_tokens",modelTierApplied:"api:"+model}}
+// switch the web app's AI between "none" (default) and the API relay
+function apiApply(){if(window.claude?.use)return;const want=API.on&&isAdminUser()&&!!TTS_URL;const was=!!sample;sample=want?wrapSample(apiCall):null;if(was!==!!sample)render()}
+async function apiStatus(){try{const u=firebase.auth().currentUser;if(!u)return {error:"로그인 필요"};const r=await fetch(TTS_URL+"/ai/status",{headers:{Authorization:"Bearer "+(await u.getIdToken())}});const j=await r.json().catch(()=>({}));return r.ok?j:{error:j.error||("HTTP "+r.status)}}catch(e){return {error:String(e.message||e)}}}
+function apiCard(){if(!WEB||!isAdminUser())return null;const st=h("p",{class:"muted small"},"");
+  const check=async()=>{st.textContent="확인 중…";const s=await apiStatus();API.status=s;
+    st.textContent=s.error?("✗ "+(/ANTHROPIC_API_KEY/.test(s.error)?"Worker에 API 키가 아직 없어요 (Settings → Variables → ANTHROPIC_API_KEY)":/not allowed/.test(s.error)?"이 계정은 허용 목록에 없어요":/HTTP 404|Not Found|OSS TTS relay/.test(s.error)?"Worker 코드가 옛 버전이에요 — 최신 tts-worker.js 로 다시 Deploy":s.error))
+      :("✓ 연결됨 · 이번 달 사용 "+(s.spentUSD==null?"(KV 미연결 — 콘솔 한도로만 관리)":"$"+s.spentUSD.toFixed(2)+" / $"+s.limitUSD.toFixed(2)+" (약 "+Math.round(s.spentUSD*1400).toLocaleString("ko-KR")+"원 / "+Math.round(s.limitUSD*1400).toLocaleString("ko-KR")+"원)")+" · 대화·해석 Haiku 5.5, 평가·모의·코치·스크립트 Sonnet 5.5")};
+  const sw=h("input",{type:"checkbox",checked:API.on,onchange:e=>{API.on=e.target.checked;try{localStorage.setItem("oss_api_mode",API.on?"1":"0")}catch(x){}apiApply();toast(API.on?"API 모드를 켰어요 — 웹에서 AI 기능을 바로 써요":"API 모드를 껐어요");if(API.on)check()}});
+  if(API.on)setTimeout(check,50);
+  return h("div",{class:"card"},h("h3",{},"API 모드"),h("p",{class:"muted small"},"이 계정 전용. 켜면 평가·스크립트·대화·해석·코치·모의시험 등 AI 기능을 웹 앱에서 바로 써요 (내 Anthropic API 키, 음성 서버를 거쳐 호출). 기록은 이 계정에 바로 저장돼요."),
+    h("label",{class:"row",style:"cursor:pointer"},sw,"API 모드 사용"),h("div",{class:"row"},h("button",{class:"btn sm",onclick:check},"연결 확인")),st)}
 function cloudErr(e){const m={"auth/invalid-email":"이메일 형식을 확인해 주세요","auth/user-not-found":"가입되지 않은 이메일이에요","auth/wrong-password":"비밀번호가 틀렸어요","auth/invalid-credential":"이메일 또는 비밀번호가 틀렸어요","auth/email-already-in-use":"이미 가입된 이메일이에요. 로그인해 주세요","auth/weak-password":"비밀번호는 6자 이상이어야 해요","auth/too-many-requests":"시도가 너무 많아요. 잠시 후 다시","auth/network-request-failed":"인터넷 연결을 확인해 주세요","permission-denied":"초대 코드가 틀렸어요"};return m[e?.code]||(e?.message||"오류가 났어요")}
 let INV_CODE="";try{const mm=/^#inv_([A-Za-z0-9_-]{3,40})$/.exec(location.hash);if(mm){INV_CODE=mm[1];history.replaceState(null,"",location.pathname+location.search)}}catch(e){}
 let loginMode=INV_CODE?"signup":"login";
@@ -618,7 +647,7 @@ function profileText(){const p=S.profile;const parts=[["이름",p.name],["나이
 function profileFill(){const p=S.profile;return PF.filter(([k])=>k!=="extra"&&(p[k]||"").trim()).length}
 
 /* ============ AI ============ */
-const ERR={not_granted:"이 페이지에서 Claude 사용이 허용되지 않았습니다. AI 평가는 꺼져 있어요.",rate_limited:"요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",session_expired:"다시 로그인이 필요해요.",invalid_json:"응답 형식 오류예요. 다시 시도해 주세요.",refused:"이 입력은 평가할 수 없어요. 내용을 바꿔 다시 시도해 주세요.",upstream_error:"연결 문제가 있었어요. 다시 시도해 주세요."};
+const ERR={not_granted:"이 페이지에서 Claude 사용이 허용되지 않았습니다. AI 평가는 꺼져 있어요.",rate_limited:"요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",session_expired:"다시 로그인이 필요해요.",invalid_json:"응답 형식 오류예요. 다시 시도해 주세요.",refused:"이 입력은 평가할 수 없어요. 내용을 바꿔 다시 시도해 주세요.",upstream_error:"연결 문제가 있었어요. 다시 시도해 주세요.",budget:"이번 달 API 한도(1만 원)에 도달했어요. 다음 달에 다시 쓸 수 있어요 (설정 → API 모드에서 확인).",api_forbidden:"이 계정은 API 모드를 쓸 수 없어요.",cancelled:"취소했어요."};
 const APPV=()=>(document.documentElement.dataset.build||document.querySelector("[data-build]")?.dataset.build||"dev").slice(-14);
 const errMsg=e=>{const c=e?.code||"";const base=ERR[c]||(c==="empty_completion"?"AI가 답을 만들지 못했어요. 다시 시도해 주세요.":c==="prompt_too_large"?"입력이 너무 길어요. 조금 줄여서 다시 시도해 주세요.":ERR.upstream_error);return base+(c?" ["+c+"]":"")+" · v"+APPV()};
 const RUBRIC=()=>`You are an OPIc (ACTFL) rater. The learner is Korean; target level is ${tgt()}. OPIc levels in order: NL, NM, NH, IL, IM1, IM2, IM3, IH, AL.
@@ -1623,9 +1652,9 @@ function vSettings(m){
   const fields=PF.map(([k,l,ph])=>{if(k==="jobDetail")return [h("label",{class:"f"},"직업",job),fld(k,"하는 일 (한 줄)",ph)];if(k==="city")return [fld(k,l,ph),h("label",{class:"f"},"거주 형태",home)];return fld(k,l,ph,["hobby","fav","memory","extra"].includes(k))}).flat();
   const cks=h("div",{class:"cks"},...survey.map(t=>h("label",{},h("input",{type:"checkbox",id:"sv_"+t.id,checked:p.survey.includes(t.id)}),t.ko)));
   put(m,h("div",{},h("p",{class:"eyebrow"},"Profile & survey"),h("h1",{},"설정")),
-    accountCard(),
+    accountCard(),apiCard(),
     (()=>{const form=h("div",{style:"display:contents"},h("label",{class:"f"},"목표 레벨",tsel),h("p",{class:"muted small"},"목표에 따라 모범답안·스크립트·예시의 분량과 난이도, 대화 상대의 질문 수준, 분석의 목표선이 바뀌어요. 목표를 바꾸면 이미 만든 스크립트·예시는 그대로 남고, 다시 만들면 새 목표 기준으로 나옵니다."),h("p",{class:"muted small"},"한국어로 편하게 적으면 돼요. 많이 채울수록 예시 스크립트·모범답안이 실제 내 이야기처럼 나오고, 시험장에서 외운 내용을 그대로 쓸 수 있어요. ("+profileFill()+"/"+(PF.length-1)+" 입력)"),...fields);
-      if(window.claude?.use)return h("div",{class:"card"},h("h3",{},"내 프로필"),h("p",{class:"muted small"},"계정별로 저장되며 AI 평가·예시 스크립트·모범답안·대화에 모두 쓰입니다."),form);
+      if(window.claude?.use||sample)return h("div",{class:"card"},h("h3",{},"내 프로필"),h("p",{class:"muted small"},"계정별로 저장되며 AI 평가·예시 스크립트·모범답안·대화에 모두 쓰입니다."),form);
       form.hidden=true;const summary=h("p",{class:"small"},"목표 "+tgt()+(profileFill()?" · "+profileText():" · 아직 입력된 프로필이 없어요."));
       return h("div",{class:"card"},h("h3",{},"내 프로필"),h("p",{class:"muted small"},"프로필은 Claude 앱에서 입력하는 걸 권장해요. Claude에서 만든 스크립트·예시와 함께 '웹으로 통합'으로 여기에 자동 반영됩니다."),summary,
         h("div",{class:"row"},h("a",{class:"btn sm",href:ART_URL,target:IS_ANDROID?"_self":"_blank",rel:"noopener",style:"text-decoration:none"},"Claude에서 입력하기"),h("button",{class:"btn sm ghost",onclick:e=>{form.hidden=!form.hidden;summary.hidden=!form.hidden;e.target.textContent=form.hidden?"여기서 직접 수정":"접기"}},"여기서 직접 수정")),form)})(),
@@ -1666,8 +1695,8 @@ function parseReply(t){const tryP=x=>{try{return {ok:true,v:JSON.parse(x)}}catch
   const i=String(t).search(/[\[{]/),j=Math.max(String(t).lastIndexOf("}"),String(t).lastIndexOf("]"));if(i>=0&&j>i){r=tryP(String(t).slice(i,j+1));if(r.ok)return r.v}
   const e=new Error("invalid_json");e.code="invalid_json";e.text=t;throw e}
 const TIER_KO={default:"기본 모델(균형형)",quick:"빠른 모델",complex:"최고 성능 모델"};
-function tierLine(t){if(!t||!t.applied)return null;const low=t.req&&t.applied!==t.req;return h("p",{class:"muted small",style:"margin:6px 0 0"},"🤖 분석 모델: "+(TIER_KO[t.applied]||t.applied)+(low?" — 요청한 "+(TIER_KO[t.req]||t.req)+" 대신 요금제에 맞춰 대체됨":""))}
-function tierCount(req,applied){try{S.usage=S.usage||{};const m=S.usage.tier=S.usage.tier||{};const k=(req||"default")+">"+(applied||req||"default");m[k]=(m[k]||0)+1}catch(e){}}
+function tierLine(t){if(!t||!t.applied)return null;if(/^api:/.test(t.applied)){const m=t.applied.slice(4);return h("p",{class:"muted small",style:"margin:6px 0 0"},"🤖 분석 모델: "+(API_MODEL_KO[m]||m)+" (API)")}const low=t.req&&t.applied!==t.req;return h("p",{class:"muted small",style:"margin:6px 0 0"},"🤖 분석 모델: "+(TIER_KO[t.applied]||t.applied)+(low?" — 요청한 "+(TIER_KO[t.req]||t.req)+" 대신 요금제에 맞춰 대체됨":""))}
+function tierCount(req,applied){try{if(/^api:/.test(applied||""))req=applied;S.usage=S.usage||{};const m=S.usage.tier=S.usage.tier||{};const k=(req||"default")+">"+(applied||req||"default");m[k]=(m[k]||0)+1}catch(e){}}
 function wrapSample(s){const w=(...a)=>s(...a);w.json=async(input,opt)=>{aiCount(input);
     // use the plain call so we learn which model tier actually answered (json() does not report it)
     const want=(opt&&opt.modelTier)||"default";const r=await s(input,opt);tierCount(want,r&&r.modelTierApplied);

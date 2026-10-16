@@ -2,7 +2,17 @@
    웹 앱이 문장을 보내면 Microsoft Edge 읽어주기 음성(edge-tts와 같은 서비스)으로 mp3를 만들어 돌려줍니다.
    배포: Cloudflare 대시보드 → Workers & Pages → Create → Worker → 이 파일 내용 전체를 붙여넣고 Deploy.
    요청: POST { "text": "...", "voice": "en-US-AndrewMultilingualNeural", "rate": "-8%" } → audio/mpeg
-   GET /voices → 사용 가능한 음성 이름 (점검용) */
+   GET /voices → 사용 가능한 음성 이름 (점검용)
+
+   API 모드 (관리자 계정 전용, 선택):
+   POST /ai        { kind, input, tier, stream } + Authorization: Bearer <Firebase ID 토큰> → Claude 응답 (SSE 스트림 또는 JSON)
+   GET  /ai/status  + Authorization → 이번 달 사용액·한도
+   설정 (Worker → Settings → Variables and Secrets):
+     ANTHROPIC_API_KEY  (Secret, 필수)   Anthropic 콘솔에서 발급한 API 키
+     API_EMAILS         (Text, 선택)     허용 이메일, 쉼표로 구분. 기본 zzono717@gmail.com
+     AI_MONTHLY_KRW     (Text, 선택)     월 한도(원). 기본 10000
+   월 한도를 Worker에서도 지키려면 KV 네임스페이스를 만들어 변수 이름 OSS_KV 로 연결하세요 (Bindings → KV namespace).
+   KV가 없으면 Anthropic 콘솔의 월 지출 한도만으로 관리됩니다. */
 
 const ALLOW_ORIGINS = ["https://zzonos.github.io", "http://localhost:8765", "http://127.0.0.1:8765"];
 const TRUSTED_CLIENT_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
@@ -17,7 +27,7 @@ const MAX_CHARS = 1200;
 
 function cors(origin) {
   const ok = ALLOW_ORIGINS.includes(origin) ? origin : ALLOW_ORIGINS[0];
-  return { "Access-Control-Allow-Origin": ok, "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Max-Age": "86400", "Vary": "Origin" };
+  return { "Access-Control-Allow-Origin": ok, "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization", "Access-Control-Expose-Headers": "X-Model", "Access-Control-Max-Age": "86400", "Vary": "Origin" };
 }
 
 let clockSkew = 0; // seconds, corrected from Microsoft's Date header after a 403
@@ -206,12 +216,98 @@ async function synthesize(text, voice, rate) {
   return out;
 }
 
+/* ================= API mode: Firebase ID token gate + Claude relay ================= */
+const FIREBASE_PROJECT = "opic-self-study";
+const DEFAULT_EMAILS = ["zzono717@gmail.com"];
+const KRW_PER_USD = 1400;
+// model per feature (quick tier always goes to Haiku)
+const MODELS = { haiku: "claude-haiku-5-5", sonnet: "claude-sonnet-5-5", opus: "claude-opus-5-5" };
+const PRICE = { "claude-haiku-5-5": [0.10, 0.50], "claude-sonnet-5-5": [2, 10], "claude-opus-5-5": [4, 20] }; // USD per 1M tokens (in, out)
+const ROUTE = { chat: "haiku", trans: "haiku", other: "haiku", eval: "sonnet", mock: "sonnet", coach: "sonnet", script: "sonnet" };
+const MAX_OUT = { chat: 800, other: 2000, trans: 6000, eval: 4096, mock: 6000, coach: 5000, script: 8000 };
+
+let JWKS = null, JWKS_AT = 0;
+async function googleKeys(force) {
+  if (!force && JWKS && Date.now() - JWKS_AT < 3600e3) return JWKS;
+  const r = await fetch("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com");
+  JWKS = (await r.json()).keys || []; JWKS_AT = Date.now(); return JWKS;
+}
+function b64u(s) { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; const b = atob(s); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+async function verifyIdToken(tok) {
+  const [h64, p64, s64] = String(tok || "").split(".");
+  if (!s64) throw new Error("no token");
+  const hdr = JSON.parse(new TextDecoder().decode(b64u(h64)));
+  const pl = JSON.parse(new TextDecoder().decode(b64u(p64)));
+  if (hdr.alg !== "RS256") throw new Error("alg");
+  let jwk = (await googleKeys()).find(k => k.kid === hdr.kid);
+  if (!jwk) jwk = (await googleKeys(true)).find(k => k.kid === hdr.kid);
+  if (!jwk) throw new Error("unknown key");
+  const key = await crypto.subtle.importKey("jwk", { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: "RS256", ext: true }, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+  const ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, b64u(s64), new TextEncoder().encode(h64 + "." + p64));
+  const now = Date.now() / 1000;
+  if (!ok) throw new Error("signature");
+  if (pl.aud !== FIREBASE_PROJECT || pl.iss !== "https://securetoken.google.com/" + FIREBASE_PROJECT) throw new Error("project");
+  if (!(pl.exp > now) || !(pl.iat < now + 300) || !pl.sub) throw new Error("expired");
+  return pl;
+}
+async function gate(req, env) {
+  const m = /^Bearer (.+)$/.exec(req.headers.get("Authorization") || "");
+  if (!m) return { err: [401, "login required"] };
+  let pl; try { pl = await verifyIdToken(m[1]); } catch (e) { return { err: [401, "invalid token: " + e.message] }; }
+  const allow = String(env.API_EMAILS || DEFAULT_EMAILS.join(",")).toLowerCase().split(/[,\s]+/).filter(Boolean);
+  const email = String(pl.email || "").toLowerCase();
+  if (!email || !allow.includes(email)) return { err: [403, "not allowed for this account"] };
+  return { email };
+}
+const monthKey = () => { const d = new Date(Date.now() + 9 * 3600e3); return "spend:" + d.toISOString().slice(0, 7); }; // KST month
+const limitUSD = env => (+env.AI_MONTHLY_KRW || 10000) / KRW_PER_USD;
+async function spent(env) { if (!env.OSS_KV) return null; return (+(await env.OSS_KV.get(monthKey())) || 0) / 1e6; }
+async function addSpend(env, usd) { if (!env.OSS_KV || !(usd > 0)) return; const k = monthKey(); const cur = +(await env.OSS_KV.get(k)) || 0; await env.OSS_KV.put(k, String(Math.round(cur + usd * 1e6)), { expirationTtl: 3600 * 24 * 70 }); }
+const costOf = (model, inT, outT) => { const p = PRICE[model] || PRICE[MODELS.sonnet]; return (inT * p[0] + outT * p[1]) / 1e6; };
+
+async function aiRoute(req, env, ctx, h, url) {
+  const J = (o, st = 200) => new Response(JSON.stringify(o), { status: st, headers: { ...h, "Content-Type": "application/json" } });
+  const g = await gate(req, env);
+  if (g.err) return J({ error: g.err[1] }, g.err[0]);
+  if (!env.ANTHROPIC_API_KEY) return J({ error: "ANTHROPIC_API_KEY is not set on the worker" }, 500);
+  const used = await spent(env);
+  if (req.method === "GET") return J({ ok: true, email: g.email, spentUSD: used, limitUSD: limitUSD(env), kv: !!env.OSS_KV, models: MODELS, route: ROUTE });
+  if (used != null && used >= limitUSD(env)) return J({ error: "monthly budget reached", spentUSD: used, limitUSD: limitUSD(env) }, 402);
+  let body; try { body = await req.json(); } catch (e) { return J({ error: "bad json" }, 400); }
+  const kind = ROUTE[body.kind] ? body.kind : "other";
+  const fam = body.tier === "quick" ? "haiku" : body.tier === "complex" ? "opus" : ROUTE[kind];
+  const model = MODELS[fam];
+  const input = body.input;
+  const messages = Array.isArray(input) ? input.filter(t => t && (t.role === "user" || t.role === "assistant")).map(t => ({ role: t.role, content: String(t.content || "") })) : [{ role: "user", content: String(input || "") }];
+  if (!messages.length || messages[messages.length - 1].role !== "user") return J({ error: "input must end with a user turn" }, 400);
+  if (JSON.stringify(messages).length > 400000) return J({ error: "input too large" }, 413);
+  const stream = body.stream !== false;
+  const up = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({ model, max_tokens: MAX_OUT[kind], messages, stream }) });
+  if (!up.ok) return J({ error: "anthropic " + up.status + ": " + (await up.text()).slice(0, 300) }, up.status === 429 ? 429 : 502);
+  if (!stream) { const j = await up.json(); const u = j.usage || {}; ctx.waitUntil(addSpend(env, costOf(model, (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0), u.output_tokens || 0)));
+    return J({ text: (j.content || []).filter(b => b.type === "text").map(b => b.text).join(""), stop: j.stop_reason, model, usage: u }); }
+  // stream the SSE straight through, reading token usage on the way to keep the monthly total
+  let buf = "", inT = 0, outT = 0; const dec = new TextDecoder(); let done; ctx.waitUntil(new Promise(r => done = r));
+  const ts = new TransformStream({
+    transform(chunk, c) { c.enqueue(chunk); buf += dec.decode(chunk, { stream: true }); let i;
+      while ((i = buf.indexOf("\n\n")) >= 0) { const ev = buf.slice(0, i); buf = buf.slice(i + 2); const line = ev.split("\n").find(l => l.startsWith("data:")); if (!line) continue;
+        try { const d = JSON.parse(line.slice(5)); if (d.type === "message_start") { const u = d.message.usage || {}; inT = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0); outT = u.output_tokens || 0; } else if (d.type === "message_delta" && d.usage) outT = d.usage.output_tokens || outT; } catch (e) { } } },
+    async flush() { try { await addSpend(env, costOf(model, inT, outT)); } finally { done(); } }
+  });
+  return new Response(up.body.pipeThrough(ts), { headers: { ...h, "Content-Type": "text/event-stream", "Cache-Control": "no-store", "X-Model": model } });
+}
+
 export default {
-  async fetch(req) {
+  async fetch(req, env, ctx) {
     const origin = req.headers.get("Origin") || "";
     const h = cors(origin);
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: h });
     const url = new URL(req.url);
+    if (url.pathname === "/ai" || url.pathname === "/ai/status") {
+      if (!ALLOW_ORIGINS.includes(origin)) return new Response("forbidden origin", { status: 403, headers: h });
+      try { return await aiRoute(req, env || {}, ctx || { waitUntil() { } }, h, url); } catch (e) { return new Response(JSON.stringify({ error: String(e.message || e) }), { status: 500, headers: { ...h, "Content-Type": "application/json" } }); }
+    }
     if (req.method === "GET" && url.pathname === "/voices") return new Response(JSON.stringify({ ...VOICES, gec: 2 }), { headers: { ...h, "Content-Type": "application/json" } });
     if (req.method !== "POST") return new Response("OSS TTS relay: POST {text, voice|tag, rate}", { headers: h });
     if (!ALLOW_ORIGINS.includes(origin)) return new Response("forbidden origin", { status: 403, headers: h });
