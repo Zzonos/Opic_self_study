@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261017-003041-ee9804">
+<html lang="ko" data-build="20261017-003424-1d8f7a">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -640,8 +640,8 @@ function azSummary(segs){let w=0;const acc={a:0,f:0,p:0,c:0,pr:0};const words=[]
   const seen=new Set();const low=words.filter(x=>{const k=x.w.toLowerCase();if(seen.has(k))return false;seen.add(k);return true}).sort((a,b)=>a.s-b.s).slice(0,10);
   return {acc:r("a"),flu:r("f"),pros:r("p"),pron:r("pr"),low,n:segs.length}}
 // drop-in replacement for micBtn(): same _isOn/_finish interface, plus _pron() for the scores
-function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)"}={}){const b=h("button",{class:"btn primary"},label);let rec=null,on=false,base="",fin="",segs=[],waitEnd=null,failed=false;
-  b._isOn=()=>on;b._pron=()=>azSummary(segs);b._reset=()=>{segs=[]};b._cut=()=>{base="";fin="";pend=""};let pend="";
+function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",gate=null,onHeard=null}={}){const b=h("button",{class:"btn primary"},label);let rec=null,on=false,base="",fin="",segs=[],waitEnd=null,failed=false;
+  b._isOn=()=>on;b._pron=()=>azSummary(segs);b._reset=()=>{segs=[]};b._cut=()=>{base="";fin="";pend=""};let pend="";b._rebase=t=>{base=t?t.trim()+" ":"";fin="";pend="";ta.value=base;ta.dispatchEvent(new Event("input"))};
   b._flush=async()=>{for(let k=0;k<16&&on&&pend;k++)await new Promise(r=>setTimeout(r,150))};
   const stop=()=>new Promise(res=>{if(!rec){on=false;b.textContent=label;b.classList.remove("rec");return res()}const r=rec;rec=null;try{r.stopContinuousRecognitionAsync(()=>{try{r.close()}catch(e){}res()},()=>res())}catch(e){res()}on=false;b.textContent=label;b.classList.remove("rec")});
   b._finish=async()=>{if(!on)return;await stop();ta.value=(base+fin).trim();ta.dispatchEvent(new Event("input"));onFinal&&onFinal(ta.value)};
@@ -650,8 +650,8 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)"}={}){const b=h
     try{const {sdk,cfg}=await azConfig(2000);const audio=sdk.AudioConfig.fromDefaultMicrophoneInput();rec=new sdk.SpeechRecognizer(cfg,audio);
       const pa=new sdk.PronunciationAssessmentConfig("",sdk.PronunciationAssessmentGradingSystem.HundredMark,sdk.PronunciationAssessmentGranularity.Word,false);try{pa.enableProsodyAssessment=true}catch(e){}pa.applyTo(rec);
       base=ta.value?ta.value.trim()+" ":"";fin="";if(!base)segs=[];
-      rec.recognizing=(s,e)=>{pend=e.result.text||"";ta.value=base+fin+pend;ta.dispatchEvent(new Event("input"))};
-      rec.recognized=(s,e)=>{pend="";if(e.result.reason!==sdk.ResultReason.RecognizedSpeech||!e.result.text)return;fin+=e.result.text+" ";ta.value=base+fin;ta.dispatchEvent(new Event("input"));
+      rec.recognizing=(s,e)=>{pend=e.result.text||"";if(gate&&gate()){onHeard&&onHeard((fin+pend).trim());return}ta.value=base+fin+pend;ta.dispatchEvent(new Event("input"))};
+      rec.recognized=(s,e)=>{pend="";if(e.result.reason!==sdk.ResultReason.RecognizedSpeech||!e.result.text)return;fin+=e.result.text+" ";if(gate&&gate()){onHeard&&onHeard(fin.trim());return}ta.value=base+fin;ta.dispatchEvent(new Event("input"));
         try{const j=JSON.parse(e.result.properties.getProperty(sdk.PropertyId.SpeechServiceResponse_JsonResult));const nb=(j.NBest||[])[0]||{};segs.push({text:e.result.text,dur:(j.Duration||0)/1e7,pa:nb.PronunciationAssessment||{},words:nb.Words||[]})}catch(x){}};
       rec.canceled=(s,e)=>{if(e.reason!==sdk.CancellationReason.Error)return;const d=String(e.errorDetails||"");audLog.push("azure canceled "+e.errorCode+" "+d.slice(0,80));
         if(/quota|429|1007|exceed/i.test(d)||e.errorCode===sdk.CancellationErrorCode.TooManyRequests)azDisable("무료 한도 소진");else if(/401|403|auth/i.test(d)||e.errorCode===sdk.CancellationErrorCode.AuthenticationFailure){AZ.tok=null;toast("Azure 인증 오류 — 다시 눌러 주세요")}else toast("Azure 연결이 끊겼어요: "+d.slice(0,60));stop()};
@@ -1264,7 +1264,7 @@ function vChat(m){
       w.remove();if(r?.fix?.better&&r.fix.original){chat.ui.push({who:"fix",fix:r.fix});bub.append(render1({who:"fix",fix:r.fix}))}
       const reply=String(r?.reply||"").trim()||"Sorry, could you say that again?";chat.turns.push({role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});bub.append(render1({who:"ai",text:reply,ko:r?.reply_ko||""}));
       // while the reply is read aloud the open mic hears it too: ignore that, then start listening fresh
-      if(chat.auto){const micOn=()=>micBtn_&&micBtn_._isOn&&micBtn_._isOn();chat.speaking=true;let done=false;const fin=()=>{if(done)return;done=true;chat.speaking=false;if(micOn()){try{micBtn_._cut&&micBtn_._cut()}catch(x){}ta.value="";status.textContent="듣는 중…"}};
+      if(chat.auto){const micOn=()=>micBtn_&&micBtn_._isOn&&micBtn_._isOn();chat.speaking=true;chat.speakingText=reply;chat.barged=false;let done=false;const fin=()=>{if(done)return;done=true;if(chat.barged)return;chat.speaking=false;if(micOn()){try{micBtn_._cut&&micBtn_._cut()}catch(x){}ta.value="";status.textContent="듣는 중…"}};
         speak(reply,{onend:fin});setTimeout(()=>{if(!done&&!(tts.ok&&speechSynthesis.speaking)&&!(AUD.el&&!AUD.el.paused))fin()},Math.max(8000,reply.length*90))}
       bub.lastChild.scrollIntoView({block:"end"});chat.n++;const cnt=$("#chat_cnt");if(cnt)cnt.textContent=chatEyebrow(sc);
       if(chat.turns.length>24)chat.turns.splice(0,2);
@@ -1279,7 +1279,14 @@ function vChat(m){
     let left=chatWait+(unfinished?3:0);status.textContent=(unfinished?"이어서 말해도 돼요 · ":"")+"말이 끝나면 "+left+"초 후 전송";const tick=()=>{if(ta.value.trim()!==now){armAuto();return}left--;if(left<=0){status.textContent="확정 중…";(async()=>{try{if(micBtn_&&micBtn_._flush)await micBtn_._flush()}catch(e){}status.textContent="";if(chat.busy||chat.speaking)return;last=ta.value.trim();send()})()}else{status.textContent=(unfinished?"이어서 말해도 돼요 · ":"")+"말이 끝나면 "+left+"초 후 전송";vt=setTimeout(tick,1000)}};vt=setTimeout(tick,1000)};
   ta.addEventListener("input",()=>{if(chat.speaking&&micBtn_&&micBtn_._isOn&&micBtn_._isOn())return;if(tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending))ttsStop()},{once:false});
   if(chatMode==="voice"){ta.addEventListener("input",armAuto);ta.placeholder=SR_OK?"🎤 버튼을 누르고 말하세요":DICT_HINT}
-  const micBtn_=azOn()?azMicBtn(ta,{onFinal:v=>{if(v.trim().length>2){clearTimeout(vt);send()}}}):SR_OK?micBtn(ta,{keepAlive:true,onFinal:v=>{if(v.trim().length>2){clearTimeout(vt);send()}}}):micLink();
+  // while the reply is read aloud the mic is muted; if what it hears is NOT the reply itself, the user is talking: stop the voice
+  const words=t=>String(t||"").toLowerCase().replace(/[^a-z' ]/g," ").split(/\s+/).filter(Boolean);
+  const onHeard=heard=>{if(!chat.speaking)return;const hw=words(heard);if(hw.length<2)return;const rw=new Set(words(chat.speakingText));
+    const own=hw.filter(w=>!rw.has(w));if(own.length<2||own.length/hw.length<0.5)return; // mostly the reply's own words → echo
+    let i=0;while(i<hw.length&&rw.has(hw[i]))i++;const mine=heard.split(/\s+/).slice(i).join(" ");
+    chat.barged=true;chat.speaking=false;ttsStop();try{micBtn_._rebase&&micBtn_._rebase(mine)}catch(e){}status.textContent="듣는 중…";armAuto()};
+  const micOpts={gate:()=>!!chat.speaking,onHeard,onFinal:v=>{if(v.trim().length>2){clearTimeout(vt);send()}}};
+  const micBtn_=azOn()?azMicBtn(ta,micOpts):SR_OK?micBtn(ta,{...micOpts,keepAlive:true}):micLink();
 
   const waitSel=h("select",{title:"말을 멈춘 뒤 얼마나 기다렸다 보낼지",onchange:e=>{chatWait=+e.target.value;try{localStorage.setItem("opic30_cwait",chatWait)}catch(x){}armAuto()}},...[[2,"2초 후 전송"],[4,"4초 후 전송"],[6,"6초 후 전송"],[10,"10초 후 전송"],[0,"직접 보내기"]].map(([v,l])=>h("option",{value:v,selected:chatWait===v},l)));waitSel.style.width="auto";
   const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn_,h("button",{class:"btn",onclick:async()=>{clearTimeout(vt);try{if(micBtn_&&micBtn_._flush)await micBtn_._flush()}catch(e){}send()}},"지금 보내기"),waitSel,status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
@@ -1785,18 +1792,22 @@ function aiGate(){const box=h("span",{class:"row",style:"gap:6px"});const note=h
       note.textContent="이 기기의 Claude 앱에서는 AI 평가를 쓸 수 없어요 ("+st+"). 브라우저에서 claude.ai로 열거나 iPhone·PC Claude 앱을 이용해 주세요"}catch(e){note.textContent="확인 실패: "+(e.code||e.message||e)}}},"AI 사용 허용");
   (async()=>{try{const P=await claude.use("permissions");const st=P?await P.state("sample"):"unavailable";note.textContent=st==="prompt"?"버튼을 눌러 AI 사용을 허용해 주세요":st==="denied"?"AI 사용이 거절돼 있어요 — 버튼을 눌러 권한을 바꿔 주세요":st==="granted"?"AI 연결 중… 잠시 후 다시 열어 주세요":"이 기기의 Claude 앱에서는 AI 기능을 쓸 수 없어요 — 브라우저에서 claude.ai로 열어 주세요"}catch(e){note.textContent=""}})();
   box.append(btn,note);return box}
-function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false}={}){if(!SR_OK)return null;const b=h("button",{class:"btn primary"},label);let on=false;let waitEnd=null;
+function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false,gate=null,onHeard=null}={}){if(!SR_OK)return null;const b=h("button",{class:"btn primary"},label);let on=false;let waitEnd=null;
   b._isOn=()=>on;b._finish=()=>new Promise(res=>{if(!on){res();return}waitEnd=res;try{rec?.stop()}catch(e){}setTimeout(()=>{if(waitEnd===res){waitEnd=null;if(on)stop();res()}},2500)});
   const stop=()=>{on=false;b.textContent=label;b.classList.remove("rec");try{rec?.stop()}catch(e){}rec=null};
   let base="",fin="",from=0,seen=0;
   // after the text was sent (chat), drop everything recognised so far so it is not sent again
   b._cut=()=>{base="";fin="";from=seen;pend=""};
+  b._rebase=t=>{base=t?t.trim()+" ":"";fin="";from=seen;pend="";ta.value=base;ta.dispatchEvent(new Event("input"))};
   let pend="",settled=null;
   // make the words still being recognised final before the text is sent: ask the browser to close the
   // session (it then finalises them); keepAlive starts listening again right after
   b._flush=()=>new Promise(res=>{if(!on||!rec||!pend.trim())return res();settled=res;try{rec.stop()}catch(e){}setTimeout(()=>{if(settled===res){settled=null;res()}},1800)});
   b.onclick=()=>{ttsStop();if(on){stop();return}const R=window.SpeechRecognition||window.webkitSpeechRecognition;rec=new R();rec.lang="en-US";rec.continuous=true;rec.interimResults=true;base=ta.value?ta.value.trim()+" ":"";fin="";from=0;seen=0;
-    rec.onresult=e=>{let interim="";fin="";seen=e.results.length;for(let i=from;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t+" ";else interim+=t}pend=interim;ta.value=base+fin+interim;ta.dispatchEvent(new Event("input"))};
+    rec.onresult=e=>{let interim="";fin="";seen=e.results.length;for(let i=from;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t+" ";else interim+=t}pend=interim;
+      // muted (the app is speaking): do not write what is heard, just report it so the app can tell echo from the user
+      if(gate&&gate()){onHeard&&onHeard((fin+interim).trim());return}
+      ta.value=base+fin+interim;ta.dispatchEvent(new Event("input"))};
     rec.onerror=e=>{if(keepAlive&&on&&(e.error==="no-speech"||e.error==="aborted"||e.error==="network"))return;if(e.error==="not-allowed")toast("마이크 권한을 허용해 주세요 (설정 → Safari → 마이크)");stop()};
     rec.onend=()=>{if(on&&keepAlive&&!waitEnd){// the browser closed the session by itself: keep what was heard and listen again
         pend="";if(settled){const s2=settled;settled=null;setTimeout(s2,0)}
