@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261016-232453-a548d0">
+<html lang="ko" data-build="20261016-235212-306918">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -581,17 +581,22 @@ async function apiCall(input,opt={}){const u=firebase.auth().currentUser;if(!u){
   if(!text.trim()){const x=new Error("empty");x.code="upstream_error";throw x}
   return {text,truncated:stop==="max_tokens",modelTierApplied:"api:"+model}}
 // switch the web app's AI between "none" (default) and the API relay
+const chatEyebrow=sc=>sc.en+" · "+chat.n+"턴"+(chatMode==="voice"?" · 말하기 모드":"")+" · "+modeLabel();
 const modeLabel=()=>window.claude?.use?"클로드 모드":(API.on&&sample)?"API 모드":"웹 모드";
 function apiApply(){if(window.claude?.use)return;const want=API.on&&isAdminUser()&&!!TTS_URL;const was=!!sample;sample=want?wrapSample(apiCall):null;if(was!==!!sample)render()}
 async function apiStatus(){try{const u=firebase.auth().currentUser;if(!u)return {error:"로그인 필요"};const r=await fetch(TTS_URL+"/ai/status",{headers:{Authorization:"Bearer "+(await u.getIdToken())}});const j=await r.json().catch(()=>({}));return r.ok?j:{error:j.error||("HTTP "+r.status)}}catch(e){return {error:String(e.message||e)}}}
 function apiCard(){if(!WEB||!isAdminUser())return null;const st=h("p",{class:"muted small"},"");
-  const check=async()=>{st.textContent="확인 중…";const s=await apiStatus();API.status=s;
+  const test=h("p",{class:"small",style:"margin:4px 0 0"},"");
+  const check=async()=>{st.textContent="확인 중…";test.textContent="";const s=await apiStatus();API.status=s;
     st.textContent=s.error?("✗ "+(/ANTHROPIC_API_KEY/.test(s.error)?"Worker에 API 키가 아직 없어요 (Settings → Variables → ANTHROPIC_API_KEY)":/not allowed/.test(s.error)?"이 계정은 허용 목록에 없어요":/HTTP 404|Not Found|OSS TTS relay/.test(s.error)?"Worker 코드가 옛 버전이에요 — 최신 tts-worker.js 로 다시 Deploy":s.error))
-      :("✓ 연결됨 · 이번 달 사용 "+(s.spentUSD==null?"(KV 미연결 — 콘솔 한도로만 관리)":"$"+s.spentUSD.toFixed(2)+" / $"+s.limitUSD.toFixed(2)+" (약 "+Math.round(s.spentUSD*1400).toLocaleString("ko-KR")+"원 / "+Math.round(s.limitUSD*1400).toLocaleString("ko-KR")+"원)")+" · 대화·해석 Haiku 5.5, 평가·모의·코치·스크립트 Sonnet 5.5")};
+      :("✓ 서버 연결됨 · 이번 달 사용 "+(s.spentUSD==null?"(KV 미연결 — 콘솔 한도로만 관리)":"$"+s.spentUSD.toFixed(2)+" / $"+s.limitUSD.toFixed(2)+" (약 "+Math.round(s.spentUSD*1400).toLocaleString("ko-KR")+"원 / "+Math.round(s.limitUSD*1400).toLocaleString("ko-KR")+"원)")+" · 대화·해석 Haiku 5.5, 평가·모의·코치·스크립트 Sonnet 5.5");
+    if(s.error)return;test.textContent="Claude 테스트 호출 중…";
+    try{const r=await apiCall('Reply with only the word OK.',{modelTier:"quick"});test.textContent="✓ Claude 응답 정상 ("+(API_MODEL_KO[r.modelTierApplied.slice(4)]||r.modelTierApplied)+": "+r.text.trim().slice(0,20)+")";test.style.color="var(--good)"}
+    catch(e){const m=String(e.message||e);test.style.color="var(--bad)";test.textContent="✗ Claude 호출 실패 — "+(/credit balance/i.test(m)?"크레딧 잔액이 없어요. 콘솔 Billing에서 충전했는지, 그 키가 충전한 조직(워크스페이스)의 키인지 확인하세요 · ":/invalid x-api-key|authentication/i.test(m)?"API 키가 올바르지 않아요. Worker의 ANTHROPIC_API_KEY 값을 다시 붙여넣으세요 · ":/not_found|model/i.test(m)?"모델 이름 문제: ":"")+m.slice(0,240)}};
   const sw=h("input",{type:"checkbox",checked:API.on,onchange:e=>{API.on=e.target.checked;try{localStorage.setItem("oss_api_mode",API.on?"1":"0")}catch(x){}apiApply();toast(API.on?"API 모드를 켰어요 — 웹에서 AI 기능을 바로 써요":"API 모드를 껐어요");if(API.on)check()}});
   if(API.on)setTimeout(check,50);
   return h("div",{class:"card"},h("h3",{},"API 모드"),h("p",{class:"muted small"},"이 계정 전용. 켜면 평가·스크립트·대화·해석·코치·모의시험 등 AI 기능을 웹 앱에서 바로 써요 (내 Anthropic API 키, 음성 서버를 거쳐 호출). 기록은 이 계정에 바로 저장돼요."),
-    h("label",{class:"row",style:"cursor:pointer"},sw,"API 모드 사용"),h("div",{class:"row"},h("button",{class:"btn sm",onclick:check},"연결 확인")),st)}
+    h("label",{class:"row",style:"cursor:pointer"},sw,"API 모드 사용"),h("div",{class:"row"},h("button",{class:"btn sm",onclick:check},"연결 확인")),st,test)}
 function cloudErr(e){const m={"auth/invalid-email":"이메일 형식을 확인해 주세요","auth/user-not-found":"가입되지 않은 이메일이에요","auth/wrong-password":"비밀번호가 틀렸어요","auth/invalid-credential":"이메일 또는 비밀번호가 틀렸어요","auth/email-already-in-use":"이미 가입된 이메일이에요. 로그인해 주세요","auth/weak-password":"비밀번호는 6자 이상이어야 해요","auth/too-many-requests":"시도가 너무 많아요. 잠시 후 다시","auth/network-request-failed":"인터넷 연결을 확인해 주세요","permission-denied":"초대 코드가 틀렸어요"};return m[e?.code]||(e?.message||"오류가 났어요")}
 let INV_CODE="";try{const mm=/^#inv_([A-Za-z0-9_-]{3,40})$/.exec(location.hash);if(mm){INV_CODE=mm[1];history.replaceState(null,"",location.pathname+location.search)}}catch(e){}
 let loginMode=INV_CODE?"signup":"login";
@@ -650,7 +655,7 @@ function profileFill(){const p=S.profile;return PF.filter(([k])=>k!=="extra"&&(p
 /* ============ AI ============ */
 const ERR={not_granted:"이 페이지에서 Claude 사용이 허용되지 않았습니다. AI 평가는 꺼져 있어요.",rate_limited:"요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",session_expired:"다시 로그인이 필요해요.",invalid_json:"응답 형식 오류예요. 다시 시도해 주세요.",refused:"이 입력은 평가할 수 없어요. 내용을 바꿔 다시 시도해 주세요.",upstream_error:"연결 문제가 있었어요. 다시 시도해 주세요.",budget:"이번 달 API 한도(1만 원)에 도달했어요. 다음 달에 다시 쓸 수 있어요 (설정 → API 모드에서 확인).",api_forbidden:"이 계정은 API 모드를 쓸 수 없어요.",cancelled:"취소했어요."};
 const APPV=()=>(document.documentElement.dataset.build||document.querySelector("[data-build]")?.dataset.build||"dev").slice(-14);
-const errMsg=e=>{const c=e?.code||"";const base=ERR[c]||(c==="empty_completion"?"AI가 답을 만들지 못했어요. 다시 시도해 주세요.":c==="prompt_too_large"?"입력이 너무 길어요. 조금 줄여서 다시 시도해 주세요.":ERR.upstream_error);return base+(c?" ["+c+"]":"")+" · v"+APPV()};
+const errMsg=e=>{const c=e?.code||"";const base=ERR[c]||(c==="empty_completion"?"AI가 답을 만들지 못했어요. 다시 시도해 주세요.":c==="prompt_too_large"?"입력이 너무 길어요. 조금 줄여서 다시 시도해 주세요.":ERR.upstream_error);return base+(c?" ["+c+"]":"")+((API.on&&!window.claude?.use&&e?.message&&!/^(upstream_error|HTTP \d+)$/.test(e.message))?" — "+String(e.message).slice(0,200):"")+" · v"+APPV()};
 const RUBRIC=()=>`You are an OPIc (ACTFL) rater. The learner is Korean; target level is ${tgt()}. OPIc levels in order: NL, NM, NH, IL, IM1, IM2, IM3, IH, AL.
 Rating guide: IL = short sentences, lists; IM1-2 = full sentences, basic connectors, some past tense errors; IM3 = paragraph-length answers with a clear structure (intro-body-ending), fluent connectors, mostly accurate past tense, personal details; IH = handles complications and unexpected questions, varied vocabulary, past/present/future controlled; AL = narrates in all time frames consistently, supports opinions, native-like idioms.
 Judge primarily on: structure, amount of detail, tense control, connectors/fillers, vocabulary range, and task completion. Ignore spelling and punctuation (the answer was dictated by voice). Explanations for the learner are in Korean (존댓말, 간결하게); example sentences are in English.`;
@@ -1193,7 +1198,7 @@ function vChat(m){
     try{const r=await sample.json([{role:"user",content:chatRules(sc)},...chat.turns],{cache:false,modelTier:"quick"});
       w.remove();if(r?.fix?.better&&r.fix.original){chat.ui.push({who:"fix",fix:r.fix});bub.append(render1({who:"fix",fix:r.fix}))}
       const reply=String(r?.reply||"").trim()||"Sorry, could you say that again?";chat.turns.push({role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});bub.append(render1({who:"ai",text:reply,ko:r?.reply_ko||""}));
-      if(chat.auto)speak(reply);bub.lastChild.scrollIntoView({block:"end"});chat.n++;const cnt=$("#chat_cnt");if(cnt)cnt.textContent=sc.en+" · "+chat.n+"턴";
+      if(chat.auto)speak(reply);bub.lastChild.scrollIntoView({block:"end"});chat.n++;const cnt=$("#chat_cnt");if(cnt)cnt.textContent=chatEyebrow(sc);
       if(chat.turns.length>24)chat.turns.splice(0,2);
     }catch(e){w.remove();bub.append(h("div",{class:"note"},errMsg(e)));chat.turns.pop();chat.ui.pop()}
     finally{chat.busy=false;last="";if(chatMode!=="voice")ta.focus()}};
@@ -1209,7 +1214,7 @@ function vChat(m){
 
   const waitSel=h("select",{title:"말을 멈춘 뒤 얼마나 기다렸다 보낼지",onchange:e=>{chatWait=+e.target.value;try{localStorage.setItem("opic30_cwait",chatWait)}catch(x){}armAuto()}},...[[2,"2초 후 전송"],[4,"4초 후 전송"],[6,"6초 후 전송"],[10,"10초 후 전송"],[0,"직접 보내기"]].map(([v,l])=>h("option",{value:v,selected:chatWait===v},l)));waitSel.style.width="auto";
   const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn_,h("button",{class:"btn",onclick:()=>{clearTimeout(vt);send()}},"지금 보내기"),waitSel,status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
-  put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow",id:"chat_cnt"},sc.en+" · "+chat.n+"턴"+(chatMode==="voice"?" · 말하기 모드":"")),h("h2",{},sc.ko)),h("div",{class:"row"},h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_auto",checked:chat.auto,onchange:e=>chat.auto=e.target.checked}),"자동 읽기"),chatMode==="voice"?h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_hide",checked:chat.hide,onchange:e=>{chat.hide=e.target.checked;bub.classList.toggle("hidetext",chat.hide)}}),"상대 말 숨기기"):null,h("button",{class:"btn sm",onclick:()=>endChat()},"대화 끝내기"))),
+  put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow",id:"chat_cnt"},chatEyebrow(sc)),h("h2",{},sc.ko)),h("div",{class:"row"},h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_auto",checked:chat.auto,onchange:e=>chat.auto=e.target.checked}),"자동 읽기"),chatMode==="voice"?h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_hide",checked:chat.hide,onchange:e=>{chat.hide=e.target.checked;bub.classList.toggle("hidetext",chat.hide)}}),"상대 말 숨기기"):null,h("button",{class:"btn sm",onclick:()=>endChat()},"대화 끝내기"))),
     bub,
     h("div",{class:"chatin"},h("div",{class:"card",style:"gap:8px"},ta,inputRow,h("div",{class:"row"},h("div",{class:"grow"},prompt_ko),hintBtn),hintOut)));
   if(chat.hide)bub.classList.add("hidetext");
