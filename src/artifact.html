@@ -548,17 +548,30 @@ function adminCard(){if(!cloud.user||String(cloud.user.email||"").toLowerCase()!
 const API={on:false,status:null};try{API.on=localStorage.getItem("oss_api_mode")==="1"}catch(e){}
 const isAdminUser=()=>!!(cloud.user&&String(cloud.user.email||"").toLowerCase()===ADMIN_EMAIL);
 const API_MODEL_KO={"claude-haiku-5-5":"Claude Haiku 5.5","claude-sonnet-5-5":"Claude Sonnet 5.5","claude-opus-5-5":"Claude Opus 5.5"};
-async function apiCall(input,opt={}){const u=firebase.auth().currentUser;if(!u){const e=new Error("login");e.code="session_expired";throw e}
-  const tok=await u.getIdToken();const kind=aiKind(input);
-  let r;try{r=await fetch(TTS_URL+"/ai",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+tok},body:JSON.stringify({kind,input,tier:opt.modelTier||"default",stream:true}),signal:opt.signal})}
+// Anthropic refuses calls relayed by Cloudflare Workers, so the browser calls the API directly.
+// The worker hands the key only to the verified owner account (and only while under the monthly budget).
+const APIK={cfg:null,at:0};
+async function apiKey(force){if(!force&&APIK.cfg&&Date.now()-APIK.at<30*60e3)return APIK.cfg;const u=firebase.auth().currentUser;if(!u){const e=new Error("login");e.code="session_expired";throw e}
+  const r=await fetch(TTS_URL+"/ai/key",{headers:{Authorization:"Bearer "+(await u.getIdToken())},cache:"no-store"});const j=await r.json().catch(()=>({}));
+  if(!r.ok){const x=new Error(j.error||("HTTP "+r.status));x.code=r.status===402?"budget":r.status===401?"session_expired":r.status===403?"api_forbidden":"upstream_error";throw x}
+  APIK.cfg=j;APIK.at=Date.now();return j}
+async function apiUsage(model,inT,outT){try{const u=firebase.auth().currentUser;if(!u)return;await fetch(TTS_URL+"/ai/usage",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+(await u.getIdToken())},body:JSON.stringify({model,inT,outT})})}catch(e){}}
+async function apiCall(input,opt={}){const cfg=await apiKey();const kind=aiKind(input);
+  const fam=opt.modelTier==="quick"?"haiku":opt.modelTier==="complex"?"opus":((cfg.route||{})[kind]||"sonnet");const model=(cfg.models||{})[fam]||"claude-sonnet-5-5";
+  const messages=Array.isArray(input)?input.map(t=>({role:t.role,content:String(t.content||"")})):[{role:"user",content:String(input||"")}];
+  let r;try{r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",signal:opt.signal,headers:{"x-api-key":cfg.key,"anthropic-version":"2023-06-01","content-type":"application/json","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model,max_tokens:((cfg.maxOut||{})[kind])||2000,messages,stream:true})})}
   catch(e){if(e&&e.name==="AbortError"){const x=new Error("cancelled");x.code="cancelled";throw x}const x=new Error(String(e.message||e));x.code="upstream_error";throw x}
-  if(!r.ok){let m="";try{m=(await r.json()).error||""}catch(e){}const x=new Error(m||("HTTP "+r.status));x.code=r.status===402?"budget":r.status===401?"session_expired":r.status===403?"api_forbidden":r.status===429?"rate_limited":"upstream_error";throw x}
-  const model=r.headers.get("X-Model")||"";const rd=r.body.getReader();const dec=new TextDecoder();let buf="",text="",stop="";
-  for(;;){const {value,done}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
+  if(!r.ok){let m="";try{const j=await r.json();m=(j.error&&j.error.message)||JSON.stringify(j).slice(0,200)}catch(e){}if(r.status===401)APIK.cfg=null;
+    const x=new Error("anthropic "+r.status+": "+m);x.code=r.status===429||r.status===529?"rate_limited":"upstream_error";throw x}
+  const rd=r.body.getReader();const dec=new TextDecoder();let buf="",text="",stop="",inT=0,outT=0;
+  try{for(;;){const {value,done}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
     while((i=buf.indexOf("\n\n"))>=0){const ev=buf.slice(0,i);buf=buf.slice(i+2);const line=ev.split("\n").find(l=>l.startsWith("data:"));if(!line)continue;let d;try{d=JSON.parse(line.slice(5))}catch(e){continue}
-      if(d.type==="content_block_delta"&&d.delta&&d.delta.type==="text_delta"){text+=d.delta.text;if(typeof opt.onText==="function")try{opt.onText({text,delta:d.delta.text})}catch(e){}}
-      else if(d.type==="message_delta"&&d.delta&&d.delta.stop_reason)stop=d.delta.stop_reason;
-      else if(d.type==="error"){const x=new Error((d.error&&d.error.message)||"stream error");x.code="upstream_error";throw x}}}
+      if(d.type==="message_start"){const u=(d.message&&d.message.usage)||{};inT=(u.input_tokens||0)+(u.cache_read_input_tokens||0)+(u.cache_creation_input_tokens||0);outT=u.output_tokens||0}
+      else if(d.type==="content_block_delta"&&d.delta&&d.delta.type==="text_delta"){text+=d.delta.text;if(typeof opt.onText==="function")try{opt.onText({text,delta:d.delta.text})}catch(e){}}
+      else if(d.type==="message_delta"){if(d.delta&&d.delta.stop_reason)stop=d.delta.stop_reason;if(d.usage&&d.usage.output_tokens)outT=d.usage.output_tokens}
+      else if(d.type==="error"){const x=new Error((d.error&&d.error.message)||"stream error");x.code="upstream_error";throw x}}}}
+  finally{if(inT||outT)apiUsage(model,inT,outT)}
   if(!text.trim()){const x=new Error("empty");x.code="upstream_error";throw x}
   return {text,truncated:stop==="max_tokens",modelTierApplied:"api:"+model}}
 // switch the web app's AI between "none" (default) and the API relay

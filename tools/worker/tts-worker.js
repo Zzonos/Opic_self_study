@@ -7,6 +7,8 @@
    API 모드 (관리자 계정 전용, 선택):
    POST /ai        { kind, input, tier, stream } + Authorization: Bearer <Firebase ID 토큰> → Claude 응답 (SSE 스트림 또는 JSON)
    GET  /ai/status  + Authorization → 이번 달 사용액·한도
+   GET  /ai/key     + Authorization → (관리자·한도 이내일 때만) 브라우저가 Anthropic을 직접 부를 키
+   POST /ai/usage   + Authorization {model,inT,outT} → 사용량 기록 (월 한도 계산용)
    설정 (Worker → Settings → Variables and Secrets):
      ANTHROPIC_API_KEY  (Secret, 필수)   Anthropic 콘솔에서 발급한 API 키
      API_EMAILS         (Text, 선택)     허용 이메일, 쉼표로 구분. 기본 zzono717@gmail.com
@@ -271,7 +273,19 @@ async function aiRoute(req, env, ctx, h, url) {
   if (g.err) return J({ error: g.err[1] }, g.err[0]);
   if (!env.ANTHROPIC_API_KEY) return J({ error: "ANTHROPIC_API_KEY is not set on the worker" }, 500);
   const used = await spent(env);
-  if (req.method === "GET") return J({ ok: true, email: g.email, spentUSD: used, limitUSD: limitUSD(env), kv: !!env.OSS_KV, models: MODELS, route: ROUTE });
+  if (req.method === "GET" && url.pathname === "/ai/status") return J({ ok: true, email: g.email, spentUSD: used, limitUSD: limitUSD(env), kv: !!env.OSS_KV, models: MODELS, route: ROUTE });
+  // Anthropic refuses requests coming from Cloudflare Workers ("Request not allowed"), so the verified owner's browser
+  // calls the API directly: hand it the key (owner only, under budget) and record usage it reports back
+  if (req.method === "GET" && url.pathname === "/ai/key") {
+    if (used != null && used >= limitUSD(env)) return J({ error: "monthly budget reached", spentUSD: used, limitUSD: limitUSD(env) }, 402);
+    return new Response(JSON.stringify({ key: env.ANTHROPIC_API_KEY, models: MODELS, route: ROUTE, maxOut: MAX_OUT, spentUSD: used, limitUSD: limitUSD(env) }), { headers: { ...h, "Content-Type": "application/json", "Cache-Control": "no-store" } });
+  }
+  if (req.method === "POST" && url.pathname === "/ai/usage") {
+    let b; try { b = await req.json(); } catch (e) { return J({ error: "bad json" }, 400); }
+    const inT = Math.max(0, Math.min(2e6, +b.inT || 0)), outT = Math.max(0, Math.min(2e5, +b.outT || 0));
+    await addSpend(env, costOf(String(b.model || ""), inT, outT));
+    return J({ ok: true, spentUSD: await spent(env), limitUSD: limitUSD(env) });
+  }
   if (used != null && used >= limitUSD(env)) return J({ error: "monthly budget reached", spentUSD: used, limitUSD: limitUSD(env) }, 402);
   let body; try { body = await req.json(); } catch (e) { return J({ error: "bad json" }, 400); }
   const kind = ROUTE[body.kind] ? body.kind : "other";
@@ -304,7 +318,7 @@ export default {
     const h = cors(origin);
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: h });
     const url = new URL(req.url);
-    if (url.pathname === "/ai" || url.pathname === "/ai/status") {
+    if (url.pathname === "/ai" || url.pathname.startsWith("/ai/")) {
       if (!ALLOW_ORIGINS.includes(origin)) return new Response("forbidden origin", { status: 403, headers: h });
       try { return await aiRoute(req, env || {}, ctx || { waitUntil() { } }, h, url); } catch (e) { return new Response(JSON.stringify({ error: String(e.message || e) }), { status: 500, headers: { ...h, "Content-Type": "application/json" } }); }
     }
