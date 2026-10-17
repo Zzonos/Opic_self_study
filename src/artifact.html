@@ -1219,7 +1219,7 @@ let chatWait=4;try{chatWait=+(localStorage.getItem("opic30_cwait")||4)}catch(e){
 function chatRules(sc){return `${sc.persona}
 The learner is Korean, preparing for the OPIc speaking test, target level ${tgt()}. Their profile: ${profileText()}.
 Style: natural spoken American English, 1-3 sentences per turn, ${spec().chat}, and ALWAYS end with a question so the conversation keeps going. Stay in character; do not lecture.
-Correction: look at the learner's LAST message only. If it has a clear grammar mistake, wrong word, or an unnatural phrase, give "fix": {"original": their sentence(s) with the issue, "better": a corrected natural version keeping their meaning, "why": a one-line explanation in Korean, "ko": a natural Korean translation of "better"}. If their message was fine, set "fix": null. Ignore spelling and punctuation (voice dictation). Never correct more than one thing per turn.
+Correction: look at the learner's LAST message only. If it has a clear grammar mistake, wrong word, or an unnatural phrase, give "fix": {"original": their sentence(s) with the issue, "better": a corrected natural version keeping their meaning, "why": a one-line explanation in Korean, "ko": a natural Korean translation of "better", "say": ONE short spoken feedback sentence in English that you say out loud BEFORE your reply, friendly and natural like a tutor, quoting the better phrase (e.g. "Oh, quick tip — since it was last weekend, say 'I went to the beach' instead of 'I go'.")}. Your "reply" then continues the conversation and must NOT repeat the correction. If their message was fine, set "fix": null. Ignore spelling and punctuation (voice dictation). Never correct more than one thing per turn.
 Reply with ONLY a JSON object: {"reply":"your in-character reply","reply_ko":"reply의 한국어 뜻 (짧게)","fix":null}`}
 function vChat(m){
   if(!chat){put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation practice"),h("h1",{},"AI와 대화")),aiNote(),
@@ -1238,7 +1238,7 @@ function vChat(m){
     if(ci){const cs=getComputedStyle(ci);pad+=ci.getBoundingClientRect().height+(parseFloat(cs.bottom)||0)}last.style.scrollMarginBottom=pad+"px";try{last.scrollIntoView({block:"end",behavior:"smooth"})}catch(e){last.scrollIntoView(false)}});
   const render1=(u)=>{if(u.who==="ai"){const b=h("div",{class:"bb ai"},u.text,u.ko?h("span",{class:"ko",hidden:true},u.ko):null);b.append(h("div",{class:"row",style:"margin-top:6px;gap:6px"},spkBtn(u.text),h("button",{class:"btn sm ghost",onclick:e=>{const k=b.querySelector(".ko");if(k)k.hidden=!k.hidden}},"해석")));return b}
     if(u.who==="me")return h("div",{class:"bb me"},u.text);
-    if(u.who==="fix")return h("div",{class:"fixc"},h("span",{class:"eyebrow"},"이렇게 말하면 더 자연스러워요"),h("span",{class:"o"},u.fix.original),h("span",{class:"b"},u.fix.better),h("span",{class:"w"},u.fix.why),h("button",{class:"btn sm",style:"align-self:flex-start;margin-top:4px",onclick:()=>{addCards([{en:u.fix.better,ko:u.fix.ko||"",why:u.fix.why||""}],sc.ko)}},"표현카드에 추가"));
+    if(u.who==="fix")return h("div",{class:"fixc"},h("span",{class:"eyebrow"},"이렇게 말하면 더 자연스러워요"),h("span",{class:"o"},u.fix.original),h("span",{class:"b"},u.fix.better),h("span",{class:"w"},u.fix.why),u.fix.say?h("span",{class:"small muted",style:"margin-top:2px"},"🔊 "+u.fix.say):null,h("button",{class:"btn sm",style:"align-self:flex-start;margin-top:4px",onclick:()=>{addCards([{en:u.fix.better,ko:u.fix.ko||"",why:u.fix.why||""}],sc.ko)}},"표현카드에 추가"));
     if(u.who==="wait")return h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")))};
   chat.ui.forEach(u=>bub.append(render1(u)));
   const ta=h("textarea",{id:"chat_in",style:"min-height:64px",placeholder:"입력하거나 받아쓰기로 말하세요 — "+DICT_HINT});
@@ -1250,8 +1250,10 @@ function vChat(m){
       w.remove();if(r?.fix?.better&&r.fix.original){chat.ui.push({who:"fix",fix:r.fix});bub.append(render1({who:"fix",fix:r.fix}))}
       const reply=String(r?.reply||"").trim()||"Sorry, could you say that again?";chat.turns.push({role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});bub.append(render1({who:"ai",text:reply,ko:r?.reply_ko||""}));
       // while the reply is read aloud the open mic hears it too: ignore that, then start listening fresh
-      if(chat.auto){const micOn=()=>micBtn_&&micBtn_._isOn&&micBtn_._isOn();chat.speaking=true;chat.speakingText=reply;chat.barged=false;let done=false;const fin=()=>{if(done)return;done=true;if(chat.barged)return;chat.speaking=false;if(micOn()){try{micBtn_._cut&&micBtn_._cut()}catch(x){}ta.value="";status.textContent="듣는 중…"}};
-        speak(reply,{onend:fin});setTimeout(()=>{if(!done&&!(tts.ok&&speechSynthesis.speaking)&&!(AUD.el&&!AUD.el.paused))fin()},Math.max(8000,reply.length*90))}
+      // spoken feedback first (when there was something to fix), then the reply
+      const say=String(r?.fix?.say||"").trim();const spoken=(say?say+" ":"")+reply;
+      if(chat.auto){const micOn=()=>micBtn_&&micBtn_._isOn&&micBtn_._isOn();chat.speaking=true;chat.speakingText=spoken;chat.barged=false;let done=false;const fin=()=>{if(done)return;done=true;if(chat.barged)return;chat.speaking=false;if(micOn()){try{micBtn_._cut&&micBtn_._cut()}catch(x){}ta.value="";status.textContent="듣는 중…"}};
+        speak(spoken,{onend:fin});setTimeout(()=>{if(!done&&!(tts.ok&&speechSynthesis.speaking)&&!(AUD.el&&!AUD.el.paused))fin()},Math.max(8000,spoken.length*90))}
       toEnd();chat.n++;const cnt=$("#chat_cnt");if(cnt)cnt.textContent=chatEyebrow(sc);
       if(chat.turns.length>24)chat.turns.splice(0,2);
     }catch(e){w.remove();bub.append(h("div",{class:"note"},errMsg(e)));toEnd();chat.turns.pop();chat.ui.pop()}
