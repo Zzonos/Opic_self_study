@@ -605,6 +605,11 @@ function apiCard(){if(!WEB||!isAdminUser())return null;const st=h("p",{class:"mu
 const MIC={stream:null,last:0,active:0};
 async function micStream(){if(MIC.stream&&MIC.stream.getAudioTracks().some(t=>t.readyState==="live")){MIC.last=Date.now();return MIC.stream}
   MIC.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});MIC.last=Date.now();return MIC.stream}
+const MIC_BTNS=new Set();
+// app went to the background: turn every microphone off (recognisers, voice detector, shared stream)
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState!=="hidden")return;
+  for(const b of [...AZ_BTNS,...MIC_BTNS]){if(!b.isConnected&&MIC_BTNS.has(b)){MIC_BTNS.delete(b);continue}try{b._bg&&b._bg()}catch(e){}}
+  setTimeout(()=>{MIC.active=0;micRelease()},300)});
 function micRelease(){if(MIC.stream){try{MIC.stream.getTracks().forEach(t=>t.stop())}catch(e){}MIC.stream=null}}
 setInterval(()=>{if(!MIC.stream||MIC.active>0)return;const idle=Date.now()-MIC.last;if(idle>(document.hidden?2:10)*60e3)micRelease()},20000);
 const AZ={tok:null,at:0,region:"",direct:false,sdk:null};
@@ -644,7 +649,7 @@ function vadWatch({onVoice,threshold=0.035,ms=250}){let stop=false,ac=null,timer
 // while the recognizer runs; the microphone permission stays because the shared stream is kept.
 const AZ_BTNS=new Set();
 function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,idleStop=0,onState=null}={}){const b=h("button",{class:"btn primary"},label);AZ_BTNS.add(b);
-  let rec=null,live=false,want=false,base="",fin="",pend="",segs=[],gen=0,skipPhrase=false,lastAct=0,idleT=null,vadStop=null,starting=false;
+  let rec=null,cl=null,live=false,want=false,base="",fin="",pend="",segs=[],gen=0,skipPhrase=false,lastAct=0,idleT=null,vadStop=null,starting=false;
   const st=s=>{try{onState&&onState(s)}catch(e){}};
   const paint=()=>{b.disabled=starting;b.textContent=starting?"연결 중…":want?(live?"■ 말하기 끝":"⏸ 대기 · 끝내기"):label;b.classList.toggle("rec",want)};
   b._isOn=()=>want;b._live=()=>live;b._wanted=()=>want;b._az=true;b._pron=()=>azSummary(segs);b._reset=()=>{segs=[]};
@@ -652,10 +657,11 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
   b._rebase=t=>{base=t?t.trim()+" ":"";fin="";pend="";ta.value=base;ta.dispatchEvent(new Event("input"))};
   b._flush=async()=>{for(let k=0;k<16&&live&&pend;k++)await new Promise(r=>setTimeout(r,150))};
   const unVad=()=>{if(vadStop){vadStop();vadStop=null}};
-  const stopRec=()=>new Promise(res=>{clearInterval(idleT);idleT=null;gen++;if(!rec){live=false;paint();return res()}const r=rec;rec=null;if(live){MIC.active=Math.max(0,MIC.active-1);MIC.last=Date.now()}live=false;paint();
-    try{r.stopContinuousRecognitionAsync(()=>{try{r.close()}catch(e){}res()},()=>res())}catch(e){res()}});
+  const dropCl=()=>{if(cl){try{cl.getTracks().forEach(t=>t.stop())}catch(e){}cl=null}};
+  const stopRec=()=>new Promise(res=>{clearInterval(idleT);idleT=null;gen++;if(!rec){live=false;dropCl();paint();return res()}const r=rec;rec=null;if(live){MIC.active=Math.max(0,MIC.active-1);MIC.last=Date.now()}live=false;paint();
+    try{r.stopContinuousRecognitionAsync(()=>{try{r.close()}catch(e){}dropCl();res()},()=>{dropCl();res()})}catch(e){dropCl();res()}});
   const startRec=async()=>{if(rec||starting)return;starting=true;paint();unVad();
-    try{const {sdk,cfg}=await azConfig(2000);let audio;try{const ms=await micStream();audio=sdk.AudioConfig.fromStreamInput(ms.clone())}catch(x){if(x&&x.name==="NotAllowedError")throw new Error("마이크 권한이 꺼져 있어요");audio=sdk.AudioConfig.fromDefaultMicrophoneInput()}
+    try{const {sdk,cfg}=await azConfig(2000);let audio;try{const ms=await micStream();dropCl();cl=ms.clone();audio=sdk.AudioConfig.fromStreamInput(cl)}catch(x){if(x&&x.name==="NotAllowedError")throw new Error("마이크 권한이 꺼져 있어요");audio=sdk.AudioConfig.fromDefaultMicrophoneInput()}
       const r=new sdk.SpeechRecognizer(cfg,audio);const my=++gen;rec=r;skipPhrase=false;
       const pa=new sdk.PronunciationAssessmentConfig("",sdk.PronunciationAssessmentGradingSystem.HundredMark,sdk.PronunciationAssessmentGranularity.Word,false);try{pa.enableProsodyAssessment=true}catch(e){}pa.applyTo(r);
       base=ta.value?ta.value.trim()+" ":"";fin="";pend="";if(!base)segs=[];
@@ -666,7 +672,7 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
         if(document.hidden){stopRec();return}
         if(/quota|429|1007|exceed/i.test(d)||e.errorCode===sdk.CancellationErrorCode.TooManyRequests){want=false;azDisable("무료 한도 소진")}else if(/401|403|auth/i.test(d)||e.errorCode===sdk.CancellationErrorCode.AuthenticationFailure){AZ.tok=null;toast("Azure 인증 오류 — 다시 눌러 주세요");want=false}else{toast("Azure 연결이 끊겼어요: "+d.slice(0,60));want=false}stopRec()};
       await new Promise((ok,bad)=>r.startContinuousRecognitionAsync(ok,bad));
-      if(my!==gen){try{r.close()}catch(e){}return}
+      if(my!==gen){try{r.close()}catch(e){}starting=false;paint();return}
       live=true;want=true;MIC.active++;lastAct=Date.now();starting=false;paint();st("listen");try{onStart&&onStart()}catch(x){}
       // long silence in a conversation: stop paying Azure, wake up again by the local voice detector
       if(idleStop)idleT=setInterval(()=>{if(live&&!pend&&Date.now()-lastAct>idleStop)b._pause(true)},1000)}
@@ -675,6 +681,7 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
   b._pause=async(idle)=>{if(!want)return;await stopRec();if(idle){st("idle");unVad();vadStop=vadWatch({onVoice:()=>{unVad();b._resume()}})}else st("paused")};
   b._resume=async()=>{if(!want||rec||starting)return;await startRec()};
   b._start=async()=>{if(want)return;want=true;await startRec()};
+  b._bg=async()=>{if(!want&&!rec&&!starting&&!vadStop)return;want=false;unVad();await stopRec();starting=false;paint();st("off");ta.value=(base+fin).trim()};
   b._kill=async()=>{want=false;unVad();AZ_BTNS.delete(b);await stopRec()};
   b._finish=async()=>{const was=want;want=false;unVad();await stopRec();st("off");if(!was)return;ta.value=(base+fin).trim();ta.dispatchEvent(new Event("input"));onFinal&&onFinal(ta.value)};
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&want&&!rec&&!vadStop&&b.isConnected&&!b._held)startRec()});
@@ -1831,14 +1838,14 @@ function aiGate(){const box=h("span",{class:"row",style:"gap:6px"});const note=h
       note.textContent="이 기기의 Claude 앱에서는 AI 평가를 쓸 수 없어요 ("+st+"). 브라우저에서 claude.ai로 열거나 iPhone·PC Claude 앱을 이용해 주세요"}catch(e){note.textContent="확인 실패: "+(e.code||e.message||e)}}},"AI 사용 허용");
   (async()=>{try{const P=await claude.use("permissions");const st=P?await P.state("sample"):"unavailable";note.textContent=st==="prompt"?"버튼을 눌러 AI 사용을 허용해 주세요":st==="denied"?"AI 사용이 거절돼 있어요 — 버튼을 눌러 권한을 바꿔 주세요":st==="granted"?"AI 연결 중… 잠시 후 다시 열어 주세요":"이 기기의 Claude 앱에서는 AI 기능을 쓸 수 없어요 — 브라우저에서 claude.ai로 열어 주세요"}catch(e){note.textContent=""}})();
   box.append(btn,note);return box}
-function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false,gate=null,onHeard=null}={}){if(!SR_OK)return null;const b=h("button",{class:"btn primary"},label);let on=false;let waitEnd=null;
+function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false,gate=null,onHeard=null}={}){if(!SR_OK)return null;const b=h("button",{class:"btn primary"},label);MIC_BTNS.add(b);let on=false;let waitEnd=null;
   b._isOn=()=>on;b._finish=()=>new Promise(res=>{if(!on){res();return}waitEnd=res;try{rec?.stop()}catch(e){}setTimeout(()=>{if(waitEnd===res){waitEnd=null;if(on)stop();res()}},2500)});
   const stop=()=>{on=false;b.textContent=label;b.classList.remove("rec");try{rec?.stop()}catch(e){}rec=null};
   let base="",fin="",from=0,seen=0;
   // after the text was sent (chat), drop everything recognised so far so it is not sent again
   b._cut=()=>{base="";fin="";from=seen;pend=""};
   b._rebase=t=>{base=t?t.trim()+" ":"";fin="";from=seen;pend="";ta.value=base;ta.dispatchEvent(new Event("input"))};
-  let want=false;b._wanted=()=>want;
+  let want=false;b._wanted=()=>want;b._bg=()=>{want=false;if(on)stop()};
   if(keepAlive)document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&want&&!on&&b.isConnected)b.onclick()});
   let pend="",settled=null;
   // make the words still being recognised final before the text is sent: ask the browser to close the
