@@ -395,7 +395,7 @@ function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;mergeUsage(o.
   const stamp=x=>x?(x.ts||(x.date?Date.parse(x.date):0)||0):0;const newer=(v,cur)=>!cur||stamp(v)>stamp(cur)||(!fromCloud&&stamp(v)===stamp(cur)&&JSON.stringify(v)!==JSON.stringify(cur));
   for(const [k,v] of Object.entries(o.scripts||{}))if(newer(v,S.scripts[k]))S.scripts[k]=v;
   S.samples=S.samples||{};for(const [k,v] of Object.entries(o.samples||{}))if(newer(v,S.samples[k]))S.samples[k]=v;
-  Object.assign(S.models=S.models||{},o.models||{});Object.assign(S.trans=S.trans||{},o.trans||{});Object.assign(S.cards,o.cards||{});
+  Object.assign(S.models=S.models||{},o.models||{});Object.assign(S.trans=S.trans||{},o.trans||{});if((o.transVer||0)>(S.transVer||0))S.transVer=o.transVer;if((o.transAllAt||0)>(S.transAllAt||0))S.transAllAt=o.transAllAt;Object.assign(S.cards,o.cards||{});
   for(const c of (o.custom||[])){const cur=S.custom.find(x=>x.en===c.en);if(!cur)S.custom.push(c);else if(c.ko&&(!cur.ko||(cur.koSrc==="mt"&&c.koSrc!=="mt"))){cur.ko=c.ko;if(c.koSrc)cur.koSrc=c.koSrc;else delete cur.koSrc}}for(const t of (o.texts||[]))if(!S.texts.some(x=>x.id===t.id||x.text===t.text))S.texts.push(t);
   if(o.profile){const newer=(o.updatedAt||0)>(S.updatedAt||0);for(const [k,v] of Object.entries(o.profile)){const cur=S.profile[k];const empty=cur==null||cur===""||(Array.isArray(cur)&&!cur.length);if(newer||empty||(k==="survey"&&!fromCloud&&Array.isArray(v)&&v.length))S.profile[k]=v}}if(o.analysis&&(o.analysis.ts||0)>(S.analysis?.ts||0))S.analysis=o.analysis;if(o.today&&o.today.date===todayStr()){for(const k of ["cards","script","practice"])S.today[k]=Math.max(S.today[k]||0,o.today[k]||0)}if((o.updatedAt||0)>(S.updatedAt||0))S.updatedAt=o.updatedAt;if(!fromCloud)save();else{try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}
 function ensureToday(){if(S.today.date!==todayStr()){S.today={date:todayStr(),cards:0,script:0,practice:0}}}
@@ -411,8 +411,8 @@ function syncPayload(){if(!S.syncedAt||S.syncFull)return fullPayload();
   let trans={};if((S.transAllAt||0)>since)trans=S.trans||{};else{const sents=new Set();const add=t=>splitSent(t).forEach(x=>sents.add(x));
     for(const sc of [...Object.values(scripts),...Object.values(samples)])for(const x of (sc.scripts||[]))add(x&&x.answer);for(const m of Object.values(models))add(m);
     for(const x of sents)if(S.trans[x])trans[x]=S.trans[x]}
-  return {delta:true,del:S.del||[],log:S.log.filter(l=>(l.ts||Date.parse(l.date)||0)>since),scripts,samples,models,trans,custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,usage:S.usage||{},updatedAt:S.updatedAt}}
-function fullPayload(){return {del:S.del||[],log:S.log,scripts:S.scripts,samples:S.samples||{},models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,usage:S.usage||{},updatedAt:S.updatedAt}}
+  return {delta:true,del:S.del||[],log:S.log.filter(l=>(l.ts||Date.parse(l.date)||0)>since),scripts,samples,models,trans,custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,usage:S.usage||{},transVer:S.transVer||1,transAllAt:S.transAllAt||0,updatedAt:S.updatedAt}}
+function fullPayload(){return {del:S.del||[],log:S.log,scripts:S.scripts,samples:S.samples||{},models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,usage:S.usage||{},transVer:S.transVer||1,transAllAt:S.transAllAt||0,updatedAt:S.updatedAt}}
 function packStateSync(){return "r"+b64u(new TextEncoder().encode(JSON.stringify(syncPayload())).buffer)}
 const SYNC_LIM=180000;
 async function packJSON(obj){const bytes=new TextEncoder().encode(JSON.stringify(obj));
