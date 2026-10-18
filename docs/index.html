@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261018-102254-c4b269">
+<html lang="ko" data-build="20261018-115206-b46ad3">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -582,7 +582,8 @@ async function apiCall1(input,opt={},fresh){const cfg=await apiKey(fresh);const 
   const fam=opt.modelTier==="quick"?"haiku":opt.modelTier==="complex"?"opus":((cfg.route||{})[kind]||"sonnet");const model=(cfg.models||{})[fam]||"claude-sonnet-5-5";
   const messages=Array.isArray(input)?input.map(t=>({role:t.role,content:String(t.content||"")})):[{role:"user",content:String(input||"")}];
   let r;try{r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",signal:opt.signal,headers:{"x-api-key":cfg.key,"anthropic-version":"2023-06-01","content-type":"application/json","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model,max_tokens:((cfg.maxOut||{})[kind])||2000,messages,stream:true})})}
+    body:JSON.stringify({model,max_tokens:Math.max(((cfg.maxOut||{})[kind])||2000,kind==="chat"?1500:0),messages,stream:true,
+      system:"Your reply is parsed by a program. Answer with ONLY one valid JSON value exactly as requested in the user's message: no text before or after it, no markdown code fences, no comments. Inside JSON strings escape double quotes and use \\n for line breaks."})})}
   catch(e){if(e&&e.name==="AbortError"){const x=new Error("cancelled");x.code="cancelled";throw x}const x=new Error(String(e.message||e));x.code="upstream_error";throw x}
   if(!r.ok){let m="";try{const j=await r.json();m=(j.error&&j.error.message)||JSON.stringify(j).slice(0,200)}catch(e){}if(r.status===401)APIK.cfg=null;
     const x=new Error("anthropic "+r.status+": "+m);if(r.status===401&&!fresh)x.status401=true;x.code=r.status===429||r.status===529?"rate_limited":"upstream_error";throw x}
@@ -1306,7 +1307,9 @@ function vChat(m){
   ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){e.preventDefault();send()}});
   const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ttsStop();ta.value="";try{micBtn_&&micBtn_._cut&&micBtn_._cut();if(micBtn_&&micBtn_._pause)micBtn_._pause()}catch(e){}chat.busy=true;
     chat.ui.push({who:"me",text:t});chat.turns.push({role:"user",content:t});bub.append(render1({who:"me",text:t}));const w=render1({who:"wait"});bub.append(w);toEnd();
-    try{const r=await sample.json([{role:"user",content:chatRules(sc)},...chat.turns],{cache:false,modelTier:"quick"});
+    try{const ask=()=>sample.json([{role:"user",content:chatRules(sc)},...chat.turns],{cache:false,modelTier:"quick"});
+      let r;try{r=await ask()}catch(e1){if(e1&&e1.code==="invalid_json"){try{r=await ask()}catch(e2){const raw=String((e2&&e2.text)||"").replace(/```[a-z]*|```/g,"").trim();const m=/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(raw);
+          if(m)r={reply:JSON.parse('"'+m[1]+'"'),fix:null};else if(raw&&!/^[\[{]/.test(raw))r={reply:raw.slice(0,600),fix:null};else throw e2}}else throw e1}
       w.remove();if(r?.fix?.better&&r.fix.original){chat.ui.push({who:"fix",fix:r.fix});bub.append(render1({who:"fix",fix:r.fix}))}
       const reply=String(r?.reply||"").trim()||"Sorry, could you say that again?";chat.turns.push({role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});bub.append(render1({who:"ai",text:reply,ko:r?.reply_ko||""}));
       // while the reply is read aloud the open mic hears it too: ignore that, then start listening fresh
@@ -1838,7 +1841,7 @@ function wrapSample(s){const w=(...a)=>s(...a);w.json=async(input,opt)=>{aiCount
     // use the plain call so we learn which model tier actually answered (json() does not report it)
     const want=(opt&&opt.modelTier)||"default";const r=await s(input,opt);tierCount(want,r&&r.modelTierApplied);
     if(r&&r.truncated){const e=new Error("invalid_json");e.code="invalid_json";e.text=r.text;throw e}
-    const v=parseReply(r&&r.text);const out=v==null?v:JSON.parse(JSON.stringify(v));if(out&&typeof out==="object"&&!Array.isArray(out))out._tier={req:want,applied:(r&&r.modelTierApplied)||want};return out};if(s.limits)w.limits=(...a)=>s.limits(...a);return w}
+    let v;try{v=parseReply(r&&r.text)}catch(pe){audLog.push("invalid_json: "+String(r&&r.text||"").slice(0,120));pe.text=r&&r.text;throw pe}const out=v==null?v:JSON.parse(JSON.stringify(v));if(out&&typeof out==="object"&&!Array.isArray(out))out._tier={req:want,applied:(r&&r.modelTierApplied)||want};return out};if(s.limits)w.limits=(...a)=>s.limits(...a);return w}
 function aiGate(){const box=h("span",{class:"row",style:"gap:6px"});const note=h("span",{class:"muted small"},"AI 기능 확인 중…");
   const btn=h("button",{class:"btn",onclick:async()=>{try{const P=await claude.use("permissions");if(!P){note.textContent="이 기기의 Claude 앱에서는 AI 평가를 쓸 수 없어요. 브라우저에서 claude.ai로 열어 주세요";return}
       let st=await P.state("sample");if(st==="prompt"){const r=await P.request(["sample"]);st=r.sample||st}
