@@ -159,6 +159,8 @@ svg.chart{width:100%;height:auto;display:block}
 .login .brand{font-family:var(--display);font-size:34px;font-weight:700;line-height:1}
 .login input[type=password],.login input[type=email]{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:var(--bg)}
 .hdr{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.hdrR{display:flex;align-items:center;gap:6px;flex-shrink:0}
+@media (max-width:900px){.hdrR{flex-direction:column;align-items:flex-end;gap:4px}}
 details summary{cursor:pointer;font-weight:500}
 .mocknav{display:flex;gap:4px;flex-wrap:wrap}
 .mocknav i{width:14px;height:6px;border-radius:3px;background:var(--line)}
@@ -1030,7 +1032,7 @@ function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);if(sub&&sub.history)
   const t=S.today;const done=[t.cards>=10,t.script>=1,t.practice>=3];
   put(m,
     h("div",{class:"hdr",style:"flex-wrap:nowrap"},h("div",{style:"min-width:0;word-break:keep-all"},h("p",{class:"eyebrow"},todayStr()+" · 목표 "+tgt()),h("h1",{},S.profile.name?`${S.profile.name}님, 오늘의 30분`:"오늘의 30분")),
-      h("div",{style:"display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0"},claudeMini(),h("span",{class:"chip "+(done.every(Boolean)?"good":"neutral")},done.filter(Boolean).length+"/3 완료"))),
+      h("div",{class:"hdrR"},claudeMini(),h("span",{class:"chip "+(done.every(Boolean)?"good":"neutral")},done.filter(Boolean).length+"/3 완료"))),
     aiNote(),webNote(),
     h("div",{class:"stats"},
       h("div",{class:"stat"},h("b",{class:"mono"},streak),h("span",{},"연속 학습일")),
