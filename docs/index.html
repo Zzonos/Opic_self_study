@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261019-152611-78ffe6">
+<html lang="ko" data-build="20261020-230346-31dd50">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1434,13 +1434,22 @@ function vMock(m){
   const tEl=h("div",{class:"timer"},"0:00");const bar=h("div",{class:"bar"},h("i"));
   const ta=h("textarea",{id:"mock_"+mock.i,placeholder:"받아쓰기로 답변 입력"});ta.value=it.a;
   const nav=h("div",{class:"mocknav"},...mock.items.map((x,i)=>h("i",{class:i<mock.i?"done":i===mock.i?"cur":""})));
-  const next=async()=>{it.a=ta.value.trim();it.secs=timerStop()||it.secs;if(mock.i<n-1){mock.i++;render()}else{mock.result="pending";render()}};
+  const next=async()=>{if(mic&&mic._isOn&&mic._isOn())await mic._finish();it.a=ta.value.trim();it.secs=timerStop()||it.secs;if(mock.i<n-1){mock.i++;render()}else{mock.result="pending";render()}};
   let plays=0;const qText=h("p",{class:"q grow",style:"margin-top:10px"},it.q);const hid=h("div",{class:"hidden-q",style:"margin-top:10px"},"질문을 듣고 답하세요. 실제 시험처럼 재생은 2번까지 가능해요.");
   const reveal=h("button",{class:"btn sm ghost",onclick:()=>{hid.hidden=true;qText.hidden=false;reveal.hidden=true}},"질문 텍스트 보기");
   const replay=h("button",{class:"btn sm",onclick:()=>{if(plays>=2){toast("실제 시험에서는 2번까지만 들을 수 있어요");return}plays++;speak(it.q,{key:it.key});replay.textContent="다시 듣기 ("+(2-plays)+"회 남음)"}},"질문 듣기 (2회)");
   if(mock.listen){qText.hidden=true;setTimeout(()=>{plays=1;speak(it.q,{key:it.key});replay.textContent="다시 듣기 (1회 남음)"},300)}else{hid.hidden=true;reveal.hidden=true}
+  // "답변 끝" stops the clock AND the recording; starting either one starts the other
+  const micOn=()=>!!(mic&&mic._isOn&&mic._isOn());
+  const stopAll=async()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}if(micOn())await mic._finish()};
+  const sb=h("button",{class:"btn primary",onclick:()=>{if(timer.on||micOn()){stopAll();return}
+    if(sb.textContent==="다시 시작"){ta.value="";it.a="";it.secs=0;try{mic&&mic._reset&&mic._reset()}catch(e){}}ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝";
+    if(mic){if(mic._az)mic._start();else if(!micOn())mic.onclick()}else ta.focus()}},"말하기 시작");autoTimer(ta,sb);
+  const mic=azOn()?azMicBtn(ta,{label:"🎙 마이크로 답하기 (Azure)",onStart:()=>{if(!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝"}},onFinal:()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}})
+    :SR_OK?micBtn(ta,{label:"🎤 마이크로 답하기",onFinal:()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}}):null;
+  if(mic&&!mic._az){const oc=mic.onclick;mic.onclick=()=>{const was=micOn();oc();if(!was&&micOn()&&!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝"}else if(was&&!micOn()&&timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}}
   put(m,h("div",{},h("p",{class:"eyebrow"},"Question "+(mock.i+1)+" / "+n+" · 난이도 "+mockDiffLabel()+" · "+it.kind),nav,qText,hid,h("div",{class:"row",style:"margin-top:8px"},replay,reveal)),
-    h("div",{class:"card"},h("div",{class:"row"},tEl,h("div",{class:"grow"},bar),(()=>{const sb=h("button",{class:"btn primary",onclick:e=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}else{if(sb.textContent==="다시 시작"){ta.value="";it.a="";it.secs=0}ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝";ta.focus()}}},"말하기 시작");autoTimer(ta,sb);return sb})()),ta,azOn()?h("div",{class:"row"},azMicBtn(ta,{label:"🎙 마이크로 답하기 (Azure)"})):SR_OK?h("div",{class:"row"},(micBtn(ta,{label:"🎤 마이크로 답하기"})||micLink("🎤 마이크로 답하기"))):null,
+    h("div",{class:"card"},h("div",{class:"row"},tEl,h("div",{class:"grow"},bar),sb),ta,mic?h("div",{class:"row"},mic):SR_OK?null:h("div",{class:"row"},micLink("🎤 마이크로 답하기")),
       h("div",{class:"row"},h("button",{class:"btn primary",onclick:next},mock.i<n-1?"다음 문항 →":"제출하고 채점"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"시험 중단"))));
 }
 async function vMockResult(m){
