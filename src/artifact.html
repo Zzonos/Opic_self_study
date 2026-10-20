@@ -1019,7 +1019,7 @@ const IS_ANDROID=/Android/i.test(navigator.userAgent);
 const ART_URL=(IS_ANDROID&&!window.claude?.use)?"intent://claude.ai/artifact/HuASd2nEpXENsSugPoScyp#Intent;scheme=https;package=com.anthropic.claude;S.browser_fallback_url="+encodeURIComponent(ART_URL_WEB)+";end":ART_URL_WEB;
 function aiNote(){if(sample||window.claude?.use)return null;prepSyncCode();return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"프로필 입력·스크립트 생성·AI 평가·대화는 Claude 앱에서 해요. Claude 앱의 '웹으로 통합' 버튼으로 여기로 오면 최신 기록이 자동으로 합쳐집니다. 여기서는 무한 재생·마이크 연습·표현카드를 쓰세요."),h("a",{class:"btn sm",href:ART_URL,target:IS_ANDROID?"_self":"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",onclick:()=>{try{navigator.clipboard?.writeText((syncCode&&syncCodeAt>=(S.updatedAt||0))?syncCode:packStateSync()).catch(()=>{})}catch(e){}}},"Claude에서 열기"))}
 // small "open in Claude" link for the web build when the AI already runs here (API mode)
-function claudeMini(){if(window.claude?.use||!sample)return null;prepSyncCode();return h("a",{class:"btn sm",href:ART_URL,target:IS_ANDROID?"_self":"_blank",rel:"noopener",title:"Claude 앱에서 열기 (최신 기록 함께 보냄)",style:"text-decoration:none;white-space:nowrap;padding:4px 10px;font-size:12px;min-height:0",onclick:()=>{try{navigator.clipboard?.writeText((syncCode&&syncCodeAt>=(S.updatedAt||0))?syncCode:packStateSync()).catch(()=>{})}catch(e){}}},"Claude에서 열기")}
+function claudeMini(){if(window.claude?.use||!sample)return null;prepSyncCode();return h("a",{class:"btn sm",href:ART_URL,target:IS_ANDROID?"_self":"_blank",rel:"noopener",title:"Claude 앱에서 열기 (최신 기록 함께 보냄)",style:"text-decoration:none;white-space:nowrap;padding:4px 10px;font-size:12px;min-height:0",onclick:()=>{try{navigator.clipboard?.writeText((syncCode&&syncCodeAt>=(S.updatedAt||0))?syncCode:packStateSync()).catch(()=>{})}catch(e){}}},"Claude 모드")}
 function webNote(){if(!window.claude?.use)return null;const n=unsyncedCount();return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"여기(Claude)의 프로필·스크립트·예시·기록을 웹 계정에 보내요. '웹으로 통합'은 저장만 하고 완료 화면을 띄우니, 그 뒤 홈 화면의 OSS 앱을 열면 반영돼 있어요."+(n?" (새 기록 "+n+"건)":"")),h("div",{class:"row",style:"gap:6px"},webLink("웹으로 통합","btn sm primary","x"),webLink("열기 →","btn sm","s")))}
 
 /* ---- TODAY ---- */
@@ -1029,8 +1029,8 @@ function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);if(sub&&sub.history)
   const streak=calcStreak();const todayMin=S.log.filter(l=>l.date===todayStr()).reduce((a,l)=>a+(l.secs||0),0)/60;
   const t=S.today;const done=[t.cards>=10,t.script>=1,t.practice>=3];
   put(m,
-    h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},todayStr()+" · 목표 "+tgt()),h("h1",{},S.profile.name?`${S.profile.name}님, 오늘의 30분`:"오늘의 30분")),
-      h("div",{class:"row",style:"gap:6px;flex-wrap:nowrap;align-items:center"},claudeMini(),h("span",{class:"chip "+(done.every(Boolean)?"good":"neutral")},done.filter(Boolean).length+"/3 완료"))),
+    h("div",{class:"hdr",style:"flex-wrap:nowrap"},h("div",{style:"min-width:0;word-break:keep-all"},h("p",{class:"eyebrow"},todayStr()+" · 목표 "+tgt()),h("h1",{},S.profile.name?`${S.profile.name}님, 오늘의 30분`:"오늘의 30분")),
+      h("div",{style:"display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0"},claudeMini(),h("span",{class:"chip "+(done.every(Boolean)?"good":"neutral")},done.filter(Boolean).length+"/3 완료"))),
     aiNote(),webNote(),
     h("div",{class:"stats"},
       h("div",{class:"stat"},h("b",{class:"mono"},streak),h("span",{},"연속 학습일")),
