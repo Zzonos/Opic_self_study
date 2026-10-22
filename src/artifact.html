@@ -1275,7 +1275,7 @@ let chatWait=4;try{chatWait=+(localStorage.getItem("opic30_cwait")||4)}catch(e){
 function chatRules(sc){return `${sc.persona}
 The learner is Korean, preparing for the OPIc speaking test, target level ${tgt()}. Their profile: ${profileText()}.
 Style: natural spoken American English, 1-3 sentences per turn, ${spec().chat}, and ALWAYS end with a question so the conversation keeps going. Stay in character; do not lecture.
-Correction: look at the learner's LAST message only. If it has a clear grammar mistake, wrong word, or an unnatural phrase, give "fix": {"original": their sentence(s) with the issue, "better": a corrected natural version keeping their meaning, "why": a one-line explanation in Korean, "ko": a natural Korean translation of "better", "say": ONE short spoken feedback sentence in English that you say out loud BEFORE your reply, friendly and natural like a tutor, quoting the better phrase (e.g. "Oh, quick tip — since it was last weekend, say 'I went to the beach' instead of 'I go'.")}. Your "reply" then continues the conversation and must NOT repeat the correction. If their message was fine, set "fix": null. Ignore spelling and punctuation (voice dictation). Never correct more than one thing per turn.
+Correction: look at the learner's LAST message only. If it has a clear grammar mistake, wrong word, or an unnatural phrase, give "fix": {"original": their sentence(s) with the issue, "better": the WHOLE sentence rewritten as one complete, natural sentence with exactly the same meaning (never just a phrase or a fragment; e.g. original "Last weekend I go to beach with family" → better "Last weekend, I went to the beach with my family."), "why": a one-line explanation in Korean, "ko": a natural Korean translation of "better"}. Your "reply" then continues the conversation and must NOT repeat the correction. If their message was fine, set "fix": null. Ignore spelling and punctuation (voice dictation). Never correct more than one thing per turn.
 Reply with ONLY a JSON object: {"reply":"your in-character reply","reply_ko":"reply의 한국어 뜻 (짧게)","fix":null}`}
 function vChat(m){
   if(!chat){put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation practice"),h("h1",{},"AI와 대화")),aiNote(),
@@ -1309,7 +1309,8 @@ function vChat(m){
       const reply=String(r?.reply||"").trim()||"Sorry, could you say that again?";chat.turns.push({role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});bub.append(render1({who:"ai",text:reply,ko:r?.reply_ko||""}));
       // while the reply is read aloud the open mic hears it too: ignore that, then start listening fresh
       // spoken feedback first (when there was something to fix), then the reply
-      const say=String(r?.fix?.say||"").trim();const spoken=(say?say+" ":"")+reply;
+      // spoken tip: always the learner's full sentence, said the better way
+      const bt=String(r?.fix?.better||"").trim();const say=bt?"Quick tip. That sentence sounds better like this: \""+bt.replace(/"/g,"").replace(/([^.!?])$/,"$1.")+"\"":"";const spoken=(say?say+" ":"")+reply;
       if(chat.auto){const micOn=()=>micBtn_&&micBtn_._isOn&&micBtn_._isOn();chat.speaking=true;chat.speakingText=spoken;chat.barged=false;let done=false;
         // Azure: the recognizer is paused while the AI talks; a local voice detector lets the user cut in
         let unv=null;if(micBtn_&&micBtn_._az&&micOn())unv=vadWatch({threshold:0.08,ms:400,onVoice:()=>{if(!chat.speaking)return;chat.barged=true;chat.speaking=false;if(unv){unv();unv=null}ttsStop();micBtn_._resume();status.textContent="듣는 중…"}});
