@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261023-070751-3bb9ea">
+<html lang="ko" data-build="20261023-081344-8ab627">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -851,7 +851,19 @@ Reply with ONLY one JSON object:
 /* ============ RECORDED AUDIO (Kokoro neural voices, pre-rendered) ============ */
 const AUD={tags:{m:"남성 · Andrew",f:"여성 · Ava"},man:{},tag:"m",el:null,ready:false};
 try{const t=localStorage.getItem("opic30_aud");if(t)AUD.tag=t}catch(e){}
-function audEl(){if(!AUD.el){AUD.el=new Audio();AUD.el.preload="auto"}return AUD.el}
+function audEl(){if(!AUD.el){AUD.el=new Audio();AUD.el.preload="auto";
+    // a pause the app did not ask for = the system interrupted (notification, call, Siri, another app)
+    AUD.el.addEventListener("pause",()=>{const a=AUD.el,src=a.src;setTimeout(()=>{if(!player.on||player.paused||player.sys||!a.paused||a.ended||a.src!==src||!src||Date.now()-(AUD.own||0)<600)return;sysPaused()},300)});
+    AUD.el.addEventListener("playing",()=>{if(player.sys){player.sys=false;clearInterval(player.sysT);mediaSession()}})}
+  return AUD.el}
+function sysPaused(){player.sys=true;audLog.push("시스템이 재생을 멈춤 (알림 등)");mediaSession();
+  // the interruption is usually short: try to continue for a while (works as long as the page is still awake)
+  let n=0;clearInterval(player.sysT);player.sysT=setInterval(()=>{if(!player.sys||!player.on||player.paused||++n>8){clearInterval(player.sysT);return}sysResume(true)},1500)}
+function sysResume(auto){if(!player.on)return;const a=AUD.el;player.sys=false;keepAlive(true);
+  if(a&&a.src&&a.paused&&!a.ended&&a.currentTime>0.1){a.play().then(()=>{clearInterval(player.sysT);audLog.push(auto?"끼어든 소리 끝 → 자동으로 이어서":"이어서 재생");mediaSession()}).catch(()=>{player.sys=true;mediaSession()})}
+  else{clearInterval(player.sysT);audLog.push("이어서 재생 (현재 문장)");playerStep();mediaSession()}}
+// Safari: the audio session reports when an interruption ends
+try{if(navigator.audioSession){navigator.audioSession.addEventListener("statechange",()=>{if(navigator.audioSession.state==="active"&&player.sys)sysResume(true)})}}catch(e){}
 async function loadManifests(){for(const t of [...Object.keys(AUD.tags),"ko"]){try{const r=await fetch("audio/"+t+"/manifest.json");if(r.ok)AUD.man[t]=await r.json()}catch(e){}}AUD.ready=true;if(!AUD.man[AUD.tag]){AUD.tag=Object.keys(AUD.man).find(t=>t!=="ko")||"off"}}
 const audSrc=key=>(AUD.tag!=="off"&&key&&AUD.man[AUD.tag]&&AUD.man[AUD.tag][key])?"audio/"+AUD.tag+"/"+key+".mp3":null;
 const koSrc=key=>(key&&AUD.man.ko&&AUD.man.ko[key])?"audio/ko/"+key+".mp3":null;
@@ -916,9 +928,9 @@ let audCb=null;
 const audLog=[];
 function audPlay(src,{rate=1,onend=null,onerror=null}={}){const a=audEl();audCb=onend;const t0=Date.now();a.onended=()=>{audLog.push(src.split("/").pop()+" ok "+((Date.now()-t0)/1000).toFixed(1)+"s");if(audLog.length>30)audLog.shift();const cb=audCb;audCb=null;cb&&cb()};
   a.onerror=()=>{audLog.push(src.split("/").pop().slice(0,24)+" ERR"+(a.error?.code||"")+" "+((Date.now()-t0)/1000).toFixed(1)+"s");const cb=audCb;audCb=null;if(onerror)onerror();else cb&&cb()};
-  a.src=src;a.playbackRate=rate;a.play().catch(e=>{if(e&&e.name==="AbortError")return;audLog.push(src.split("/").pop().slice(0,24)+" play-fail "+(e&&e.name||""));const cb=audCb;audCb=null;if(onerror)onerror();else cb&&cb()})}
+  AUD.own=Date.now();a.src=src;a.playbackRate=rate;a.play().catch(e=>{if(e&&e.name==="AbortError")return;audLog.push(src.split("/").pop().slice(0,24)+" play-fail "+(e&&e.name||""));const cb=audCb;audCb=null;if(onerror)onerror();else cb&&cb()})}
 function audDone(){const a=AUD.el;if(!a||!a.src||!audCb)return false;const end=a.ended||(a.paused&&a.duration>0&&isFinite(a.duration)&&a.currentTime>=a.duration-0.25);if(!end)return false;audLog.push("끝 신호 누락 → 다음으로");const cb=audCb;audCb=null;try{cb()}catch(e){}return true}
-function audStop(){audCb=null;try{const a=audEl();a.onended=null;a.pause();a.removeAttribute("src");a.load()}catch(e){}}
+function audStop(){audCb=null;AUD.own=Date.now();try{const a=audEl();a.onended=null;a.pause();a.removeAttribute("src");a.load()}catch(e){}}
 
 /* ============ TTS (듣기) ============ */
 const SPK_ICON='<svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg>';
@@ -1587,8 +1599,8 @@ function keepAlive(on){try{if(!keep){keep=new Audio(KEEP_URI);keep.loop=true;kee
   if(on){keep.play().catch(()=>{})}else{keep.pause()}}catch(e){}}
 function mediaSession(){if(!("mediaSession" in navigator))return;try{const it=player.items[player.i]||{};
   navigator.mediaSession.metadata=new MediaMetadata({title:(it.en||"OSS").slice(0,80),artist:it.label||"OSS 무한 재생",album:"OSS · Opic Self Study"});
-  navigator.mediaSession.playbackState=player.paused?"paused":"playing";
-  const H={play:()=>{if(player.paused)playerPause()},pause:()=>{if(!player.paused)playerPause()},nexttrack:playerNext,previoustrack:playerPrev,stop:playerStop};
+  navigator.mediaSession.playbackState=(player.paused||player.sys)?"paused":"playing";
+  const H={play:()=>{if(player.sys){sysResume(false);return}if(player.paused)playerPause()},pause:()=>{if(player.sys){player.sys=false;clearInterval(player.sysT)}if(!player.paused)playerPause()},nexttrack:playerNext,previoustrack:playerPrev,stop:playerStop};
   for(const k in H){try{navigator.mediaSession.setActionHandler(k,H[k])}catch(e){}}}catch(e){}}
 
 /* ============ INFINITE PLAYER ============ */
@@ -1613,10 +1625,10 @@ function savedPos(){try{const p=JSON.parse(localStorage.getItem("opic30_pos")||"
 function playerStart(resume){if(!tts.ok&&!Object.keys(AUD.man).length){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
   const pos=resume===true?savedPos():null;player.items=pos?pos.items:buildPlaylist();if(!player.items.length){toast("재생할 항목이 없어요. 아래에서 내용을 선택하세요");return}
   player.loop=0;player.busy=false;player.on=true;player.paused=false;player.i=pos?pos.i:0;player.segs=pos?buildSegs(player.items[pos.i]):[];player.si=pos?Math.min(pos.si,Math.max(0,player.segs.length-1)):0;ttsStop();wakeLock(true);keepAlive(true);playerStep();mediaSession();renderMini();if(view==="listen")render()}
-function playerStop(){try{localStorage.removeItem("opic30_pos")}catch(e){}player.on=false;player.paused=false;clearTimeout(player.t);player.t=null;ttsStop();wakeLock(false);keepAlive(false);try{navigator.mediaSession.playbackState="none"}catch(e){}renderMini();if(view==="listen")render()}
-function playerPause(){if(!player.on)return;player.paused=!player.paused;clearTimeout(player.t);player.t=null;if(player.paused){audStop();if(tts.ok)speechSynthesis.cancel();keepAlive(false)}else{keepAlive(true);playerStep()}mediaSession();renderMini();if(view==="listen")render()}
+function playerStop(){try{localStorage.removeItem("opic30_pos")}catch(e){}player.sys=false;clearInterval(player.sysT);player.on=false;player.paused=false;clearTimeout(player.t);player.t=null;ttsStop();wakeLock(false);keepAlive(false);try{navigator.mediaSession.playbackState="none"}catch(e){}renderMini();if(view==="listen")render()}
+function playerPause(){if(!player.on)return;player.sys=false;clearInterval(player.sysT);player.paused=!player.paused;clearTimeout(player.t);player.t=null;if(player.paused){audStop();if(tts.ok)speechSynthesis.cancel();keepAlive(false)}else{keepAlive(true);playerStep()}mediaSession();renderMini();if(view==="listen")render()}
 // previous: like a music player — restart the current item if it is already under way, otherwise go back one item
-function audSoftStop(){audCb=null;try{const a=AUD.el;if(a){a.onended=null;a.onerror=null;a.pause()}}catch(e){}}
+function audSoftStop(){audCb=null;AUD.own=Date.now();try{const a=AUD.el;if(a){a.onended=null;a.onerror=null;a.pause()}}catch(e){}}
 function playerKick(){setTimeout(()=>{if(!player.on||player.paused)return;const a=AUD.el;const playing=a&&!a.paused&&!a.ended&&a.src;if(playing||player.t||player.busy||(tts.ok&&speechSynthesis.speaking))return;audLog.push("이동 후 재생 재시도");if(a&&a.src&&a.paused&&!a.ended&&a.currentTime>0.05)a.play().catch(()=>playerStep());else playerStep()},1500)}
 function playerPrev(){if(!player.on)return;clearTimeout(player.t);player.t=null;audSoftStop();if(tts.ok&&speechSynthesis.speaking)speechSynthesis.cancel();keepAlive(true);
   if(player.si<=1&&!player.loop&&player.items.length>1)player.i=(player.i-1+player.items.length)%player.items.length;player.loop=0;player.segs=[];player.si=0;player.paused=false;playerStep();playerKick();renderMini();if(view==="listen"&&!document.hidden)render()}
