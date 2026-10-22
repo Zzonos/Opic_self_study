@@ -1330,9 +1330,28 @@ function vChat(m){
   const prompt_ko=h("input",{type:"text",id:"chat_ko",placeholder:"뭐라고 말하지? 한국어로 쓰면 영어로 알려줘요",onkeydown:e=>{if(e.key==="Enter"){e.preventDefault();hint()}}});const hintBtn=h("button",{class:"btn sm",onclick:hint},"영어로");const hintOut=h("span",{class:"muted small"});
   // voice mode: auto-send when dictated text stops changing
   let vt=null,last="";const status=h("span",{class:"muted small mono"});
-  const armAuto=()=>{clearTimeout(vt);if(chat.busy||chat.speaking)return;const now=ta.value.trim();if(!chatWait){status.textContent=now?"다 말했으면 '지금 보내기'":"";return}if(now.length<3||now===last){status.textContent=now?"":"말하면 자동으로 보내요";return}
-    const unfinished=/\b(and|but|so|because|or|um+|uh+|er+|like|the|a|an|to|of|with|for|in|on|at|my|your|i|i'm|is|was|were|are|when|if|that|which|who|then|also|really|very|just|maybe|actually|you know|kind of|sort of)[\s,.…-]*$/i.test(now)||/,\s*$/.test(now);
-    let left=chatWait+(unfinished?3:0);status.textContent=(unfinished?"이어서 말해도 돼요 · ":"")+"말이 끝나면 "+left+"초 후 전송";const tick=()=>{if(ta.value.trim()!==now){armAuto();return}left--;if(left<=0){status.textContent="확정 중…";(async()=>{try{if(micBtn_&&micBtn_._flush)await micBtn_._flush()}catch(e){}status.textContent="";if(chat.busy||chat.speaking)return;last=ta.value.trim();send()})()}else{status.textContent=(unfinished?"이어서 말해도 돼요 · ":"")+"말이 끝나면 "+left+"초 후 전송";vt=setTimeout(tick,1000)}};vt=setTimeout(tick,1000)};
+  // end of turn: silence + the words themselves. When the pause starts, a quick AI check ("is the answer finished, or still thinking?")
+  // runs in the background; if it says "not finished" we keep waiting (up to END_MAX seconds of silence). "That's it" sends at once.
+  const DONE_RE=/[\s,.]*\b(that'?s it|that is it|i'?m done|i am done|that'?s all|that is all)[\s.!]*$/i;const END_MAX=10;let chg=0,seenTxt="";
+  const lastQ=()=>{for(let k=chat.ui.length-1;k>=0;k--)if(chat.ui[k].who==="ai")return chat.ui[k].text;return ""};
+  const endCheck=t=>{if(!sample)return Promise.resolve(null);endCheck.m=endCheck.m||new Map();if(endCheck.m.has(t))return endCheck.m.get(t);
+    const pr=sample.json(`Spoken English conversation practice. The learner (Korean, target ${tgt()}) is answering: "${lastQ().slice(0,300)}"
+Their speech so far (live voice transcript, may lack punctuation): "${t.slice(-600)}"
+They just paused. Is their turn finished, or are they probably still thinking and about to say more?
+Say "done": false only when it clearly sounds unfinished: a cut-off sentence, a filler or connector at the end, or just the first short part of an answer that obviously has more coming (e.g. only "I went to the beach" to "What did you do last weekend and how was it?"). Otherwise true.
+Reply with ONLY JSON: {"done":true} or {"done":false}`,{cache:false,modelTier:"quick"}).then(r=>r&&typeof r.done==="boolean"?r.done:null).catch(()=>null);endCheck.m.set(t,pr);return pr};
+  const sendNow=async(strip)=>{clearTimeout(vt);status.textContent="확정 중…";try{if(micBtn_&&micBtn_._flush)await micBtn_._flush()}catch(e){}if(strip)ta.value=ta.value.trim().replace(DONE_RE,"").trim();status.textContent="";if(chat.busy||chat.speaking||ta.value.trim().length<2)return;last=ta.value.trim();send()};
+  const armAuto=()=>{clearTimeout(vt);if(chat.busy||chat.speaking)return;const now=ta.value.trim();if(now!==seenTxt){seenTxt=now;chg=Date.now()}
+    if(!chatWait){status.textContent=now?"다 말했으면 '지금 보내기'":"";return}if(now.length<3||now===last){status.textContent=now?"":"말하면 자동으로 보내요";return}
+    if(DONE_RE.test(now)&&now.replace(DONE_RE,"").trim().length>=3){sendNow(true);return}
+    const unfinished=/\b(and|but|so|because|or|um+|uh+|er+|like|the|a|an|to|of|with|for|in|on|at|my|your|i|i'm|is|was|were|are|when|if|that|which|who|then|also|really|very|just|maybe|actually|you know|kind of|sort of)[\s,.…-]*$/i.test(now)||/,\s*$/.test(now)||(!!(micBtn_&&micBtn_._az)&&!/[.?!]["')]?$/.test(now));
+    const chk=endCheck(now);const waited=()=>Math.round((Date.now()-chg)/1000);
+    let left=chatWait+(unfinished?3:0);const show=t=>{status.textContent=t};show((unfinished?"이어서 말해도 돼요 · ":"")+"말이 끝나면 "+left+"초 후 전송");
+    const hold=()=>{if(ta.value.trim()!==now){armAuto();return}const rest=END_MAX-waited();if(rest<=0){sendNow(false);return}show("생각 중이면 더 기다릴게요 · "+rest+"초 (끝났으면 \"That's it\")");vt=setTimeout(hold,1000)};
+    const tick=()=>{if(ta.value.trim()!==now){armAuto();return}left--;if(left>0){show((unfinished?"이어서 말해도 돼요 · ":"")+"말이 끝나면 "+left+"초 후 전송");vt=setTimeout(tick,1000);return}
+      show("말 끝났는지 확인 중…");Promise.race([chk,new Promise(r=>setTimeout(()=>r(null),2500))]).then(done=>{if(ta.value.trim()!==now||chat.busy||chat.speaking){armAuto();return}
+        if(done===false&&waited()<END_MAX){audLog.push("말 이어질 것 같음 → 대기");hold();return}sendNow(false)})};
+    vt=setTimeout(tick,1000)};
   ta.addEventListener("input",()=>{if(chat.speaking&&micBtn_&&micBtn_._isOn&&micBtn_._isOn())return;if(tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending))ttsStop()},{once:false});
   if(chatMode==="voice"){ta.addEventListener("input",armAuto);ta.placeholder=SR_OK?"🎤 버튼을 누르고 말하세요":DICT_HINT}
   // while the reply is read aloud the mic is muted; if what it hears is NOT the reply itself, the user is talking: stop the voice
