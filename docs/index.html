@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261022-204958-6a5c48">
+<html lang="ko" data-build="20261023-003800-7fecbf">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -972,16 +972,16 @@ function natFetch(sn,lang){const tag=lang==="ko"?"ko":AUD.tag==="f"?"f":"m";cons
     if(cache){const hit=await cache.match(ck);if(hit){const u=URL.createObjectURL(await hit.blob());NAT.urls[k]=u;return u}}
     if(!WEB||!TTS_URL)return null;const again=e=>/ 403|429|50[234]/.test(String(e.message||e))?new Promise(r=>setTimeout(r,300)).then(()=>ttsFetch1(sn,tag)):Promise.reject(e);const bytes=await ttsFetch1(sn,tag).catch(again).catch(again);const blob=new Blob([bytes],{type:"audio/mpeg"});if(cache)cache.put(ck,new Response(blob)).catch(()=>{});
     const u=URL.createObjectURL(blob);NAT.urls[k]=u;return u}catch(e){audLog.push("즉석 음성 실패: "+(e.message||e));return null}finally{delete NAT.busy[k]}})();return NAT.busy[k]}
-function natSpeak(text,{btn,rate,onend,fallback,whole=false}){let ss=splitSent(text);if(whole&&ss.length>2)ss=[ss[0],ss.slice(1).join(" ")];const cur={u:null,btn,nat:true};tts.cur=cur;if(btn){btn.classList.add("on");btn.innerHTML=STOP_ICON}
+function natSpeak(text,{btn,rate,onend,fallback,whole=false,chunks=null}){let ss=splitSent(text);if(chunks&&chunks.length)ss=chunks.filter(Boolean);else if(whole&&ss.length>2)ss=[ss[0],ss.slice(1).join(" ")];const cur={u:null,btn,nat:true};tts.cur=cur;if(btn){btn.classList.add("on");btn.innerHTML=STOP_ICON}
   const done=()=>{if(tts.cur!==cur)return;if(btn){btn.classList.remove("on");btn.innerHTML=SPK_ICON}tts.cur=null;onend&&onend()};
   const urls=ss.map(()=>null);
   // a request that hangs (weak signal while driving) gives up after 15s instead of stalling the voice
   const get=i=>urls[i]||(urls[i]=Promise.race([natUrl(ss[i]).catch(()=>null),new Promise(r=>setTimeout(()=>r(null),15000))]));
-  const step=i=>{if(tts.cur!==cur)return;if(i>=ss.length){done();return}get(i);if(i+1<ss.length)get(i+1);if(i+2<ss.length)get(i+2);
+  const step=i=>{if(tts.cur!==cur)return;if(i>=ss.length){done();return}for(let k=i;k<Math.min(ss.length,i+(chunks?6:3));k++)get(k);
     urls[i].then(u=>{if(tts.cur!==cur)return;if(!u){const parts=splitSent(ss[i]);if(parts.length>1){ss.splice(i,1,...parts);urls.splice(i,1,...parts.map(()=>null));step(i);return}if(i===0){tts.cur=null;fallback();return}step(i+1);return}
       audPlay(u,{rate:rate??tts.rate,onend:()=>step(i+1),onerror:()=>step(i+1)})})};
   step(0)}
-function speak(text,{btn=null,rate=null,onend=null,key=null,whole=false}={}){
+function speak(text,{btn=null,rate=null,onend=null,key=null,whole=false,chunks=null}={}){
   const src=audSrc(key);
   if(!tts.ok&&!src){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
   if(tts.cur&&tts.cur.btn===btn&&btn){ttsStop();return}
@@ -989,7 +989,7 @@ function speak(text,{btn=null,rate=null,onend=null,key=null,whole=false}={}){
   ttsStop();
   if(src){tts.cur={u:null,btn};if(btn){btn.classList.add("on");btn.innerHTML=STOP_ICON}
     audPlay(src,{rate:rate??tts.rate,onend:()=>{if(btn){btn.classList.remove("on");btn.innerHTML=SPK_ICON}tts.cur=null;onend&&onend()}});return}
-  if(!src&&!speak._dev&&natOK(text)){natSpeak(text,{btn,rate,onend,whole,fallback:()=>{speak._dev=true;try{speak(text,{btn,rate,onend,key})}finally{speak._dev=false}}});return}
+  if(!src&&!speak._dev&&natOK(text)){natSpeak(text,{btn,rate,onend,whole,chunks,fallback:()=>{speak._dev=true;try{speak(text,{btn,rate,onend,key})}finally{speak._dev=false}}});return}
   const u=new SpeechSynthesisUtterance(ttsText(text));u.lang=tts.voice?.lang||"en-US";if(tts.voice)u.voice=tts.voice;u.rate=rate??tts.rate;u.pitch=1;
   tts.cur={u,btn};if(btn){btn.classList.add("on");btn.innerHTML=STOP_ICON}
   u.onend=u.onerror=()=>{if(tts.cur&&tts.cur.u===u){if(btn){btn.classList.remove("on");btn.innerHTML=SPK_ICON}tts.cur=null;onend&&onend()}};
@@ -1291,10 +1291,11 @@ const SCEN=[
 let chat=null;let chatMode="text";try{chatMode=localStorage.getItem("opic30_cmode")||"text"}catch(e){}
 const saveMode=()=>{try{localStorage.setItem("opic30_cmode",chatMode)}catch(e){}};
 let chatWait=4;try{chatWait=+(localStorage.getItem("opic30_cwait")||4)}catch(e){}
+const TIP_OPEN="Quick tip. That sentence sounds better like this:";
 function chatRules(sc){return `${sc.persona}
 The learner is Korean, preparing for the OPIc speaking test, target level ${tgt()}. Their profile: ${profileText()}.
 Style: natural spoken American English, 1-3 sentences per turn, ${spec().chat}, and ALWAYS end with a question so the conversation keeps going. Stay in character; do not lecture.
-Correction: look at the learner's LAST message only. If it has a clear grammar mistake, wrong word, or an unnatural phrase, give "fix": {"original": their sentence(s) with the issue, "better": the WHOLE sentence rewritten as one complete, natural sentence with exactly the same meaning (never just a phrase or a fragment; e.g. original "Last weekend I go to beach with family" → better "Last weekend, I went to the beach with my family."), "why": a one-line explanation in Korean, "ko": a natural Korean translation of "better"}. Your "reply" then continues the conversation and must NOT repeat the correction. If their message was fine, set "fix": null. Ignore spelling and punctuation (voice dictation). Never correct more than one thing per turn.
+Correction: look at the learner's LAST message only. If it has grammar/structure mistakes, wrong or unnatural words, or awkward expressions, give "fix": {"original": their sentence(s) with problems, "better": those sentence(s) rewritten completely and naturally with exactly the same meaning, fixing ALL the problems at once — grammar, structure, word choice and expressions (never just a phrase or a fragment; e.g. original "Last weekend I go to beach and it was very funny" → better "Last weekend, I went to the beach, and it was really fun."), "words": up to 2 wrong or unnatural words/expressions they used, as [{"from":"what they said","to":"the better word or expression"}] (e.g. [{"from":"funny","to":"fun"}]; [] if the problem was only grammar), "why": a one-line explanation in Korean, "ko": a natural Korean translation of "better"}. Your "reply" then continues the conversation and must NOT repeat the correction. If their message was fine, set "fix": null. Ignore spelling and punctuation (voice dictation). 
 Reply with ONLY a JSON object: {"reply":"your in-character reply","reply_ko":"reply의 한국어 뜻 (짧게)","fix":null}`}
 function vChat(m){
   if(!chat){put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation practice"),h("h1",{},"AI와 대화")),aiNote(),
@@ -1313,7 +1314,7 @@ function vChat(m){
     if(ci){const cs=getComputedStyle(ci);pad+=ci.getBoundingClientRect().height+(parseFloat(cs.bottom)||0)}last.style.scrollMarginBottom=pad+"px";try{last.scrollIntoView({block:"end",behavior:"smooth"})}catch(e){last.scrollIntoView(false)}});
   const render1=(u)=>{if(u.who==="ai"){const b=h("div",{class:"bb ai"},u.text,u.ko?h("span",{class:"ko",hidden:true},u.ko):null);b.append(h("div",{class:"row",style:"margin-top:6px;gap:6px"},spkBtn(u.text),h("button",{class:"btn sm ghost",onclick:e=>{const k=b.querySelector(".ko");if(k)k.hidden=!k.hidden}},"해석")));return b}
     if(u.who==="me")return h("div",{class:"bb me"},u.text);
-    if(u.who==="fix")return h("div",{class:"fixc"},h("span",{class:"eyebrow"},"이렇게 말하면 더 자연스러워요"),h("span",{class:"o"},u.fix.original),h("span",{class:"b"},u.fix.better),h("span",{class:"w"},u.fix.why),u.fix.say?h("span",{class:"small muted",style:"margin-top:2px"},"🔊 "+u.fix.say):null,h("button",{class:"btn sm",style:"align-self:flex-start;margin-top:4px",onclick:()=>{addCards([{en:u.fix.better,ko:u.fix.ko||"",why:u.fix.why||""}],sc.ko)}},"표현카드에 추가"));
+    if(u.who==="fix")return h("div",{class:"fixc"},h("span",{class:"eyebrow"},"이렇게 말하면 더 자연스러워요"),h("span",{class:"o"},u.fix.original),h("span",{class:"b"},u.fix.better),h("span",{class:"w"},u.fix.why),Array.isArray(u.fix.words)&&u.fix.words.length?h("span",{class:"small"},u.fix.words.filter(x=>x&&x.from&&x.to).map(x=>x.from+" → "+x.to).join(" · ")):null,u.fix.say?h("span",{class:"small muted",style:"margin-top:2px"},"🔊 "+u.fix.say):null,h("button",{class:"btn sm",style:"align-self:flex-start;margin-top:4px",onclick:()=>{addCards([{en:u.fix.better,ko:u.fix.ko||"",why:u.fix.why||""}],sc.ko)}},"표현카드에 추가"));
     if(u.who==="wait")return h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")))};
   chat.ui.forEach(u=>bub.append(render1(u)));
   const ta=h("textarea",{id:"chat_in",style:"min-height:64px",placeholder:"입력하거나 받아쓰기로 말하세요 — "+DICT_HINT});
@@ -1329,12 +1330,14 @@ function vChat(m){
       // while the reply is read aloud the open mic hears it too: ignore that, then start listening fresh
       // spoken feedback first (when there was something to fix), then the reply
       // spoken tip: always the learner's full sentence, said the better way
-      const bt=String(r?.fix?.better||"").trim();const say=bt?"Quick tip. That sentence sounds better like this: \""+bt.replace(/"/g,"").replace(/([^.!?])$/,"$1.")+"\"":"";const spoken=(say?say+" ":"")+reply;
+      const bt=String(r?.fix?.better||"").trim().replace(/"/g,"").replace(/([^.!?])$/,"$1.");const wl=(Array.isArray(r?.fix?.words)?r.fix.words:[]).filter(x=>x&&x.from&&x.to&&String(x.from).toLowerCase()!==String(x.to).toLowerCase()).slice(0,2);
+      const parts=bt?[TIP_OPEN,"\""+bt+"\"",...(wl.length?[wl.map((x,k)=>(k?"And ":"Also, ")+"instead of \""+String(x.from).replace(/"/g,"")+"\", say \""+String(x.to).replace(/"/g,"")+"\".").join(" ")]:[]),reply]:null;
+      const spoken=parts?parts.join(" "):reply;
       if(chat.auto){const micOn=()=>micBtn_&&micBtn_._isOn&&micBtn_._isOn();chat.speaking=true;chat.speakingText=spoken;chat.barged=false;let done=false;
         // Azure: the recognizer is paused while the AI talks; a local voice detector lets the user cut in
         let unv=null;if(micBtn_&&micBtn_._az&&micOn())unv=vadWatch({threshold:0.08,ms:400,onVoice:()=>{if(!chat.speaking)return;chat.barged=true;chat.speaking=false;if(unv){unv();unv=null}ttsStop();micBtn_._resume();status.textContent="듣는 중…"}});
         const fin=()=>{if(unv){unv();unv=null}if(done)return;done=true;if(chat.barged)return;chat.speaking=false;if(micOn()){try{micBtn_._cut&&micBtn_._cut()}catch(x){}ta.value="";status.textContent="듣는 중…";if(micBtn_._resume)micBtn_._resume()}};
-        speak(spoken,{onend:fin,whole:true});const t0=Date.now(),cap=Math.max(45000,spoken.length*200);
+        speak(spoken,{onend:fin,whole:true,chunks:parts});const t0=Date.now(),cap=Math.max(45000,spoken.length*200);
         const sg=setInterval(()=>{if(done){clearInterval(sg);return}const busy=!!tts.cur||(tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending))||(AUD.el&&!AUD.el.paused&&!AUD.el.ended);
           if((!busy&&Date.now()-t0>3000)||Date.now()-t0>cap){clearInterval(sg);fin()}},1000)}
       if(!chat.auto&&micBtn_&&micBtn_._resume)micBtn_._resume();
@@ -1369,7 +1372,7 @@ function vChat(m){
   if(chat.hide)bub.classList.add("hidetext");
   setTimeout(toEnd,50);
 }
-async function startChat(sc){chat={sc,turns:[],ui:[],n:0,busy:false,auto:true,hide:false,summary:null};render();
+async function startChat(sc){chat={sc,turns:[],ui:[],n:0,busy:false,auto:true,hide:false,summary:null};render();try{if(WEB&&TTS_URL&&natOK(TIP_OPEN))natUrl(TIP_OPEN).catch(()=>{})}catch(e){}
   const bub=$("#bubbles");const w=h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")));bub.append(w);
   try{const r=await sample.json([{role:"user",content:chatRules(sc)+"\n\nStart the conversation now with a natural greeting and your first question. Reply with ONLY the JSON object (fix: null)."}],{cache:false,modelTier:"quick"});
     w.remove();const reply=String(r?.reply||"Hi! How's it going?");chat.turns.push({role:"user",content:"(start)"},{role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});render();if(chat.auto)speak(reply)}
