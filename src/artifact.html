@@ -607,7 +607,10 @@ function apiCard(){if(!WEB||!isAdminUser())return null;const st=h("p",{class:"mu
   const sw=h("input",{type:"checkbox",checked:API.on,onchange:e=>{API.on=e.target.checked;try{localStorage.setItem("oss_api_mode",API.on?"1":"0")}catch(x){}apiApply();toast(API.on?"API 모드를 켰어요 — 웹에서 AI 기능을 바로 써요":"API 모드를 껐어요");if(API.on)check()}});
   if(API.on)setTimeout(check,50);
   return h("div",{class:"card"},h("h3",{},"API 모드"),h("p",{class:"muted small"},"이 계정 전용. 켜면 평가·스크립트·대화·해석·코치·모의시험 등 AI 기능을 웹 앱에서 바로 써요 (내 Anthropic API 키, 음성 서버를 거쳐 호출). 기록은 이 계정에 바로 저장돼요."),
-    h("label",{class:"row",style:"cursor:pointer"},sw,"API 모드 사용"),use,h("div",{class:"row"},h("button",{class:"btn sm",onclick:check},"연결 확인")),st,test,az)}
+    h("label",{class:"row",style:"cursor:pointer"},sw,"API 모드 사용"),use,h("details",{style:"margin:4px 0"},h("summary",{class:"small",style:"cursor:pointer"},"Azure 인식 단어 (고유명사)"),
+      h("p",{class:"muted small"},"내 스크립트·예시 답변에 나오는 고유명사(지명·이름·브랜드)는 자동으로 Azure에 알려줘요. 일반 단어는 넣지 않아 점수가 부풀려지지 않아요. 더 넣을 이름이 있으면 쉼표로 적어 주세요."),
+      h("textarea",{style:"min-height:48px",placeholder:"예: Suji, Tancheon, Gwanggyo Lake Park",oninput:e=>{S.profile.asrWords=e.target.value;S.updatedAt=Date.now();save()}},S.profile.asrWords||""),
+      (()=>{const l=asrPhrases();return h("p",{class:"muted small",style:"word-break:break-word"},"지금 알려주는 단어 "+l.length+"개: "+l.slice(0,30).join(", ")+(l.length>30?" …":""))})()),h("div",{class:"row"},h("button",{class:"btn sm",onclick:check},"연결 확인")),st,test,az)}
 /* ============ AZURE SPEECH (API mode): verbatim recognition + pronunciation assessment ============ */
 // one microphone stream for the whole visit, so the browser asks for permission once; stopped after a while
 // without recording (2 min in the background, 10 min in the foreground) — the next recording asks again
@@ -647,6 +650,19 @@ async function azConfig(silenceMs){const sdk=await azSdk();const a=await azToken
   cfg.setProperty(sdk.PropertyId.Speech_SegmentationSilenceTimeoutMs,String(silenceMs||1800));
   return {sdk,cfg}}
 // summary of the phrase-level pronunciation results (duration-weighted)
+const ASR_STOP=new Set("I I'm I've I'd I'll OK Okay Ok Mr Mrs Ms Dr Yes No Oh Well So And But Then Also Actually Honestly Anyway Plus First Second Finally".split(" "));
+function asrPhrases(){const cnt=new Map();const add=(p,w=1)=>{p=String(p||"").trim();if(p.length<2||p.length>40)return;cnt.set(p,(cnt.get(p)||0)+w)};
+  const scan=t=>{for(const sn of splitSent(t)){const toks=sn.replace(/[^A-Za-z' -]/g," ").split(/\s+/).filter(Boolean);let run=[];
+    const flush=()=>{if(run.length){const ph=run.join(" ");if(!(run.length===1&&ASR_STOP.has(run[0])))add(ph)}run=[]};
+    toks.forEach((w,i)=>{if(i>0&&/^[A-Z][a-zA-Z']+$/.test(w)&&!ASR_STOP.has(w))run.push(w);else flush()});flush()}};
+  for(const st of [S.scripts||{},S.samples||{}])for(const v of Object.values(st))for(const x of (v&&v.scripts)||[])if(x&&typeof x.answer==="string")scan(x.answer);
+  for(const [k,v] of Object.entries(S.profile||{}))if(typeof v==="string"&&!/^(target|asrWords|mockDiff|mockDiffT)$/.test(k))for(const m of v.match(/\b[A-Z][a-zA-Z']+(?:\s[A-Z][a-zA-Z']+)*/g)||[])if(!/^[A-Z]{1,3}\d?$/.test(m))add(m,3);
+  for(const w of String(S.profile.asrWords||"").split(/[,\n]/))add(w,99);
+  return [...cnt.entries()].sort((a,b)=>b[1]-a[1]).slice(0,200).map(x=>x[0])}
+// words Azure was unsure about (low confidence, or scored as a likely mis-hearing) — shown so a wrong transcript is not mistaken for my mistake
+function azDoubt(segs){const out=[];const seen=new Set();for(const sg of segs)for(const x of (sg.words||[])){const q=x.PronunciationAssessment||{};
+    const c=typeof x.Confidence==="number"?x.Confidence:null;const bad=(c!=null&&c<0.5)||(c==null&&q.AccuracyScore!=null&&q.AccuracyScore<45);
+    if(bad&&x.Word&&!seen.has(x.Word.toLowerCase())){seen.add(x.Word.toLowerCase());out.push(x.Word)}}return out.slice(0,8)}
 function azSummary(segs){let w=0;const acc={a:0,f:0,p:0,c:0,pr:0};const words=[];let txt=[];
   for(const s of segs){const pa=s.pa||{};const d=Math.max(1,s.dur||1);w+=d;acc.a+=d*(pa.AccuracyScore||0);acc.f+=d*(pa.FluencyScore||0);acc.p+=d*(pa.ProsodyScore||0);acc.pr+=d*(pa.PronScore||0);
     for(const x of (s.words||[])){const q=(x.PronunciationAssessment||{});if(q.ErrorType==="Mispronunciation"||(q.AccuracyScore!=null&&q.AccuracyScore<60))words.push({w:x.Word,s:Math.round(q.AccuracyScore||0)})}txt.push(s.text)}
@@ -669,8 +685,11 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
   let rec=null,cl=null,live=false,want=false,base="",fin="",pend="",segs=[],gen=0,skipPhrase=false,lastAct=0,idleT=null,vadStop=null,starting=false;
   const st=s=>{try{onState&&onState(s)}catch(e){}};
   const paint=()=>{b.disabled=starting;b.textContent=starting?"연결 중…":want?(live?"■ 말하기 끝":"⏸ 대기 · 끝내기"):label;b.classList.toggle("rec",want)};
-  b._isOn=()=>want;b._live=()=>live;b._wanted=()=>want;b._az=true;b._pron=()=>azSummary(segs);b._reset=()=>{segs=[]};
-  b._cut=()=>{base="";fin="";if(pend)skipPhrase=true;pend=""};
+  b._isOn=()=>want;b._live=()=>live;b._wanted=()=>want;b._az=true;b._pron=()=>azSummary(segs);b._reset=()=>{segs=[];segCut=0;if(ta._doubtEl)ta._doubtEl.hidden=true};
+  let segCut=0;const showDoubt=()=>{const d=azDoubt(segs.slice(segCut));let el=ta._doubtEl;if(!d.length){if(el)el.hidden=true;return}
+    if(!el||!el.isConnected){el=ta._doubtEl=h("p",{class:"small",style:"margin:4px 0 0;color:var(--warn,#b45309)"});ta.after(el)}el.hidden=false;el.textContent="⚠ 잘못 들렸을 수 있는 단어: "+d.join(", ")};
+  b._doubt=()=>azDoubt(segs.slice(segCut));
+  b._cut=()=>{base="";fin="";if(pend)skipPhrase=true;pend="";segCut=segs.length;if(ta._doubtEl)ta._doubtEl.hidden=true};
   b._rebase=t=>{base=t?t.trim()+" ":"";fin="";pend="";ta.value=base;ta.dispatchEvent(new Event("input"))};
   b._flush=async()=>{for(let k=0;k<16&&live&&pend;k++)await new Promise(r=>setTimeout(r,150))};
   const unVad=()=>{if(vadStop){vadStop();vadStop=null}};
@@ -680,11 +699,12 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
   const startRec=async()=>{if(rec||starting)return;starting=true;paint();unVad();
     try{const {sdk,cfg}=await azConfig(2000);let audio;try{const ms=await micStream();dropCl();cl=ms.clone();audio=sdk.AudioConfig.fromStreamInput(cl)}catch(x){if(x&&x.name==="NotAllowedError")throw new Error("마이크 권한이 꺼져 있어요");audio=sdk.AudioConfig.fromDefaultMicrophoneInput()}
       const r=new sdk.SpeechRecognizer(cfg,audio);const my=++gen;rec=r;skipPhrase=false;
+      try{const pl=sdk.PhraseListGrammar.fromRecognizer(r);for(const ph of asrPhrases())pl.addPhrase(ph)}catch(x){}
       const pa=new sdk.PronunciationAssessmentConfig("",sdk.PronunciationAssessmentGradingSystem.HundredMark,sdk.PronunciationAssessmentGranularity.Word,false);try{pa.enableProsodyAssessment=true}catch(e){}pa.applyTo(r);
       base=ta.value?ta.value.trim()+" ":"";fin="";pend="";if(!base)segs=[];
       r.recognizing=(s,e)=>{if(my!==gen)return;lastAct=Date.now();if(skipPhrase)return;pend=e.result.text||"";ta.value=base+fin+pend;ta.dispatchEvent(new Event("input"))};
       r.recognized=(s,e)=>{if(my!==gen)return;lastAct=Date.now();MIC.last=Date.now();pend="";if(skipPhrase){skipPhrase=false;return}if(e.result.reason!==sdk.ResultReason.RecognizedSpeech||!e.result.text)return;fin+=e.result.text+" ";ta.value=base+fin;ta.dispatchEvent(new Event("input"));
-        try{const j=JSON.parse(e.result.properties.getProperty(sdk.PropertyId.SpeechServiceResponse_JsonResult));const nb=(j.NBest||[])[0]||{};segs.push({text:e.result.text,dur:(j.Duration||0)/1e7,pa:nb.PronunciationAssessment||{},words:nb.Words||[]})}catch(x){}};
+        try{const j=JSON.parse(e.result.properties.getProperty(sdk.PropertyId.SpeechServiceResponse_JsonResult));const nb=(j.NBest||[])[0]||{};segs.push({text:e.result.text,dur:(j.Duration||0)/1e7,pa:nb.PronunciationAssessment||{},words:nb.Words||[]})}catch(x){}showDoubt()};
       r.canceled=(s,e)=>{if(my!==gen||e.reason!==sdk.CancellationReason.Error)return;const d=String(e.errorDetails||"");audLog.push("azure canceled "+e.errorCode+" "+d.slice(0,80));
         if(document.hidden){stopRec();return}
         if(/quota|429|1007|exceed/i.test(d)||e.errorCode===sdk.CancellationErrorCode.TooManyRequests){want=false;azDisable("무료 한도 소진")}else if(/401|403|auth/i.test(d)||e.errorCode===sdk.CancellationErrorCode.AuthenticationFailure){AZ.tok=null;toast("Azure 인증 오류 — 다시 눌러 주세요");want=false}else{toast("Azure 연결이 끊겼어요: "+d.slice(0,60));want=false}stopRec()};
@@ -1325,15 +1345,15 @@ function vChat(m){
   const toEnd=()=>requestAnimationFrame(()=>{const last=bub.lastElementChild;if(!last)return;const ci=document.querySelector(".chatin");let pad=12;
     if(ci){const cs=getComputedStyle(ci);pad+=ci.getBoundingClientRect().height+(parseFloat(cs.bottom)||0)}last.style.scrollMarginBottom=pad+"px";try{last.scrollIntoView({block:"end",behavior:"smooth"})}catch(e){last.scrollIntoView(false)}});
   const render1=(u)=>{if(u.who==="ai"){const b=h("div",{class:"bb ai"},u.text,u.ko?h("span",{class:"ko",hidden:true},u.ko):null);b.append(h("div",{class:"row",style:"margin-top:6px;gap:6px"},spkBtn(u.text),h("button",{class:"btn sm ghost",onclick:e=>{const k=b.querySelector(".ko");if(k)k.hidden=!k.hidden}},"해석")));return b}
-    if(u.who==="me")return h("div",{class:"bb me"},u.text);
+    if(u.who==="me")return h("div",{class:"bb me"},u.text,u.dz&&u.dz.length?h("div",{style:"font-size:11px;opacity:.8;margin-top:3px"},"⚠ 잘못 들렸을 수 있음: "+u.dz.join(", ")):null);
     if(u.who==="fix")return h("div",{class:"fixc"},h("span",{class:"eyebrow"},"이렇게 말하면 더 자연스러워요"),h("span",{class:"o"},u.fix.original),h("span",{class:"b"},u.fix.better),h("span",{class:"w"},u.fix.why),Array.isArray(u.fix.words)&&u.fix.words.length?h("span",{class:"small"},u.fix.words.filter(x=>x&&x.from&&x.to).map(x=>x.from+" → "+x.to).join(" · ")):null,u.fix.say?h("span",{class:"small muted",style:"margin-top:2px"},"🔊 "+u.fix.say):null,h("button",{class:"btn sm",style:"align-self:flex-start;margin-top:4px",onclick:()=>{addCards([{en:u.fix.better,ko:u.fix.ko||"",why:u.fix.why||""}],sc.ko)}},"표현카드에 추가"));
     if(u.who==="wait")return h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")))};
   chat.ui.forEach(u=>bub.append(render1(u)));
   const ta=h("textarea",{id:"chat_in",style:"min-height:64px",placeholder:"입력하거나 받아쓰기로 말하세요 — "+DICT_HINT});
   // Enter sends, Shift+Enter makes a new line (ignored while a Korean/IME word is still being composed)
   ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){e.preventDefault();send()}});
-  const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ttsStop();ta.value="";try{micBtn_&&micBtn_._cut&&micBtn_._cut();if(micBtn_&&micBtn_._pause)micBtn_._pause()}catch(e){}chat.busy=true;
-    chat.ui.push({who:"me",text:t});chat.turns.push({role:"user",content:t});bub.append(render1({who:"me",text:t}));const w=render1({who:"wait"});bub.append(w);toEnd();
+  const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ttsStop();ta.value="";let dz=[];try{dz=micBtn_&&micBtn_._doubt?micBtn_._doubt():[]}catch(e){}try{micBtn_&&micBtn_._cut&&micBtn_._cut();if(micBtn_&&micBtn_._pause)micBtn_._pause()}catch(e){}chat.busy=true;
+    chat.ui.push({who:"me",text:t,dz});chat.turns.push({role:"user",content:t});bub.append(render1({who:"me",text:t,dz}));const w=render1({who:"wait"});bub.append(w);toEnd();
     const pre=new Set();const warm=t=>{if(!t||pre.has(t)||!chat.auto||!(WEB&&TTS_URL))return;pre.add(t);try{if(natOK(t))natUrl(t).catch(()=>{})}catch(e){}};
     const str=(src,k)=>{const m=new RegExp('"'+k+'"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"').exec(src);if(!m)return null;try{return JSON.parse('"'+m[1]+'"')}catch(e){return null}};
     const onText=({text})=>{try{const b=str(text,"better");if(b){warm(TIP_OPEN);warm(tipBetter(b))}
