@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261023-180000-a94579">
+<html lang="ko" data-build="20261023-225757-c3c2f8">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1322,8 +1322,12 @@ const TIP_OPEN="Quick tip. That sentence sounds better like this:";
 function chatRules(sc){return `${sc.persona}
 The learner is Korean, preparing for the OPIc speaking test, target level ${tgt()}. Their profile: ${profileText()}.
 Style: natural spoken American English, 1-3 sentences per turn, ${spec().chat}, and ALWAYS end with a question so the conversation keeps going. Stay in character; do not lecture.
-Correction: look at the learner's LAST message only. If it has grammar/structure mistakes, wrong or unnatural words, or awkward expressions, give "fix": {"original": their sentence(s) with problems, "better": those sentence(s) rewritten completely and naturally with exactly the same meaning, fixing ALL the problems at once — grammar, structure, word choice and expressions (never just a phrase or a fragment; e.g. original "Last weekend I go to beach and it was very funny" → better "Last weekend, I went to the beach, and it was really fun."), "words": up to 2 wrong or unnatural words/expressions they used, as [{"from":"what they said","to":"the better word or expression"}] (e.g. [{"from":"funny","to":"fun"}]; [] if the problem was only grammar), "why": a one-line explanation in Korean, "ko": a natural Korean translation of "better"}. Your "reply" then continues the conversation and must NOT repeat the correction. If their message was fine, set "fix": null. Ignore spelling and punctuation (voice dictation). 
-Reply with ONLY a JSON object: {"reply":"your in-character reply","reply_ko":"reply의 한국어 뜻 (짧게)","fix":null}`}
+Correction: look at the learner's LAST message only. If it has grammar/structure mistakes, wrong or unnatural words, or awkward expressions, give "fix": {"better": those sentence(s) rewritten completely and naturally with exactly the same meaning, fixing ALL the problems at once — grammar, structure, word choice and expressions (never just a phrase or a fragment; e.g. original "Last weekend I go to beach and it was very funny" → better "Last weekend, I went to the beach, and it was really fun."), "original": their sentence(s) with problems, "words": up to 2 wrong or unnatural words/expressions they used, as [{"from":"what they said","to":"the better word or expression"}] (e.g. [{"from":"funny","to":"fun"}]; [] if the problem was only grammar), "why": a one-line explanation in Korean, "ko": a natural Korean translation of "better"}. Your "reply" then continues the conversation and must NOT repeat the correction. If their message was fine, set "fix": null. Ignore spelling and punctuation (voice dictation). 
+Reply with ONLY a JSON object, keys in this order: {"fix":null,"reply":"your in-character reply","reply_ko":"reply의 한국어 뜻 (짧게)"}`}
+// the spoken tip, piece by piece (same text when prefetched during streaming and when played)
+const tipBetter=b=>{b=String(b||"").trim().replace(/"/g,"").replace(/([^.!?])$/,"$1.");return b?"\""+b+"\"":""};
+const tipWords=ws=>{const wl=(Array.isArray(ws)?ws:[]).filter(x=>x&&x.from&&x.to&&String(x.from).toLowerCase()!==String(x.to).toLowerCase()).slice(0,2);
+  return wl.length?wl.map((x,k)=>(k?"And ":"Also, ")+"instead of \""+String(x.from).replace(/"/g,"")+"\", say \""+String(x.to).replace(/"/g,"")+"\".").join(" "):""};
 function vChat(m){
   if(!chat){put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation practice"),h("h1",{},"AI와 대화")),aiNote(),
     h("div",{class:"note"},"말하기 → 상대가 답하면서 틀린 표현은 그 자리에서 고쳐 주고 → 대화를 이어가는 연습이에요. '뭐라고 말하지?'에 한국어로 쓰면 영어 표현을 알려줍니다. 끝내면 레벨 추정과 표현 정리가 나와요."),
@@ -1349,7 +1353,12 @@ function vChat(m){
   ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){e.preventDefault();send()}});
   const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ttsStop();ta.value="";try{micBtn_&&micBtn_._cut&&micBtn_._cut();if(micBtn_&&micBtn_._pause)micBtn_._pause()}catch(e){}chat.busy=true;
     chat.ui.push({who:"me",text:t});chat.turns.push({role:"user",content:t});bub.append(render1({who:"me",text:t}));const w=render1({who:"wait"});bub.append(w);toEnd();
-    try{const ask=()=>sample.json([{role:"user",content:chatRules(sc)},...chat.turns],{cache:false,modelTier:"quick"});
+    const pre=new Set();const warm=t=>{if(!t||pre.has(t)||!chat.auto||!(WEB&&TTS_URL))return;pre.add(t);try{if(natOK(t))natUrl(t).catch(()=>{})}catch(e){}};
+    const str=(src,k)=>{const m=new RegExp('"'+k+'"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"').exec(src);if(!m)return null;try{return JSON.parse('"'+m[1]+'"')}catch(e){return null}};
+    const onText=({text})=>{try{const b=str(text,"better");if(b){warm(TIP_OPEN);warm(tipBetter(b))}
+      const wm=/"words"\s*:\s*(\[[^\]]*\])/.exec(text);if(wm&&b){try{const w=tipWords(JSON.parse(wm[1]));if(w)warm(w)}catch(e){}}
+      const rp=str(text,"reply");if(rp)warm(rp.trim()||null)}catch(e){}};
+    try{const ask=()=>sample.json([{role:"user",content:chatRules(sc)},...chat.turns],{cache:false,modelTier:"quick",onText});
       let r;try{r=await ask()}catch(e1){if(e1&&e1.code==="invalid_json"){try{r=await ask()}catch(e2){const raw=String((e2&&e2.text)||"").replace(/```[a-z]*|```/g,"").trim();const m=/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(raw);
           if(m)r={reply:JSON.parse('"'+m[1]+'"'),fix:null};else if(raw&&!/^[\[{]/.test(raw))r={reply:raw.slice(0,600),fix:null};else throw e2}}else throw e1}
       w.remove();if(r?.fix?.better&&r.fix.original){chat.ui.push({who:"fix",fix:r.fix});bub.append(render1({who:"fix",fix:r.fix}))}
@@ -1357,8 +1366,8 @@ function vChat(m){
       // while the reply is read aloud the open mic hears it too: ignore that, then start listening fresh
       // spoken feedback first (when there was something to fix), then the reply
       // spoken tip: always the learner's full sentence, said the better way
-      const bt=String(r?.fix?.better||"").trim().replace(/"/g,"").replace(/([^.!?])$/,"$1.");const wl=(Array.isArray(r?.fix?.words)?r.fix.words:[]).filter(x=>x&&x.from&&x.to&&String(x.from).toLowerCase()!==String(x.to).toLowerCase()).slice(0,2);
-      const parts=bt?[TIP_OPEN,"\""+bt+"\"",...(wl.length?[wl.map((x,k)=>(k?"And ":"Also, ")+"instead of \""+String(x.from).replace(/"/g,"")+"\", say \""+String(x.to).replace(/"/g,"")+"\".").join(" ")]:[]),reply]:null;
+      const bt=tipBetter(r?.fix?.better);const ww=tipWords(r?.fix?.words);
+      const parts=bt?[TIP_OPEN,bt,...(ww?[ww]:[]),reply]:[reply];
       const spoken=parts?parts.join(" "):reply;
       if(chat.auto){const micOn=()=>micBtn_&&micBtn_._isOn&&micBtn_._isOn();chat.speaking=true;chat.speakingText=spoken;chat.barged=false;let done=false;
         // Azure: the recognizer is paused while the AI talks; a local voice detector lets the user cut in
