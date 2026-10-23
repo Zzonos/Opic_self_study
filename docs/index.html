@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261023-081344-8ab627">
+<html lang="ko" data-build="20261023-180000-a94579">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1308,7 +1308,7 @@ categories at most 5 (most frequent first), type_tips for the 1-2 weakest types,
 /* ---- CHAT (AI 회화) ---- */
 const SCEN=[
  {id:"interview",ko:"오픽 인터뷰어 (Ava)",en:"OPIc interviewer",desc:"실제 시험처럼 질문하고, 답하면 꼬리 질문으로 이어가요",persona:"You are Ava, a friendly OPIc interviewer. Ask one question at a time about the learner's survey topics, following the real OPIc pattern: describe → routine → past experience → comparison, then move to the next topic. React briefly and naturally to what they said (one short sentence) before the next question. Never answer for them."},
- {id:"free",ko:"자유 대화",en:"Small talk",desc:"일상 주제로 편하게 수다. 끊기지 않게 질문을 이어줘요",persona:"You are Sam, a warm, curious American friend making small talk. Talk about everyday topics (weekend, work, food, hobbies, travel). Share a little about yourself too, so it feels like a real two-way chat, then ask a follow-up question."},
+ {id:"free",ko:"자유 대화",en:"Small talk",desc:"일상 주제로 편하게 수다. 끊기지 않게 질문을 이어줘요",persona:"You are Sam, a warm, curious American friend making small talk. Talk about the learner's own life — their job, where they live, family, hobbies and interests from their profile — and everyday topics; vary the topics and do not default to 'the weekend'. Share a little about yourself too, so it feels like a real two-way chat, then ask a follow-up question."},
  {id:"gym",ko:"헬스장 직원",en:"Gym front desk",desc:"회원권 문의 → 문제 상황까지 롤플레이",persona:"You are the front-desk staff at a gym. The learner is calling to ask about membership. Answer their questions with realistic details (prices, hours, trial). After 4-5 exchanges, introduce a small problem (e.g. the class they want is full) so they must negotiate a solution."},
  {id:"travel",ko:"여행사 직원",en:"Travel agent",desc:"패키지 문의 → 일정 변경 협상",persona:"You are a travel agent. The learner wants to book a trip. Ask what they want, suggest a package with concrete details, answer questions. After a few turns, bring up a complication (dates unavailable, price change) so they must propose alternatives."},
  {id:"restaurant",ko:"식당 예약",en:"Restaurant host",desc:"예약 전화 → 예약 누락 문제 해결",persona:"You are the host at a popular restaurant. The learner calls to make a reservation. Ask for details (date, party size, requests). Later, tell them there is a problem (no record of the booking, or only a late slot available) and let them handle it."},
@@ -1418,9 +1418,15 @@ Reply with ONLY JSON: {"done":true} or {"done":false}`,{cache:false,modelTier:"q
   if(chat.hide)bub.classList.add("hidetext");
   setTimeout(toEnd,50);
 }
+// the first topic of a chat: picked from the learner's profile and survey, avoiding the last few chats' openers
+function chatSeed(sc){if(sc.id!=="free"&&sc.id!=="interview")return "";const p=S.profile;const c=[];
+  if(sc.id==="free"){if(p.job)c.push("their work ("+p.job+")");if(p.city)c.push("where they live ("+p.city+")");if(p.home)c.push("their home");if(p.family)c.push("the people they live with");if(p.hobby)c.push("their hobby ("+p.hobby+")");if(p.fav)c.push("something they like ("+p.fav+")");if(p.memory)c.push("a memorable experience they had")}
+  for(const id of (p.survey||[])){const t=TOPICS.find(x=>x.id===id);if(t)c.push((sc.id==="free"?"their interest: ":"survey topic: ")+t.en)}
+  if(!c.length)return "";let recent=[];try{recent=JSON.parse(localStorage.getItem("oss_chat_seeds")||"[]")}catch(e){}
+  const fresh=c.filter(x=>!recent.includes(x));const pickd=pick(fresh.length?fresh:c,1)[0];try{localStorage.setItem("oss_chat_seeds",JSON.stringify([...recent,pickd].slice(-Math.min(6,Math.max(1,c.length-1)))))}catch(e){}return pickd}
 async function startChat(sc){chat={sc,turns:[],ui:[],n:0,busy:false,auto:true,hide:false,summary:null};render();try{if(WEB&&TTS_URL&&natOK(TIP_OPEN))natUrl(TIP_OPEN).catch(()=>{})}catch(e){}
-  const bub=$("#bubbles");const w=h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")));bub.append(w);
-  try{const r=await sample.json([{role:"user",content:chatRules(sc)+"\n\nStart the conversation now with a natural greeting and your first question. Reply with ONLY the JSON object (fix: null)."}],{cache:false,modelTier:"quick"});
+  const bub=$("#bubbles");const w=h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")));bub.append(w);const seed=chatSeed(sc);
+  try{const r=await sample.json([{role:"user",content:chatRules(sc)+"\n\nStart the conversation now with a natural greeting and your first question."+(seed?" Make the first question about "+seed+", personal to them (use the profile details), not about the weekend.":"")+" Reply with ONLY the JSON object (fix: null)."}],{cache:false,modelTier:"quick"});
     w.remove();const reply=String(r?.reply||"Hi! How's it going?");chat.turns.push({role:"user",content:"(start)"},{role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});render();if(chat.auto)speak(reply)}
   catch(e){w.remove();bub.append(h("div",{class:"note"},errMsg(e)))}}
 async function endChat(){if(!chat)return;if(!player.on)keepAlive(false);const mine=chat.ui.filter(u=>u.who==="me");if(mine.length<2){chat=null;render();return}
@@ -1448,9 +1454,9 @@ const DIFF_INFO={1:"12문항 · 쉬운 묘사·습관 위주, 짧게 답해도 �
 // user-set: IM3 → 5, IH/AL → 6 (the top step); lower grades one step apart below that
 const DIFF_REC={AL:{def:6,range:"6"},IH:{def:6,range:"6"},IM3:{def:5,range:"5"},IM2:{def:4,range:"4"},IM1:{def:3,range:"3"},IL:{def:2,range:"2"},"NM–NH":{def:1,range:"1"}};
 const diffDefault=()=>{const v=+S.profile.mockDiff;return v>=1&&v<=6&&S.profile.mockDiffT===tgt()?v:(DIFF_REC[tgt()]||{def:4}).def};
-function buildMock(lv,used){lv=Math.min(6,Math.max(1,+lv||4));used=new Set(used||[]);
+function buildMock(lv,used,sel){lv=Math.min(6,Math.max(1,+lv||4));used=new Set(used||[]);sel=sel||mockSel();const must=new Set(sel.must||[]);const useSudden=sel.sudden!==false;
   const free=t=>!used.has(t.id);const take=(list,n)=>{const o=pick(list.filter(free),n);o.forEach(t=>used.add(t.id));return o};
-  const mine=TOPICS.filter(t=>t.group==="서베이"&&S.profile.survey.includes(t.id));const surveyAll=TOPICS.filter(t=>t.group==="서베이");const sudden=TOPICS.filter(t=>t.group==="돌발");
+  const mine=TOPICS.filter(t=>t.group==="서베이"&&(sel.survey||[]).includes(t.id));const surveyAll=TOPICS.filter(t=>t.group==="서베이");const sudden=TOPICS.filter(t=>t.group==="돌발");
   const orders={1:["desc","routine","desc"],2:["desc","routine","exp"],3:["desc","routine","exp"],4:["desc","exp","compare"],5:["desc","exp","compare"],6:["exp","compare","exp"]}[lv];
   const asItem=(t,q,pre)=>({kind:(pre||"")+t.en+" · "+QT[q.t],q:q.q,key:"q_"+t.id+"_"+t.qs.indexOf(q),tid:t.id});
   // n questions from topic t following the preferred types; unexpected topics have only 2 questions → borrow one from another unused unexpected topic
@@ -1458,19 +1464,35 @@ function buildMock(lv,used){lv=Math.min(6,Math.max(1,+lv||4));used=new Set(used|
     while(qs.length<n){const rest=t.qs.filter(x=>!qs.includes(x)&&x.t!=="intro");if(!rest.length)break;const pref=rest.filter(x=>ord.includes(x.t));qs.push(pick(pref.length?pref:rest,1)[0])}
     const out=qs.map(q=>asItem(t,q,pre));
     if(out.length<n){const t2=take(t.group==="돌발"?sudden:surveyAll,1)[0];if(t2){const q2=t2.qs.find(x=>x.t==="exp")||t2.qs.find(x=>x.t!=="intro");if(q2)out.push(asItem(t2,q2,pre))}}return out};
-  const surveyPick=n=>{const o=take(mine,n);if(o.length<n)o.push(...take(surveyAll,n-o.length));return o};
+  const surveyPick=n=>{const o=take(mine.filter(t=>must.has(t.id)),n);if(o.length<n)o.push(...take(mine,n-o.length));if(o.length<n)o.push(...take(surveyAll,n-o.length));return o};
   const items=[{kind:"자기소개",q:TOPICS[0].qs[0].q,key:"q_intro_0"}];
-  const combos=lv<=2?surveyPick(3):[...surveyPick(2),...(take(sudden,1).length?[...used].slice(-1).map(id=>TOPICS.find(t=>t.id===id)):surveyPick(1))];
+  const combos=lv<=2||!useSudden?surveyPick(3):[...surveyPick(2),...(take(sudden,1).length?[...used].slice(-1).map(id=>TOPICS.find(t=>t.id===id)):surveyPick(1))];
   combos.forEach(t=>items.push(...setOf(t,orders,3)));
   const rp=pick(ROLEPLAYS,1)[0];
   if(lv<=2)items.push({kind:"롤플레이 · 질문하기",q:rp.q11,key:rp.id+"_11"},{kind:"롤플레이 · 관련 경험",q:rp.q13,key:rp.id+"_13"});
   else{items.push({kind:"롤플레이 11 · 질문하기",q:rp.q11,key:rp.id+"_11"},{kind:"롤플레이 12 · 문제 해결",q:rp.q12,key:rp.id+"_12"},{kind:"롤플레이 13 · 경험",q:rp.q13,key:rp.id+"_13"});
     if(lv>=5)pick(ADVANCED,2).forEach(q=>items.push({kind:"14–15 · 고난도",q,key:"adv_"+ADVANCED.indexOf(q)}));
-    else{const t=take(sudden,1)[0]||take(surveyAll,1)[0];items.push(...setOf(t,lv===4?["exp","compare","desc"]:["desc","exp"],2,"14–15 · "))}}
+    else{const t=(useSudden?take(sudden,1)[0]:null)||surveyPick(1)[0]||take(surveyAll,1)[0];items.push(...setOf(t,lv===4?["exp","compare","desc"]:["desc","exp"],2,"14–15 · "))}}
   return items.slice(0,lv<=2?12:15).map(it=>({...it,a:"",secs:0}))}
 // after question 7 the real test offers one re-selection: easier / same / harder — rebuild questions 8+
+function mockSel(){let v=null;try{v=JSON.parse(localStorage.getItem("oss_mock_sel")||"null")}catch(e){}
+  const ok=id=>TOPICS.some(t=>t.id===id&&t.group==="서베이");
+  if(!v||!Array.isArray(v.survey))v={survey:[...(S.profile.survey||[])],must:[],sudden:true};v.survey=v.survey.filter(ok);v.must=(v.must||[]).filter(id=>v.survey.includes(id));return v}
+function mockSelSave(v){try{localStorage.setItem("oss_mock_sel",JSON.stringify(v))}catch(e){}}
+function surveyCard(){const v=mockSel();const all=TOPICS.filter(t=>t.group==="서베이");
+  const chip=t=>{const on=v.survey.includes(t.id),mu=v.must.includes(t.id);
+    return h("button",{class:"btn sm"+(on?" primary":""),style:"margin:0;"+(mu?"box-shadow:0 0 0 2px var(--warn,#d97706) inset":""),title:"누를 때마다: 선택 → 꼭 출제(★) → 해제",
+      onclick:()=>{if(!on){v.survey.push(t.id)}else if(!mu){v.must.push(t.id)}else{v.survey=v.survey.filter(x=>x!==t.id);v.must=v.must.filter(x=>x!==t.id)}mockSelSave(v);render()}},(mu?"★ ":"")+t.ko)};
+  const n=v.survey.length;
+  return h("div",{class:"card"},h("h3",{},"이번 시험 서베이 (Background Survey)"),
+    h("p",{class:"muted small"},"실제 시험처럼 고른 주제 안에서 무작위로 출제돼요. 한 번 누르면 선택, 한 번 더 누르면 ★ 꼭 출제(최대 2개 반영), 한 번 더 누르면 해제. 프로필 서베이는 바뀌지 않아요."),
+    h("div",{class:"row",style:"flex-wrap:wrap;gap:6px"},...all.map(chip)),
+    h("div",{class:"row",style:"margin-top:8px;flex-wrap:wrap;gap:8px;align-items:center"},
+      h("label",{class:"row",style:"cursor:pointer;gap:6px"},h("input",{type:"checkbox",checked:v.sudden!==false,onchange:e=>{v.sudden=e.target.checked;mockSelSave(v)}}),"돌발 주제 포함"),
+      h("button",{class:"btn sm ghost",onclick:()=>{try{localStorage.removeItem("oss_mock_sel")}catch(e){}render()}},"프로필대로"),
+      h("span",{class:"muted small"},n+"개 선택"+(v.must.length?" · ★ "+v.must.length:"")+(n<3?" — 3개 미만이면 다른 서베이 주제가 섞여요":""))))}
 function mockAdjust(delta){const lv=Math.min(6,Math.max(1,mock.lv+delta));mock.lv2=lv;mock.adjusted=true;
-  if(delta!==0){const keep=mock.items.slice(0,7);const fresh=buildMock(lv,keep.map(x=>x.tid).filter(Boolean));mock.items=[...keep,...fresh.slice(7)]}render()}
+  if(delta!==0){const keep=mock.items.slice(0,7);const fresh=buildMock(lv,keep.map(x=>x.tid).filter(Boolean),mock.sel);mock.items=[...keep,...fresh.slice(7)]}render()}
 function diffPicker(cur,onPick){const rec=DIFF_REC[tgt()]||{def:4,range:"3–4"};
   return h("div",{style:"display:flex;flex-direction:column;gap:6px"},...[1,2,3,4,5,6].map(v=>{const recd=Object.entries(DIFF_REC).filter(([k,r])=>r.def===v).map(([k])=>k);
     return h("label",{class:"li",style:"cursor:pointer;gap:10px;align-items:flex-start"+(v===cur?";border-color:var(--accent)":"")},h("input",{type:"radio",name:"mdiff",checked:v===cur,onchange:()=>onPick(v),style:"margin-top:3px"}),
@@ -1479,9 +1501,9 @@ function diffPicker(cur,onPick){const rec=DIFF_REC[tgt()]||{def:4,range:"3–4"}
 const mockDiffLabel=()=>mock?(mock.lv+(mock.adjusted?"-"+(mock.lv2||mock.lv):"")):"";
 function vMock(m){
   if(!mock){put(m,h("div",{},h("p",{class:"eyebrow"},"Mock test · Self Assessment 1–6"),h("h1",{},"모의시험")),aiNote(),
-    h("div",{class:"card"},h("h3",{},"난이도 선택 (Self Assessment)"),h("p",{class:"muted small"},"실제 오픽처럼 시작 전에 난이도를 고르고, 7번 문항 뒤에 한 번 더 '쉽게 / 비슷하게 / 어렵게'를 고를 수 있어요. 기본값은 목표 레벨에 맞춰져 있어요."),diffPicker(diffDefault(),v=>{S.profile.mockDiff=v;S.profile.mockDiffT=tgt();save();render()})),
+    h("div",{class:"card"},h("h3",{},"난이도 선택 (Self Assessment)"),h("p",{class:"muted small"},"실제 오픽처럼 시작 전에 난이도를 고르고, 7번 문항 뒤에 한 번 더 '쉽게 / 비슷하게 / 어렵게'를 고를 수 있어요. 기본값은 목표 레벨에 맞춰져 있어요."),diffPicker(diffDefault(),v=>{S.profile.mockDiff=v;S.profile.mockDiffT=tgt();save();render()})),surveyCard(),
     h("div",{class:"card"},h("p",{},"난이도 "+diffDefault()+" 구성: "+DIFF_INFO[diffDefault()]+". 문항당 최대 2분."),h("p",{class:"muted small"},"끝나면 Claude가 전체를 한 번에 채점해 종합 레벨과 문항별 피드백을 줍니다. 중간에 나가면 진행 내용은 사라져요."),
-      h("label",{class:"row",style:"cursor:pointer"},h("input",{type:"checkbox",id:"mock_listen",checked:tts.ok}),"실전 듣기 모드 — 질문을 음성으로만 듣고 답하기 (텍스트 숨김, 2회 재생)"),h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{mock={lv:diffDefault(),items:buildMock(diffDefault()),i:0,result:null,listen:$("#mock_listen").checked&&tts.ok};render()}},"시험 시작"))),
+      h("label",{class:"row",style:"cursor:pointer"},h("input",{type:"checkbox",id:"mock_listen",checked:tts.ok}),"실전 듣기 모드 — 질문을 음성으로만 듣고 답하기 (텍스트 숨김, 2회 재생)"),h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{const sel=mockSel();mock={lv:diffDefault(),sel,items:buildMock(diffDefault(),[],sel),i:0,result:null,listen:$("#mock_listen").checked&&tts.ok};render()}},"시험 시작"))),
     S.log.filter(l=>l.kind==="mock").length?h("div",{class:"card"},h("h3",{},"지난 모의시험"),h("div",{class:"list"},...S.log.filter(l=>l.kind==="mock").slice(-5).reverse().map(l=>h("div",{class:"li"},h("span",{class:"d"},l.date),h("span",{class:"grow"},l.title),lvChip(l.level))))):null);return}
   if(mock.result)return vMockResult(m);
   if(mock.i===7&&!mock.adjusted&&mock.items.length>8){const cur=mock.lv;const b=(d,label,sub)=>h("button",{class:"btn"+(d===0?" primary":""),style:"flex:1;flex-direction:column;min-width:96px",disabled:cur+d<1||cur+d>6,onclick:()=>mockAdjust(d)},h("b",{},label),h("span",{class:"small muted"},cur+d>=1&&cur+d<=6?"난이도 "+(cur+d):"—"));
