@@ -616,9 +616,9 @@ function apiCard(){if(!WEB||!isAdminUser())return null;const st=h("p",{class:"mu
 // without recording (2 min in the background, 10 min in the foreground) — the next recording asks again
 const MIC={stream:null,last:0,active:0,hifi:null};
 let HIFI=false;try{HIFI=localStorage.getItem("oss_hifi")==="1"}catch(e){}
-function setHifi(v){HIFI=!!v;try{localStorage.setItem("oss_hifi",HIFI?"1":"0")}catch(e){}if(MIC.stream&&!MIC.active)micRelease()}
-async function micStream(){if(MIC.stream&&MIC.hifi!==HIFI&&!MIC.active)micRelease();if(MIC.stream&&MIC.stream.getAudioTracks().some(t=>t.readyState==="live")){MIC.last=Date.now();return MIC.stream}
-  MIC.stream=await navigator.mediaDevices.getUserMedia({audio:HIFI?{echoCancellation:false,noiseSuppression:false,autoGainControl:true}:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});MIC.hifi=HIFI;MIC.last=Date.now();return MIC.stream}
+function setHifi(v){HIFI=!!v;try{localStorage.setItem("oss_hifi",HIFI?"1":"0")}catch(e){}}
+async function micStream(){if(MIC.stream&&MIC.stream.getAudioTracks().some(t=>t.readyState==="live")){MIC.last=Date.now();return MIC.stream}
+  MIC.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});MIC.hifi=HIFI;MIC.last=Date.now();return MIC.stream}
 const MIC_BTNS=new Set();
 // app went to the background: turn every microphone off (recognisers, voice detector, shared stream)
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState!=="hidden")return;
@@ -1356,7 +1356,7 @@ function vChat(m){
   const ta=h("textarea",{id:"chat_in",style:"min-height:64px",placeholder:"입력하거나 받아쓰기로 말하세요 — "+DICT_HINT});
   // Enter sends, Shift+Enter makes a new line (ignored while a Korean/IME word is still being composed)
   ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){e.preventDefault();send()}});
-  const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ttsStop();ta.value="";let dz=[];try{dz=micBtn_&&micBtn_._doubt?micBtn_._doubt():[]}catch(e){}try{micBtn_&&micBtn_._cut&&micBtn_._cut();if(micBtn_&&micBtn_._pause)micBtn_._pause()}catch(e){}chat.busy=true;
+  const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ttsStop();ta.value="";let dz=[];try{dz=micBtn_&&micBtn_._doubt?micBtn_._doubt():[]}catch(e){}try{micBtn_&&micBtn_._cut&&micBtn_._cut();if(micBtn_&&micBtn_._pause)Promise.resolve(micBtn_._pause()).then(()=>{if(HIFI&&micBtn_._az&&!MIC.active){micRelease();audLog.push("AI 차례: 마이크 닫음 (일반 음질)")}})}catch(e){}chat.busy=true;
     chat.ui.push({who:"me",text:t,dz});chat.turns.push({role:"user",content:t});bub.append(render1({who:"me",text:t,dz}));const w=render1({who:"wait"});bub.append(w);toEnd();
     const pre=new Set();const warm=t=>{if(!t||pre.has(t)||!chat.auto||!(WEB&&TTS_URL))return;pre.add(t);try{if(natOK(t))natUrl(t).catch(()=>{})}catch(e){}};
     const str=(src,k)=>{const m=new RegExp('"'+k+'"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"').exec(src);if(!m)return null;try{return JSON.parse('"'+m[1]+'"')}catch(e){return null}};
@@ -1425,7 +1425,7 @@ Reply with ONLY JSON: {"done":true} or {"done":false}`,{cache:false,modelTier:"q
   if(micBtn_&&micBtn_._isOn)micBtn_.addEventListener("click",()=>setTimeout(()=>{if(micBtn_._isOn())keepAlive(true);else if(!player.on)keepAlive(false)},800));
 
   const waitSel=h("select",{title:"말을 멈춘 뒤 얼마나 기다렸다 보낼지",onchange:e=>{chatWait=+e.target.value;try{localStorage.setItem("opic30_cwait",chatWait)}catch(x){}armAuto()}},...[[2,"2초 후 전송"],[4,"4초 후 전송"],[6,"6초 후 전송"],[10,"10초 후 전송"],[0,"직접 보내기"]].map(([v,l])=>h("option",{value:v,selected:chatWait===v},l)));waitSel.style.width="auto";
-  const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn_,h("button",{class:"btn",onclick:async()=>{clearTimeout(vt);try{if(micBtn_&&micBtn_._flush)await micBtn_._flush()}catch(e){}send()}},"지금 보내기"),waitSel,(micBtn_&&micBtn_._az)?h("label",{class:"row small",style:"cursor:pointer;gap:4px",title:"마이크의 에코 제거를 꺼서 휴대폰이 통화 모드로 바뀌지 않게 해요. AI가 말할 때 끼어들기는 꺼져요."},h("input",{type:"checkbox",checked:HIFI,onchange:e=>{setHifi(e.target.checked);toast(HIFI?"일반 음질 모드 — 다음 녹음부터 적용돼요 (끼어들기 꺼짐)":"통화 음질 모드 — 끼어들기 켜짐")}}),"일반 음질 (끼어들기 끔)"):null,status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
+  const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn_,h("button",{class:"btn",onclick:async()=>{clearTimeout(vt);try{if(micBtn_&&micBtn_._flush)await micBtn_._flush()}catch(e){}send()}},"지금 보내기"),waitSel,(micBtn_&&micBtn_._az)?h("label",{class:"row small",style:"cursor:pointer;gap:4px",title:"AI가 말하는 동안 마이크를 완전히 닫아 휴대폰이 통화 모드로 바뀌지 않게 해요. 끼어들기는 꺼지고, 내 차례마다 마이크를 다시 열어요."},h("input",{type:"checkbox",checked:HIFI,onchange:e=>{setHifi(e.target.checked);toast(HIFI?"AI가 말할 땐 마이크를 닫아요 — 일반 음질 (끼어들기 꺼짐)":"마이크 계속 켜 둠 — 끼어들기 켜짐 (통화 음질)")}}),"AI 말할 땐 마이크 끄기 (일반 음질)"):null,status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
   put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow",id:"chat_cnt"},chatEyebrow(sc)),h("h2",{},sc.ko)),h("div",{class:"row"},h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_auto",checked:chat.auto,onchange:e=>chat.auto=e.target.checked}),"자동 읽기"),chatMode==="voice"?h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_hide",checked:chat.hide,onchange:e=>{chat.hide=e.target.checked;bub.classList.toggle("hidetext",chat.hide)}}),"상대 말 숨기기"):null,h("button",{class:"btn sm",onclick:()=>endChat()},"대화 끝내기"))),
     bub,
     h("div",{class:"chatin"},h("div",{class:"card",style:"gap:8px"},ta,inputRow,h("div",{class:"row"},h("div",{class:"grow"},prompt_ko),hintBtn),hintOut)));
