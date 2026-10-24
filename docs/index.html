@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261023-231231-67f08b">
+<html lang="ko" data-build="20261024-090647-ceb4e4">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1420,11 +1420,11 @@ Reply with ONLY JSON: {"done":true} or {"done":false}`,{cache:false,modelTier:"q
     if(!chatWait){status.textContent=now?"다 말했으면 '지금 보내기'":"";return}if(now.length<3||now===last){status.textContent=now?"":"말하면 자동으로 보내요";return}
     if(DONE_RE.test(now)&&now.replace(DONE_RE,"").trim().length>=3){sendNow(true);return}
     const unfinished=/\b(and|but|so|because|or|um+|uh+|er+|like|the|a|an|to|of|with|for|in|on|at|my|your|i|i'm|is|was|were|are|when|if|that|which|who|then|also|really|very|just|maybe|actually|you know|kind of|sort of)[\s,.…-]*$/i.test(now)||/,\s*$/.test(now)||(!!(micBtn_&&micBtn_._az)&&!/[.?!]["')]?$/.test(now));
-    const chk=endCheck(now);const waited=()=>Math.round((Date.now()-chg)/1000);
+    let chk=null;const waited=()=>Math.round((Date.now()-chg)/1000);
     let left=chatWait+(unfinished?3:0);const show=t=>{status.textContent=t};show((unfinished?"이어서 말해도 돼요 · ":"")+"말이 끝나면 "+left+"초 후 전송");
     const hold=()=>{if(ta.value.trim()!==now){armAuto();return}const rest=END_MAX-waited();if(rest<=0){sendNow(false);return}show("생각 중이면 더 기다릴게요 · "+rest+"초 (끝났으면 \"That's it\")");vt=setTimeout(hold,1000)};
-    const tick=()=>{if(ta.value.trim()!==now){armAuto();return}left--;if(left>0){show((unfinished?"이어서 말해도 돼요 · ":"")+"말이 끝나면 "+left+"초 후 전송");vt=setTimeout(tick,1000);return}
-      show("말 끝났는지 확인 중…");Promise.race([chk,new Promise(r=>setTimeout(()=>r(null),2500))]).then(done=>{if(ta.value.trim()!==now||chat.busy||chat.speaking){armAuto();return}
+    const tick=()=>{if(ta.value.trim()!==now){armAuto();return}if(!chk)chk=endCheck(now);left--;if(left>0){show((unfinished?"이어서 말해도 돼요 · ":"")+"말이 끝나면 "+left+"초 후 전송");vt=setTimeout(tick,1000);return}
+      show("말 끝났는지 확인 중…");Promise.race([chk||endCheck(now),new Promise(r=>setTimeout(()=>r(null),2500))]).then(done=>{if(ta.value.trim()!==now||chat.busy||chat.speaking){armAuto();return}
         if(done===false&&waited()<END_MAX){audLog.push("말 이어질 것 같음 → 대기");hold();return}sendNow(false)})};
     vt=setTimeout(tick,1000)};
   ta.addEventListener("input",()=>{if(chat.speaking&&micBtn_&&micBtn_._isOn&&micBtn_._isOn())return;if(tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending))ttsStop()},{once:false});
