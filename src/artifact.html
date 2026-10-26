@@ -683,7 +683,7 @@ function vadWatch({onVoice,threshold=0.035,ms=250}){let stop=false,ac=null,timer
 // while the recognizer runs; the microphone permission stays because the shared stream is kept.
 const AZ_BTNS=new Set();
 function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,idleStop=0,onState=null,assess=true}={}){const b=h("button",{class:"btn primary"},label);AZ_BTNS.add(b);
-  let rec=null,cl=null,live=false,want=false,base="",fin="",pend="",segs=[],gen=0,skipPhrase=false,lastAct=0,idleT=null,vadStop=null,starting=false;
+  let rec=null,cl=null,t0=0,lastEnd=0,lastProg=0,live=false,want=false,base="",fin="",pend="",segs=[],gen=0,skipPhrase=false,lastAct=0,idleT=null,vadStop=null,starting=false;
   const st=s=>{try{onState&&onState(s)}catch(e){}};
   const paint=()=>{b.disabled=starting;b.textContent=starting?"연결 중…":want?(live?"■ 말하기 끝":"⏸ 대기 · 끝내기"):label;b.classList.toggle("rec",want)};
   b._isOn=()=>want;b._live=()=>live;b._wanted=()=>want;b._az=true;b._pron=()=>azSummary(segs);b._reset=()=>{segs=[];segCut=0;if(ta._doubtEl)ta._doubtEl.hidden=true};
@@ -704,14 +704,14 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
       // pronunciation scoring only where it is shown (practice / mock); a conversation only needs the words, fast
       if(assess){const pa=new sdk.PronunciationAssessmentConfig("",sdk.PronunciationAssessmentGradingSystem.HundredMark,sdk.PronunciationAssessmentGranularity.Word,false);pa.applyTo(r)}
       base=ta.value?ta.value.trim()+" ":"";fin="";pend="";if(!base)segs=[];
-      let t0=0,lagMax=0;const lag=e=>{try{if(!t0)return;const end=((e.result.offset||0)+(e.result.duration||0))/1e7;const l=(Date.now()-t0)/1000-end;if(l>lagMax)lagMax=l}catch(x){}};
+      let lagMax=0;t0=0;lastEnd=0;lastProg=Date.now();const lag=e=>{try{if(!t0)return;const end=((e.result.offset||0)+(e.result.duration||0))/1e7;if(end>lastEnd){lastEnd=end;lastProg=Date.now()}const l=(Date.now()-t0)/1000-end;if(l>lagMax)lagMax=l}catch(x){}};
       r.recognizing=(s,e)=>{if(my!==gen)return;lag(e);lastAct=Date.now();if(skipPhrase)return;pend=e.result.text||"";ta.value=base+fin+pend;ta.dispatchEvent(new Event("input"))};
       r.recognized=(s,e)=>{if(my!==gen)return;lag(e);if(lagMax>1.5){audLog.push("Azure 인식 지연 최대 "+lagMax.toFixed(1)+"초"+(assess?" (발음평가 켬)":""));if(audLog.length>30)audLog.shift()}lagMax=0;lastAct=Date.now();MIC.last=Date.now();pend="";if(skipPhrase){skipPhrase=false;return}if(e.result.reason!==sdk.ResultReason.RecognizedSpeech||!e.result.text)return;fin+=e.result.text+" ";ta.value=base+fin;ta.dispatchEvent(new Event("input"));
         try{const j=JSON.parse(e.result.properties.getProperty(sdk.PropertyId.SpeechServiceResponse_JsonResult));const nb=(j.NBest||[])[0]||{};segs.push({text:e.result.text,dur:(j.Duration||0)/1e7,pa:nb.PronunciationAssessment||{},words:nb.Words||[]})}catch(x){}showDoubt()};
       r.canceled=(s,e)=>{if(my!==gen||e.reason!==sdk.CancellationReason.Error)return;const d=String(e.errorDetails||"");audLog.push("azure canceled "+e.errorCode+" "+d.slice(0,80));
         if(document.hidden){stopRec();return}
         if(/quota|429|1007|exceed/i.test(d)||e.errorCode===sdk.CancellationErrorCode.TooManyRequests){want=false;azDisable("무료 한도 소진")}else if(/401|403|auth/i.test(d)||e.errorCode===sdk.CancellationErrorCode.AuthenticationFailure){AZ.tok=null;toast("Azure 인증 오류 — 다시 눌러 주세요");want=false}else{toast("Azure 연결이 끊겼어요: "+d.slice(0,60));want=false}stopRec()};
-      await new Promise((ok,bad)=>r.startContinuousRecognitionAsync(ok,bad));t0=Date.now();
+      await new Promise((ok,bad)=>r.startContinuousRecognitionAsync(ok,bad));t0=Date.now();lastProg=Date.now();
       if(my!==gen){try{r.close()}catch(e){}starting=false;paint();return}
       live=true;want=true;MIC.active++;AZ.live.set(b,Date.now());lastAct=Date.now();starting=false;paint();st("listen");try{onStart&&onStart()}catch(x){}
       // long silence in a conversation: stop paying Azure, wake up again by the local voice detector
@@ -723,7 +723,10 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
   b._start=async()=>{if(want)return;want=true;await startRec()};
   b._bg=async()=>{if(!want&&!rec&&!starting&&!vadStop)return;want=false;unVad();await stopRec();starting=false;paint();st("off");ta.value=(base+fin).trim()};
   b._kill=async()=>{want=false;unVad();AZ_BTNS.delete(b);await stopRec()};
-  b._finish=async()=>{const was=want;want=false;unVad();await stopRec();st("off");if(!was)return;ta.value=(base+fin).trim();ta.dispatchEvent(new Event("input"));onFinal&&onFinal(ta.value)};
+  b._drain=async()=>{if(!rec||!live)return;const until=Date.now()+20000;let shown=false;
+    while(Date.now()<until&&rec){const back=(Date.now()-t0)/1000-lastEnd;if(!pend&&(back<1.2||Date.now()-lastProg>(back>2.5?5000:2000)))break;if(!shown&&back>2.5){shown=true;b.textContent="받아쓰기 따라잡는 중…"}await new Promise(r=>setTimeout(r,200))}
+    if(shown)audLog.push("답변 끝: 밀린 받아쓰기 기다림")};
+  b._finish=async()=>{const was=want;want=false;unVad();await b._drain();await stopRec();st("off");if(!was)return;ta.value=(base+fin).trim();ta.dispatchEvent(new Event("input"));onFinal&&onFinal(ta.value)};
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&want&&!rec&&!vadStop&&b.isConnected&&!b._held)startRec()});
   b.onclick=async()=>{ttsStop();if(want){await b._finish();return}want=true;await startRec()};
   return b}
