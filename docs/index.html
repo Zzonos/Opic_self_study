@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261026-210603-0983f9">
+<html lang="ko" data-build="20261026-225921-cfd747">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -756,7 +756,8 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
   b._drain=async()=>{if(!rec||!live)return;const until=Date.now()+20000;let shown=false;
     while(Date.now()<until&&rec){const back=(Date.now()-t0)/1000-lastEnd;if(!pend&&(back<1.2||Date.now()-lastProg>(back>2.5?5000:2000)))break;if(!shown&&back>2.5){shown=true;b.textContent="받아쓰기 따라잡는 중…"}await new Promise(r=>setTimeout(r,200))}
     if(shown)audLog.push("답변 끝: 밀린 받아쓰기 기다림")};
-  b._finish=async()=>{const was=want;want=false;unVad();await b._drain();await stopRec();st("off");if(!was)return;ta.value=(base+fin).trim();ta.dispatchEvent(new Event("input"));onFinal&&onFinal(ta.value)};
+  let ab=0;b._abort=async()=>{ab++;want=false;unVad();gen++;base="";fin="";pend="";segs=[];segCut=0;if(ta._doubtEl)ta._doubtEl.hidden=true;await stopRec();starting=false;paint();st("off")};
+  b._finish=async()=>{const was=want,myAb=ab;want=false;unVad();await b._drain();if(myAb!==ab)return;await stopRec();if(myAb!==ab)return;st("off");if(!was)return;ta.value=(base+fin).trim();ta.dispatchEvent(new Event("input"));onFinal&&onFinal(ta.value)};
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&want&&!rec&&!vadStop&&b.isConnected&&!b._held)startRec()});
   b.onclick=async()=>{ttsStop();if(want){await b._finish();return}want=true;await startRec()};
   return b}
@@ -1214,7 +1215,7 @@ function vAnswer(m,s){
   const {topic,q}=s;let secs=0;let fbBox=h("div",{class:"fb"});let ctl=null;
   const tEl=h("div",{class:"timer"},"0:00");const bar=h("div",{class:"bar"},h("i"));
   const ta=h("textarea",{id:"ans_"+topic.id,placeholder:"여기에 말한 내용을 받아쓰기로 입력하세요. (휴대폰: 키보드의 마이크 키 / Windows: Win+H / Mac: 🎤 키 또는 Fn 두 번)"});
-  const startBtn=h("button",{class:"btn primary",onclick:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작";}else{if(startBtn.textContent==="다시 시작"){ta.value="";ta.dispatchEvent(new Event("input"));fbBox.replaceChildren();evalBtn.disabled=false;secs=0;try{mic&&mic._reset&&mic._reset()}catch(e){}}ta._timed=true;timerStart(tEl,bar.firstChild);startBtn.textContent="답변 끝";if(mic&&mic._az){mic._start()}else ta.focus()}
+  const startBtn=h("button",{class:"btn primary",onclick:async()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작";}else{if(startBtn.textContent==="다시 시작"){try{if(mic&&mic._abort)await mic._abort()}catch(e){}ta.value="";ta.dispatchEvent(new Event("input"));fbBox.replaceChildren();evalBtn.disabled=false;secs=0;try{mic&&mic._reset&&mic._reset()}catch(e){}}ta._timed=true;timerStart(tEl,bar.firstChild);startBtn.textContent="답변 끝";if(mic&&mic._az){mic._start()}else ta.focus()}
     if(!timer.on&&mic&&mic._az&&mic._isOn&&mic._isOn())mic._finish()}},"말하기 시작");autoTimer(ta,startBtn);
   const evalBtn=h("button",{class:"btn primary",disabled:!sample,onclick:async()=>{
     if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}
@@ -1570,8 +1571,8 @@ function vMock(m){
   // "답변 끝" stops the clock AND the recording; starting either one starts the other
   const micOn=()=>!!(mic&&mic._isOn&&mic._isOn());
   const stopAll=async()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}if(micOn())await mic._finish()};
-  const sb=h("button",{class:"btn primary",onclick:()=>{if(timer.on||micOn()){stopAll();return}
-    if(sb.textContent==="다시 시작"){ta.value="";it.a="";it.secs=0;try{mic&&mic._reset&&mic._reset()}catch(e){}}ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝";
+  const sb=h("button",{class:"btn primary",onclick:async()=>{if(timer.on||micOn()){stopAll();return}
+    if(sb.textContent==="다시 시작"){try{if(mic&&mic._abort)await mic._abort()}catch(e){}ta.value="";it.a="";it.secs=0;try{mic&&mic._reset&&mic._reset()}catch(e){}}ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝";
     if(mic){if(mic._az)mic._start();else if(!micOn())mic.onclick()}else ta.focus()}},"말하기 시작");autoTimer(ta,sb);
   const mic=azOn()?azMicBtn(ta,{label:"🎙 마이크로 답하기 (Azure)",assess:false,onStart:()=>{if(!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝"}},onFinal:()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}})
     :SR_OK?micBtn(ta,{label:"🎤 마이크로 답하기",onFinal:()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}}):null;
@@ -2002,14 +2003,14 @@ function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false,gate=nul
   // after the text was sent (chat), drop everything recognised so far so it is not sent again
   b._cut=()=>{base="";fin="";from=seen;pend=""};
   b._rebase=t=>{base=t?t.trim()+" ":"";fin="";from=seen;pend="";ta.value=base;ta.dispatchEvent(new Event("input"))};
-  let want=false;b._wanted=()=>want;b._bg=()=>{want=false;if(on)stop()};
+  let want=false;b._wanted=()=>want;b._bg=()=>{want=false;if(on)stop()};b._abort=()=>{want=false;waitEnd=null;if(on)stop();base="";fin="";pend="";from=0;seen=0};
   if(keepAlive)document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&want&&!on&&b.isConnected)b.onclick()});
   let pend="",settled=null;
   // make the words still being recognised final before the text is sent: ask the browser to close the
   // session (it then finalises them); keepAlive starts listening again right after
   b._flush=()=>new Promise(res=>{if(!on||!rec||!pend.trim())return res();settled=res;try{rec.stop()}catch(e){}setTimeout(()=>{if(settled===res){settled=null;res()}},1800)});
   b.onclick=()=>{ttsStop();if(on){want=false;stop();return}const R=window.SpeechRecognition||window.webkitSpeechRecognition;rec=new R();rec.lang="en-US";rec.continuous=true;rec.interimResults=true;base=ta.value?ta.value.trim()+" ":"";fin="";from=0;seen=0;
-    rec.onresult=e=>{let interim="";fin="";seen=e.results.length;for(let i=from;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t+" ";else interim+=t}pend=interim;
+    rec.onresult=e=>{if(!on||(e.target&&e.target!==rec))return;let interim="";fin="";seen=e.results.length;for(let i=from;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t+" ";else interim+=t}pend=interim;
       // muted (the app is speaking): do not write what is heard, just report it so the app can tell echo from the user
       if(gate&&gate()){onHeard&&onHeard((fin+interim).trim());return}
       ta.value=base+fin+interim;ta.dispatchEvent(new Event("input"))};
