@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261026-225921-cfd747">
+<html lang="ko" data-build="20261026-230258-7d3315">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -626,7 +626,7 @@ function apiCard(){if(!WEB||!isAdminUser())return null;const st=h("p",{class:"mu
   const sw=h("input",{type:"checkbox",checked:API.on,onchange:e=>{API.on=e.target.checked;try{localStorage.setItem("oss_api_mode",API.on?"1":"0")}catch(x){}apiApply();toast(API.on?"API 모드를 켰어요 — 웹에서 AI 기능을 바로 써요":"API 모드를 껐어요");if(API.on)check()}});
   if(API.on)setTimeout(check,50);
   return h("div",{class:"card"},h("h3",{},"API 모드"),h("p",{class:"muted small"},"이 계정 전용. 켜면 평가·스크립트·대화·해석·코치·모의시험 등 AI 기능을 웹 앱에서 바로 써요 (내 Anthropic API 키, 음성 서버를 거쳐 호출). 기록은 이 계정에 바로 저장돼요."),
-    h("label",{class:"row",style:"cursor:pointer"},sw,"API 모드 사용"),use,h("details",{style:"margin:4px 0"},h("summary",{class:"small",style:"cursor:pointer"},"내 고유명사 (AI 평가에 반영)"),
+    h("label",{class:"row",style:"cursor:pointer"},sw,"API 모드 사용"),use,rawMicBox(),h("details",{style:"margin:4px 0"},h("summary",{class:"small",style:"cursor:pointer"},"내 고유명사 (AI 평가에 반영)"),
       h("p",{class:"muted small"},"내 스크립트·예시 답변에 나오는 고유명사(지명·이름·브랜드)를 AI 평가·교정에 알려줘요. 받아쓰기에서 이름이 비슷한 소리로 잘못 적혀도(Suji→Suzy) 틀린 걸로 보지 않아요. 고유명사만 대상이라 점수가 부풀려지지 않아요. 더 넣을 이름이 있으면 쉼표로 적어 주세요."),
       h("textarea",{style:"min-height:48px",placeholder:"예: Suji, Tancheon, Gwanggyo Lake Park",oninput:e=>{S.profile.asrWords=e.target.value;S.updatedAt=Date.now();save()}},S.profile.asrWords||""),
       (()=>{const l=asrPhrases();return h("p",{class:"muted small",style:"word-break:break-word"},"AI에 알려주는 이름 "+Math.min(50,l.length)+"개: "+l.slice(0,30).join(", ")+(l.length>30?" …":""))})()),h("div",{class:"row"},h("button",{class:"btn sm",onclick:check},"연결 확인")),st,test,az)}
@@ -634,10 +634,13 @@ function apiCard(){if(!WEB||!isAdminUser())return null;const st=h("p",{class:"mu
 // one microphone stream for the whole visit, so the browser asks for permission once; stopped after a while
 // without recording (2 min in the background, 10 min in the foreground) — the next recording asks again
 const MIC={stream:null,last:0,active:0,hifi:null};
+let RAWMIC=false;try{RAWMIC=localStorage.getItem("oss_rawmic")==="1"}catch(e){}
+function setRawMic(v){RAWMIC=!!v;try{localStorage.setItem("oss_rawmic",RAWMIC?"1":"0")}catch(e){}toast(RAWMIC?"잡음 제거 끔 — 조용한 곳에서 더 정확해요 (다음 녹음부터)":"잡음 제거 켬 — 시끄러운 곳에 적합 (다음 녹음부터)")}
+const rawMicBox=()=>h("label",{class:"row small",style:"cursor:pointer;gap:4px",title:"휴대폰의 잡음 제거·에코 제거·자동 음량을 끄고 원본 소리를 Azure에 보내요. 조용한 곳에서는 인식이 더 정확하고, 시끄러운 곳(차량 등)에서는 켜 두는 게 나아요."},h("input",{type:"checkbox",checked:RAWMIC,onchange:e=>setRawMic(e.target.checked)}),"조용한 곳 모드 (잡음 제거 끔)");
 let PRON_ON=false;try{PRON_ON=localStorage.getItem("oss_pron")==="1"}catch(e){}
 const HIFI=true;
-async function micStream(){if(MIC.stream&&MIC.stream.getAudioTracks().some(t=>t.readyState==="live")){MIC.last=Date.now();return MIC.stream}
-  MIC.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});MIC.hifi=HIFI;MIC.last=Date.now();return MIC.stream}
+async function micStream(){if(MIC.stream&&MIC.raw!==RAWMIC&&!MIC.active)micRelease();if(MIC.stream&&MIC.stream.getAudioTracks().some(t=>t.readyState==="live")){MIC.last=Date.now();return MIC.stream}
+  MIC.stream=await navigator.mediaDevices.getUserMedia({audio:RAWMIC?{echoCancellation:false,noiseSuppression:false,autoGainControl:false}:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});MIC.hifi=HIFI;MIC.raw=RAWMIC;MIC.last=Date.now();return MIC.stream}
 const MIC_BTNS=new Set();
 // app went to the background: turn every microphone off (recognisers, voice detector, shared stream)
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState!=="hidden")return;
@@ -1241,7 +1244,7 @@ function vAnswer(m,s){
   put(m,
     h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("practice",topic.qs?{topic,q:null}:null)},"← 뒤로"),h("p",{class:"eyebrow",style:"margin-top:10px"},topic.en+" · "+(s.kind||"")),h("div",{class:"row",style:"flex-wrap:nowrap;align-items:flex-start"},h("p",{class:"q grow"},q.q),spkBtn(q.q,null,qKey(topic,q,s)))),
     h("div",{class:"card"},h("div",{class:"row"},tEl,h("div",{class:"grow"},bar,h("p",{class:"muted small",style:"margin-top:4px"},"권장 1:00–2:00. 질문을 되받고 → 2–3가지 디테일 → 한 줄 마무리.")),startBtn),
-      ta,h("div",{class:"row"},mic||micLink(),sample?evalBtn:null,stopBtn,mic&&mic._az?h("label",{class:"row small",style:"cursor:pointer;gap:4px",title:"켜면 Azure가 발음 점수도 함께 매겨요. 받아쓰기가 느려지거나 빠질 수 있어요."},h("input",{type:"checkbox",checked:PRON_ON,onchange:e=>{PRON_ON=e.target.checked;try{localStorage.setItem("oss_pron",PRON_ON?"1":"0")}catch(x){}toast(PRON_ON?"발음 평가 켬 — 다음 녹음부터 (받아쓰기가 느려질 수 있어요)":"발음 평가 끔 — 받아쓰기만 빠르게")}}),"발음 점수도 받기"):null,sample?null:window.claude?.use?aiGate():h("button",{class:"btn",onclick:()=>{const a=ta.value.trim();if(!a){toast("먼저 답변을 말하거나 입력하세요");return}navigator.clipboard?.writeText("[OPIc 연습 평가 요청]\nQ: "+q.q+"\nA: "+a).catch(()=>{});(IS_ANDROID?location.href=ART_URL:window.open(ART_URL,"_blank"));toast("답변을 복사했어요. Claude에서 붙여넣어 평가하세요")}},"Claude에서 평가"),h("span",{class:"muted small"},SR_OK?"마이크로 말하면 바로 글자로 바뀌어요":sample?"":""))),
+      ta,h("div",{class:"row"},mic||micLink(),sample?evalBtn:null,stopBtn,mic&&mic._az?h("label",{class:"row small",style:"cursor:pointer;gap:4px",title:"켜면 Azure가 발음 점수도 함께 매겨요. 받아쓰기가 느려지거나 빠질 수 있어요."},h("input",{type:"checkbox",checked:PRON_ON,onchange:e=>{PRON_ON=e.target.checked;try{localStorage.setItem("oss_pron",PRON_ON?"1":"0")}catch(x){}toast(PRON_ON?"발음 평가 켬 — 다음 녹음부터 (받아쓰기가 느려질 수 있어요)":"발음 평가 끔 — 받아쓰기만 빠르게")}}),"발음 점수도 받기"):null,mic&&mic._az?rawMicBox():null,sample?null:window.claude?.use?aiGate():h("button",{class:"btn",onclick:()=>{const a=ta.value.trim();if(!a){toast("먼저 답변을 말하거나 입력하세요");return}navigator.clipboard?.writeText("[OPIc 연습 평가 요청]\nQ: "+q.q+"\nA: "+a).catch(()=>{});(IS_ANDROID?location.href=ART_URL:window.open(ART_URL,"_blank"));toast("답변을 복사했어요. Claude에서 붙여넣어 평가하세요")}},"Claude에서 평가"),h("span",{class:"muted small"},SR_OK?"마이크로 말하면 바로 글자로 바뀌어요":sample?"":""))),
     myScript?h("details",{class:"card"},h("summary",{},"내 스크립트 보기"),h("div",{class:"model"},myScript)):null,
     fbBox);
 }
