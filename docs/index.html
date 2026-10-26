@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261026-204044-95e36a">
+<html lang="ko" data-build="20261026-204813-f01501">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -626,10 +626,10 @@ function apiCard(){if(!WEB||!isAdminUser())return null;const st=h("p",{class:"mu
   const sw=h("input",{type:"checkbox",checked:API.on,onchange:e=>{API.on=e.target.checked;try{localStorage.setItem("oss_api_mode",API.on?"1":"0")}catch(x){}apiApply();toast(API.on?"API 모드를 켰어요 — 웹에서 AI 기능을 바로 써요":"API 모드를 껐어요");if(API.on)check()}});
   if(API.on)setTimeout(check,50);
   return h("div",{class:"card"},h("h3",{},"API 모드"),h("p",{class:"muted small"},"이 계정 전용. 켜면 평가·스크립트·대화·해석·코치·모의시험 등 AI 기능을 웹 앱에서 바로 써요 (내 Anthropic API 키, 음성 서버를 거쳐 호출). 기록은 이 계정에 바로 저장돼요."),
-    h("label",{class:"row",style:"cursor:pointer"},sw,"API 모드 사용"),use,h("details",{style:"margin:4px 0"},h("summary",{class:"small",style:"cursor:pointer"},"Azure 인식 단어 (고유명사)"),
-      h("p",{class:"muted small"},"내 스크립트·예시 답변에 나오는 고유명사(지명·이름·브랜드)는 자동으로 Azure에 알려줘요. 일반 단어는 넣지 않아 점수가 부풀려지지 않아요. 더 넣을 이름이 있으면 쉼표로 적어 주세요."),
+    h("label",{class:"row",style:"cursor:pointer"},sw,"API 모드 사용"),use,h("details",{style:"margin:4px 0"},h("summary",{class:"small",style:"cursor:pointer"},"내 고유명사 (AI 평가에 반영)"),
+      h("p",{class:"muted small"},"내 스크립트·예시 답변에 나오는 고유명사(지명·이름·브랜드)를 AI 평가·교정에 알려줘요. 받아쓰기에서 이름이 비슷한 소리로 잘못 적혀도(Suji→Suzy) 틀린 걸로 보지 않아요. 고유명사만 대상이라 점수가 부풀려지지 않아요. 더 넣을 이름이 있으면 쉼표로 적어 주세요."),
       h("textarea",{style:"min-height:48px",placeholder:"예: Suji, Tancheon, Gwanggyo Lake Park",oninput:e=>{S.profile.asrWords=e.target.value;S.updatedAt=Date.now();save()}},S.profile.asrWords||""),
-      (()=>{const l=asrPhrases();return h("p",{class:"muted small",style:"word-break:break-word"},"지금 알려주는 단어 "+l.length+"개: "+l.slice(0,30).join(", ")+(l.length>30?" …":""))})()),h("div",{class:"row"},h("button",{class:"btn sm",onclick:check},"연결 확인")),st,test,az)}
+      (()=>{const l=asrPhrases();return h("p",{class:"muted small",style:"word-break:break-word"},"AI에 알려주는 이름 "+Math.min(50,l.length)+"개: "+l.slice(0,30).join(", ")+(l.length>30?" …":""))})()),h("div",{class:"row"},h("button",{class:"btn sm",onclick:check},"연결 확인")),st,test,az)}
 /* ============ AZURE SPEECH (API mode): verbatim recognition + pronunciation assessment ============ */
 // one microphone stream for the whole visit, so the browser asks for permission once; stopped after a while
 // without recording (2 min in the background, 10 min in the foreground) — the next recording asks again
@@ -681,6 +681,9 @@ function asrPhrases(){const cnt=new Map();const add=(p,w=1)=>{p=String(p||"").tr
   for(const w of String(S.profile.asrWords||"").split(/[,\n]/))add(w,99);
   return [...cnt.entries()].sort((a,b)=>b[1]-a[1]).slice(0,200).map(x=>x[0])}
 // words Azure was unsure about (low confidence, or scored as a likely mis-hearing) — shown so a wrong transcript is not mistaken for my mistake
+// my proper nouns for the AI: a speech-recognition misspelling of one of my names is not my mistake
+function nameHint(){const l=asrPhrases().slice(0,50);if(!l.length)return "";
+  return `\nThe learner's text comes from speech recognition, so their own proper nouns may be written as similar-sounding words. Their names and places: ${l.join(", ")}. If a word sounds like one of these (e.g. "Suzy" for "Suji"), read it as that name: never correct it, list it as a mistake, or lower the score for it. This applies only to these names, not to any other word.\n`}
 function azDoubt(segs){const out=[];const seen=new Set();for(const sg of segs)for(const x of (sg.words||[])){const q=x.PronunciationAssessment||{};
     const c=typeof x.Confidence==="number"?x.Confidence:null;const bad=(c!=null&&c<0.5)||(c==null&&q.AccuracyScore!=null&&q.AccuracyScore<45);
     if(bad&&x.Word&&!seen.has(x.Word.toLowerCase())){seen.add(x.Word.toLowerCase());out.push(x.Word)}}return out.slice(0,8)}
@@ -720,8 +723,7 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
   const startRec=async()=>{if(rec||starting)return;starting=true;paint();unVad();
     try{const {sdk,cfg}=await azConfig(2000);let audio;try{const ms=await micStream();dropCl();cl=ms.clone();audio=sdk.AudioConfig.fromStreamInput(cl)}catch(x){if(x&&x.name==="NotAllowedError")throw new Error("마이크 권한이 꺼져 있어요");audio=sdk.AudioConfig.fromDefaultMicrophoneInput()}
       const A=typeof assess==="function"?!!assess():!!assess;if(!A)try{cfg.requestWordLevelTimestamps()}catch(x){}const r=new sdk.SpeechRecognizer(cfg,audio);const my=++gen;rec=r;skipPhrase=false;
-      // phrase list only without pronunciation scoring (with it, recognition broke: few or no results)
-      if(!A)try{const pl=sdk.PhraseListGrammar.fromRecognizer(r);for(const ph of asrPhrases())pl.addPhrase(ph)}catch(x){}
+      // (no phrase list: my proper nouns are given to the AI instead — see nameHint())
       // pronunciation scoring only where it is shown (practice / mock); a conversation only needs the words, fast
       if(A){const pa=new sdk.PronunciationAssessmentConfig("",sdk.PronunciationAssessmentGradingSystem.HundredMark,sdk.PronunciationAssessmentGranularity.Word,false);pa.applyTo(r)}
       base=ta.value?ta.value.trim()+" ":"";fin="";pend="";if(!base)segs=[];
@@ -828,7 +830,7 @@ Learner's answer (voice-dictated) — this single answer is the ONLY thing you r
 ${answer}
 """
 ${pron?`Pronunciation assessment of the recording (Azure, 0-100): overall ${pron.pron}, accuracy ${pron.acc}, fluency ${pron.flu}${(pron.prosody??pron.pros)!=null?", prosody/intonation "+(pron.prosody??pron.pros):""}${pron.low&&pron.low.length?`; mispronounced words: ${pron.low.map(x=>x.w+" ("+x.s+")").join(", ")}`:""}. The transcript above is verbatim speech recognition (fillers and grammar mistakes kept). Mention pronunciation briefly in the summary (Korean) and, if useful, add one fix about it.
-`:""}Background profile (NOT part of the answer; use it only to fill in small missing details of the model answers, never to replace the learner's story): ${profileText()}
+`:""}${nameHint()}Background profile (NOT part of the answer; use it only to fill in small missing details of the model answers, never to replace the learner's story): ${profileText()}
 
 Rules: evaluate this answer alone. Every comment, strength and fix must refer to what is actually in the answer above — places, people and events exactly as the learner said them. Do not mention places, trips or details that appear only in the profile. The model answers must tell the SAME story as the learner (same place, same event), just better.
 
@@ -868,7 +870,7 @@ async function evalMock(items,onText){
 
 This is a full ${items.length}-question OPIc mock test taken at self-assessment difficulty ${mock?mockDiffLabel():"?"} (scale 1-6; 1-2 = easy 12-question form, 3-4 = standard, 5-6 = hardest form with advanced questions 14-15). Judge only what was demonstrated: easier forms give less evidence of IH/AL-level ability, so do not reward an easy form beyond what the answers show. Rate the overall level as a real OPIc rater would (the level is driven by the weakest consistent performance, not the best single answer). Then give short per-question feedback.
 Background profile (NOT part of the answers; never mention places or events that appear only here — comment only on what each answer actually says): ${profileText()}
-
+${nameHint()}
 ${body}
 
 Reply with ONLY one JSON object:
@@ -1350,7 +1352,7 @@ const TIP_OPEN="Quick tip. That sentence sounds better like this:";
 function chatRules(sc){return `${sc.persona}
 The learner is Korean, preparing for the OPIc speaking test, target level ${tgt()}. Their profile: ${profileText()}.
 Style: natural spoken American English, 1-3 sentences per turn, ${spec().chat}, and ALWAYS end with a question so the conversation keeps going. Stay in character; do not lecture.
-Correction: look at the learner's LAST message only. If it has grammar/structure mistakes, wrong or unnatural words, or awkward expressions, give "fix": {"better": those sentence(s) rewritten completely and naturally with exactly the same meaning, fixing ALL the problems at once — grammar, structure, word choice and expressions (never just a phrase or a fragment; e.g. original "Last weekend I go to beach and it was very funny" → better "Last weekend, I went to the beach, and it was really fun."), "original": their sentence(s) with problems, "words": up to 2 wrong or unnatural words/expressions they used, as [{"from":"what they said","to":"the better word or expression"}] (e.g. [{"from":"funny","to":"fun"}]; [] if the problem was only grammar), "why": a one-line explanation in Korean, "ko": a natural Korean translation of "better"}. Your "reply" then continues the conversation and must NOT repeat the correction. If their message was fine, set "fix": null. Ignore spelling and punctuation (voice dictation). 
+Correction: look at the learner's LAST message only. If it has grammar/structure mistakes, wrong or unnatural words, or awkward expressions, give "fix": {"better": those sentence(s) rewritten completely and naturally with exactly the same meaning, fixing ALL the problems at once — grammar, structure, word choice and expressions (never just a phrase or a fragment; e.g. original "Last weekend I go to beach and it was very funny" → better "Last weekend, I went to the beach, and it was really fun."), "original": their sentence(s) with problems, "words": up to 2 wrong or unnatural words/expressions they used, as [{"from":"what they said","to":"the better word or expression"}] (e.g. [{"from":"funny","to":"fun"}]; [] if the problem was only grammar), "why": a one-line explanation in Korean, "ko": a natural Korean translation of "better"}. Your "reply" then continues the conversation and must NOT repeat the correction. If their message was fine, set "fix": null. Ignore spelling and punctuation (voice dictation).${nameHint()} 
 Reply with ONLY a JSON object, keys in this order: {"fix":null,"reply":"your in-character reply","reply_ko":"reply의 한국어 뜻 (짧게)"}`}
 // the spoken tip, piece by piece (same text when prefetched during streaming and when played)
 const tipBetter=b=>{b=String(b||"").trim().replace(/"/g,"").replace(/([^.!?])$/,"$1.");return b?"\""+b+"\"":""};
