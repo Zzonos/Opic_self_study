@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261024-094920-9807f4">
+<html lang="ko" data-build="20261026-202522-799631">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -684,11 +684,11 @@ function azDoubt(segs){const out=[];const seen=new Set();for(const sg of segs)fo
     const c=typeof x.Confidence==="number"?x.Confidence:null;const bad=(c!=null&&c<0.5)||(c==null&&q.AccuracyScore!=null&&q.AccuracyScore<45);
     if(bad&&x.Word&&!seen.has(x.Word.toLowerCase())){seen.add(x.Word.toLowerCase());out.push(x.Word)}}return out.slice(0,8)}
 function azSummary(segs){let w=0;const acc={a:0,f:0,p:0,c:0,pr:0};const words=[];let txt=[];
-  for(const s of segs){const pa=s.pa||{};const d=Math.max(1,s.dur||1);w+=d;acc.a+=d*(pa.AccuracyScore||0);acc.f+=d*(pa.FluencyScore||0);acc.p+=d*(pa.ProsodyScore||0);acc.pr+=d*(pa.PronScore||0);
+  for(const s of segs){const pa=s.pa||{};const d=Math.max(1,s.dur||1);w+=d;acc.a+=d*(pa.AccuracyScore||0);acc.f+=d*(pa.FluencyScore||0);if(pa.ProsodyScore!=null){acc.p+=d*pa.ProsodyScore;acc.pw=(acc.pw||0)+d}acc.pr+=d*(pa.PronScore||0);
     for(const x of (s.words||[])){const q=(x.PronunciationAssessment||{});if(q.ErrorType==="Mispronunciation"||(q.AccuracyScore!=null&&q.AccuracyScore<60))words.push({w:x.Word,s:Math.round(q.AccuracyScore||0)})}txt.push(s.text)}
   if(!w)return null;const r=k=>Math.round(acc[k]/w);
   const seen=new Set();const low=words.filter(x=>{const k=x.w.toLowerCase();if(seen.has(k))return false;seen.add(k);return true}).sort((a,b)=>a.s-b.s).slice(0,10);
-  return {acc:r("a"),flu:r("f"),pros:r("p"),pron:r("pr"),low,n:segs.length}}
+  return {acc:r("a"),flu:r("f"),pros:acc.pw?Math.round(acc.p/acc.pw):null,pron:r("pr"),low,n:segs.length}}
 // drop-in replacement for micBtn(): same _isOn/_finish interface, plus _pron() for the scores
 // local voice detector on the shared mic stream (no Azure usage): calls onVoice when someone talks
 function vadWatch({onVoice,threshold=0.035,ms=250}){let stop=false,ac=null,timer=null;
@@ -721,7 +721,7 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
       if(!assess)try{cfg.requestWordLevelTimestamps()}catch(x){}const r=new sdk.SpeechRecognizer(cfg,audio);const my=++gen;rec=r;skipPhrase=false;
       try{const pl=sdk.PhraseListGrammar.fromRecognizer(r);for(const ph of asrPhrases())pl.addPhrase(ph)}catch(x){}
       // pronunciation scoring only where it is shown (practice / mock); a conversation only needs the words, fast
-      if(assess){const pa=new sdk.PronunciationAssessmentConfig("",sdk.PronunciationAssessmentGradingSystem.HundredMark,sdk.PronunciationAssessmentGranularity.Word,false);try{pa.enableProsodyAssessment=true}catch(e){}pa.applyTo(r)}
+      if(assess){const pa=new sdk.PronunciationAssessmentConfig("",sdk.PronunciationAssessmentGradingSystem.HundredMark,sdk.PronunciationAssessmentGranularity.Word,false);pa.applyTo(r)}
       base=ta.value?ta.value.trim()+" ":"";fin="";pend="";if(!base)segs=[];
       let t0=0,lagMax=0;const lag=e=>{try{if(!t0)return;const end=((e.result.offset||0)+(e.result.duration||0))/1e7;const l=(Date.now()-t0)/1000-end;if(l>lagMax)lagMax=l}catch(x){}};
       r.recognizing=(s,e)=>{if(my!==gen)return;lag(e);lastAct=Date.now();if(skipPhrase)return;pend=e.result.text||"";ta.value=base+fin+pend;ta.dispatchEvent(new Event("input"))};
@@ -747,7 +747,7 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
   b.onclick=async()=>{ttsStop();if(want){await b._finish();return}want=true;await startRec()};
   return b}
 function pronCard(p){if(!p)return null;const bar=(l,v)=>h("div",{class:"row",style:"gap:8px;align-items:center"},h("span",{class:"small",style:"width:64px"},l),h("div",{class:"bar grow"},h("i",{style:"width:"+Math.max(0,Math.min(100,v||0))+"%"})),h("b",{class:"small mono",style:"width:30px;text-align:right"},v==null?"-":v));
-  return h("div",{class:"card"},h("h3",{},"발음 평가 (Azure)"),bar("종합",p.pron),bar("정확도",p.acc),bar("유창성",p.flu),bar("억양",p.pros),
+  return h("div",{class:"card"},h("h3",{},"발음 평가 (Azure)"),bar("종합",p.pron),bar("정확도",p.acc),bar("유창성",p.flu),p.pros!=null?bar("억양",p.pros):null,
     p.low&&p.low.length?h("p",{class:"small",style:"margin:6px 0 0"},h("b",{},"다시 연습할 단어: "),p.low.map(x=>x.w+" ("+x.s+")").join(", ")):h("p",{class:"muted small"},"눈에 띄게 틀린 단어는 없었어요."))}
 function cloudErr(e){const m={"auth/invalid-email":"이메일 형식을 확인해 주세요","auth/user-not-found":"가입되지 않은 이메일이에요","auth/wrong-password":"비밀번호가 틀렸어요","auth/invalid-credential":"이메일 또는 비밀번호가 틀렸어요","auth/email-already-in-use":"이미 가입된 이메일이에요. 로그인해 주세요","auth/weak-password":"비밀번호는 6자 이상이어야 해요","auth/too-many-requests":"시도가 너무 많아요. 잠시 후 다시","auth/network-request-failed":"인터넷 연결을 확인해 주세요","permission-denied":"초대 코드가 틀렸어요"};return m[e?.code]||(e?.message||"오류가 났어요")}
 let INV_CODE="";try{const mm=/^#inv_([A-Za-z0-9_-]{3,40})$/.exec(location.hash);if(mm){INV_CODE=mm[1];history.replaceState(null,"",location.pathname+location.search)}}catch(e){}
@@ -822,7 +822,7 @@ Learner's answer (voice-dictated) — this single answer is the ONLY thing you r
 """
 ${answer}
 """
-${pron?`Pronunciation assessment of the recording (Azure, 0-100): overall ${pron.pron}, accuracy ${pron.acc}, fluency ${pron.flu}, prosody/intonation ${pron.prosody??pron.pros}${pron.low&&pron.low.length?`; mispronounced words: ${pron.low.map(x=>x.w+" ("+x.s+")").join(", ")}`:""}. The transcript above is verbatim speech recognition (fillers and grammar mistakes kept). Mention pronunciation briefly in the summary (Korean) and, if useful, add one fix about it.
+${pron?`Pronunciation assessment of the recording (Azure, 0-100): overall ${pron.pron}, accuracy ${pron.acc}, fluency ${pron.flu}${(pron.prosody??pron.pros)!=null?", prosody/intonation "+(pron.prosody??pron.pros):""}${pron.low&&pron.low.length?`; mispronounced words: ${pron.low.map(x=>x.w+" ("+x.s+")").join(", ")}`:""}. The transcript above is verbatim speech recognition (fillers and grammar mistakes kept). Mention pronunciation briefly in the summary (Korean) and, if useful, add one fix about it.
 `:""}Background profile (NOT part of the answer; use it only to fill in small missing details of the model answers, never to replace the learner's story): ${profileText()}
 
 Rules: evaluate this answer alone. Every comment, strength and fix must refer to what is actually in the answer above — places, people and events exactly as the learner said them. Do not mention places, trips or details that appear only in the profile. The model answers must tell the SAME story as the learner (same place, same event), just better.
@@ -1142,7 +1142,7 @@ function vHistory(m){const KIND={practice:"연습",mock:"모의시험",chat:"대
     const det=h("div",{class:"card",style:"margin:-4px 0 6px;gap:12px"},
       l.q?h("div",{},h("p",{class:"eyebrow"},"질문"),h("div",{class:"row",style:"align-items:flex-start;flex-wrap:nowrap"},h("p",{class:"small grow",style:"font-weight:600"},l.q),spkBtn(l.q,null,q?"q_"+t.id+"_"+t.qs.indexOf(q):null))):null,
       l.a?h("div",{},h("p",{class:"eyebrow"},"내 답변"),h("div",{class:"model"},l.a)):null,
-      l.level?h("p",{class:"muted small"},"AI 판정 레벨: "+(l.lvRaw||l.level)+(lvNorm(l.lvRaw||l.level)!==String(l.lvRaw||l.level).trim()?" → "+LEVELS[lvIdx(l.lvRaw||l.level)]+"로 기록":"")+(l.score!=null?" · "+l.score+"점":"")):null,tierLine(l.tier),l.pron?h("p",{class:"muted small"},"🎙 발음(Azure) 종합 "+l.pron.pron+" · 정확도 "+l.pron.acc+" · 유창성 "+l.pron.flu+" · 억양 "+l.pron.pros+(l.pron.low&&l.pron.low.length?" · 연습 단어: "+l.pron.low.slice(0,6).map(x=>x.w).join(", "):"")):null,
+      l.level?h("p",{class:"muted small"},"AI 판정 레벨: "+(l.lvRaw||l.level)+(lvNorm(l.lvRaw||l.level)!==String(l.lvRaw||l.level).trim()?" → "+LEVELS[lvIdx(l.lvRaw||l.level)]+"로 기록":"")+(l.score!=null?" · "+l.score+"점":"")):null,tierLine(l.tier),l.pron?h("p",{class:"muted small"},"🎙 발음(Azure) 종합 "+l.pron.pron+" · 정확도 "+l.pron.acc+" · 유창성 "+l.pron.flu+(l.pron.pros!=null?" · 억양 "+l.pron.pros:"")+(l.pron.low&&l.pron.low.length?" · 연습 단어: "+l.pron.low.slice(0,6).map(x=>x.w).join(", "):"")):null,
       l.sum?h("div",{},h("p",{class:"eyebrow"},"총평"),h("p",{class:"small"},l.sum)):null,
       (l.str||[]).length?h("div",{},h("p",{class:"eyebrow"},"잘한 점"),...l.str.map(x=>h("p",{class:"small"},"✓ "+x))):null,
       fx.length?h("div",{},h("p",{class:"eyebrow"},l.kind==="mock"?"개선 포인트":"고칠 부분"),...fx.map(x=>x.o||x.b?h("div",{class:"fix"},x.o?h("span",{class:"o"},x.o):null,x.b?h("span",{class:"b"},x.b):null,x.w?h("span",{class:"w"},x.w):null):h("p",{class:"small"},"• "+x.w))):null,
@@ -1557,7 +1557,7 @@ function vMock(m){
   const sb=h("button",{class:"btn primary",onclick:()=>{if(timer.on||micOn()){stopAll();return}
     if(sb.textContent==="다시 시작"){ta.value="";it.a="";it.secs=0;try{mic&&mic._reset&&mic._reset()}catch(e){}}ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝";
     if(mic){if(mic._az)mic._start();else if(!micOn())mic.onclick()}else ta.focus()}},"말하기 시작");autoTimer(ta,sb);
-  const mic=azOn()?azMicBtn(ta,{label:"🎙 마이크로 답하기 (Azure)",onStart:()=>{if(!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝"}},onFinal:()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}})
+  const mic=azOn()?azMicBtn(ta,{label:"🎙 마이크로 답하기 (Azure)",assess:false,onStart:()=>{if(!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝"}},onFinal:()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}})
     :SR_OK?micBtn(ta,{label:"🎤 마이크로 답하기",onFinal:()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}}):null;
   if(mic&&!mic._az){const oc=mic.onclick;mic.onclick=()=>{const was=micOn();oc();if(!was&&micOn()&&!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝"}else if(was&&!micOn()&&timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}}
   put(m,h("div",{},h("p",{class:"eyebrow"},"Question "+(mock.i+1)+" / "+n+" · 난이도 "+mockDiffLabel()+" · "+it.kind),nav,qText,hid,h("div",{class:"row",style:"margin-top:8px"},replay,reveal)),
