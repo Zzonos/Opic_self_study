@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261026-203443-1e2c9c">
+<html lang="ko" data-build="20261026-204044-95e36a">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -720,7 +720,8 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
   const startRec=async()=>{if(rec||starting)return;starting=true;paint();unVad();
     try{const {sdk,cfg}=await azConfig(2000);let audio;try{const ms=await micStream();dropCl();cl=ms.clone();audio=sdk.AudioConfig.fromStreamInput(cl)}catch(x){if(x&&x.name==="NotAllowedError")throw new Error("마이크 권한이 꺼져 있어요");audio=sdk.AudioConfig.fromDefaultMicrophoneInput()}
       const A=typeof assess==="function"?!!assess():!!assess;if(!A)try{cfg.requestWordLevelTimestamps()}catch(x){}const r=new sdk.SpeechRecognizer(cfg,audio);const my=++gen;rec=r;skipPhrase=false;
-      try{const pl=sdk.PhraseListGrammar.fromRecognizer(r);for(const ph of asrPhrases())pl.addPhrase(ph)}catch(x){}
+      // phrase list only without pronunciation scoring (with it, recognition broke: few or no results)
+      if(!A)try{const pl=sdk.PhraseListGrammar.fromRecognizer(r);for(const ph of asrPhrases())pl.addPhrase(ph)}catch(x){}
       // pronunciation scoring only where it is shown (practice / mock); a conversation only needs the words, fast
       if(A){const pa=new sdk.PronunciationAssessmentConfig("",sdk.PronunciationAssessmentGradingSystem.HundredMark,sdk.PronunciationAssessmentGranularity.Word,false);pa.applyTo(r)}
       base=ta.value?ta.value.trim()+" ":"";fin="";pend="";if(!base)segs=[];
