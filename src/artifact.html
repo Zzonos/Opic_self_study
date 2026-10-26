@@ -1198,6 +1198,7 @@ function vAnswer(m,s){
   const startBtn=h("button",{class:"btn primary",onclick:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작";}else{if(startBtn.textContent==="다시 시작"){ta.value="";ta.dispatchEvent(new Event("input"));fbBox.replaceChildren();evalBtn.disabled=false;secs=0;try{mic&&mic._reset&&mic._reset()}catch(e){}}ta._timed=true;timerStart(tEl,bar.firstChild);startBtn.textContent="답변 끝";if(mic&&mic._az){mic._start()}else ta.focus()}
     if(!timer.on&&mic&&mic._az&&mic._isOn&&mic._isOn())mic._finish()}},"말하기 시작");autoTimer(ta,startBtn);
   const evalBtn=h("button",{class:"btn primary",disabled:!sample,onclick:async()=>{
+    if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}
     if(mic&&mic._isOn&&mic._isOn()){evalBtn.disabled=true;evalBtn.textContent="녹음 마무리 중…";await mic._finish();evalBtn.textContent="AI 평가 받기";evalBtn.disabled=false}
     // keyboard dictation may still be writing the last words: end it (blur) and wait until the text stops changing
     if(document.activeElement===ta||ta._lastInput&&Date.now()-ta._lastInput<1500){evalBtn.disabled=true;evalBtn.textContent="받아쓰기 마무리 중…";ta.blur();let last=ta.value,stable=0;for(let k=0;k<15&&stable<4;k++){await new Promise(r=>setTimeout(r,200));if(ta.value===last)stable++;else{stable=0;last=ta.value}}evalBtn.textContent="AI 평가 받기";evalBtn.disabled=false}
@@ -1542,7 +1543,7 @@ function vMock(m){
   const tEl=h("div",{class:"timer"},"0:00");const bar=h("div",{class:"bar"},h("i"));
   const ta=h("textarea",{id:"mock_"+mock.i,placeholder:"받아쓰기로 답변 입력"});ta.value=it.a;
   const nav=h("div",{class:"mocknav"},...mock.items.map((x,i)=>h("i",{class:i<mock.i?"done":i===mock.i?"cur":""})));
-  const next=async()=>{if(mic&&mic._isOn&&mic._isOn())await mic._finish();it.a=ta.value.trim();it.secs=timerStop()||it.secs;if(mock.i<n-1){mock.i++;render()}else{mock.result="pending";render()}};
+  const next=async()=>{if(timer.on){it.secs=timerStop()||it.secs;sb.textContent="다시 시작"}if(mic&&mic._isOn&&mic._isOn())await mic._finish();it.a=ta.value.trim();if(mock.i<n-1){mock.i++;render()}else{mock.result="pending";render()}};
   let plays=0;const qText=h("p",{class:"q grow",style:"margin-top:10px"},it.q);const hid=h("div",{class:"hidden-q",style:"margin-top:10px"},"질문을 듣고 답하세요. 실제 시험처럼 재생은 2번까지 가능해요.");
   const reveal=h("button",{class:"btn sm ghost",onclick:()=>{hid.hidden=true;qText.hidden=false;reveal.hidden=true}},"질문 텍스트 보기");
   const replay=h("button",{class:"btn sm",onclick:()=>{if(plays>=2){toast("실제 시험에서는 2번까지만 들을 수 있어요");return}plays++;speak(it.q,{key:it.key});replay.textContent="다시 듣기 ("+(2-plays)+"회 남음)"}},"질문 듣기 (2회)");
