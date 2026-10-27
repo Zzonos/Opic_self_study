@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261027-111021-4406c5">
+<html lang="ko" data-build="20261027-111948-47dd1a">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -895,6 +895,7 @@ try{const t=localStorage.getItem("opic30_aud");if(t)AUD.tag=t}catch(e){}
 function audEl(){if(!AUD.el){AUD.el=new Audio();AUD.el.preload="auto";
     // a pause the app did not ask for = the system interrupted (notification, call, Siri, another app)
     AUD.el.addEventListener("pause",()=>{const a=AUD.el,src=a.src;setTimeout(()=>{if(!player.on||player.paused||player.sys||!a.paused||a.ended||a.src!==src||!src||Date.now()-(AUD.own||0)<600)return;sysPaused()},300)});
+    AUD.el.addEventListener("timeupdate",()=>{const a=AUD.el;if(player.on&&a.src&&!/silence_/.test(a.src)&&a.currentTime>0){player.lastT=a.currentTime;player.lastSi=player.si;player.lastI=player.i}});
     AUD.el.addEventListener("playing",()=>{if(player.sys){player.sys=false;clearInterval(player.sysT);mediaSession()}})}
   return AUD.el}
 function sysPaused(){player.sys=true;audLog.push("시스템이 재생을 멈춤 (알림 등)");mediaSession();
@@ -904,7 +905,10 @@ function playingNow(){const a=AUD.el;return !!(a&&a.src&&!a.paused&&!a.ended)||(
 function remotePlay(){if(!player.on)return;if(player.paused){playerPause();return}
   if(playingNow()&&!player.sys){mediaSession();return}
   player.sys=false;clearInterval(player.sysT);keepAlive(true);const a=AUD.el;audLog.push("잠금화면 ▶");
-  const restart=()=>{clearTimeout(player.t);player.t=null;player.busy=false;player.tok=(player.tok||0)+1;if(!player.segs.length)player.si=0;playerStep();mediaSession()};
+  const restart=()=>{clearTimeout(player.t);player.t=null;player.busy=false;player.tok=(player.tok||0)+1;
+    if(!player.segs.length&&player.lastI===player.i&&player.items[player.i]){player.segs=buildSegs(player.items[player.i])}
+    if(player.lastI===player.i&&player.lastSi!=null&&player.lastSi<player.segs.length){player.si=player.lastSi;if(player.lastT>0.5){AUD.seek={t:Math.max(0,player.lastT-0.5),until:Date.now()+15000}}}
+    audLog.push("이어서: "+(player.i+1)+"번째 항목 · "+(player.si+1)+"번째 구간"+(AUD.seek?" · "+AUD.seek.t.toFixed(1)+"초부터":""));playerStep();mediaSession()};
   if(a&&a.src&&a.paused&&!a.ended&&a.currentTime>0.1&&audCb){a.play().then(()=>mediaSession()).catch(restart)}else restart()}
 function sysResume(auto){if(!player.on)return;const a=AUD.el;player.sys=false;keepAlive(true);
   if(a&&a.src&&a.paused&&!a.ended&&a.currentTime>0.1){a.play().then(()=>{clearInterval(player.sysT);audLog.push(auto?"끼어든 소리 끝 → 자동으로 이어서":"이어서 재생");mediaSession()}).catch(()=>{player.sys=true;mediaSession()})}
@@ -975,7 +979,10 @@ let audCb=null;
 const audLog=[];
 function audPlay(src,{rate=1,onend=null,onerror=null}={}){const a=audEl();audCb=onend;const t0=Date.now();a.onended=()=>{audLog.push(src.split("/").pop()+" ok "+((Date.now()-t0)/1000).toFixed(1)+"s");if(audLog.length>30)audLog.shift();const cb=audCb;audCb=null;cb&&cb()};
   a.onerror=()=>{audLog.push(src.split("/").pop().slice(0,24)+" ERR"+(a.error?.code||"")+" "+((Date.now()-t0)/1000).toFixed(1)+"s");const cb=audCb;audCb=null;if(onerror)onerror();else cb&&cb()};
-  AUD.own=Date.now();a.src=src;a.playbackRate=rate;a.play().catch(e=>{if(e&&e.name==="AbortError")return;audLog.push(src.split("/").pop().slice(0,24)+" play-fail "+(e&&e.name||""));const cb=audCb;audCb=null;if(onerror)onerror();else cb&&cb()})}
+  AUD.own=Date.now();
+  let seekAt=null;if(AUD.seek&&Date.now()<AUD.seek.until&&!/silence_/.test(src)){seekAt=AUD.seek.t;AUD.seek=null}
+  const doSeek=()=>{if(seekAt==null)return;try{if(a.readyState>=1&&seekAt<(a.duration||1e9)-0.3){a.currentTime=seekAt;seekAt=null}}catch(e){}};if(seekAt!=null){a.addEventListener("loadedmetadata",doSeek,{once:true});a.addEventListener("playing",doSeek,{once:true})}
+  a.src=src;a.playbackRate=rate;a.play().catch(e=>{if(e&&e.name==="AbortError")return;audLog.push(src.split("/").pop().slice(0,24)+" play-fail "+(e&&e.name||""));const cb=audCb;audCb=null;if(onerror)onerror();else cb&&cb()})}
 function audDone(){const a=AUD.el;if(!a||!a.src||!audCb)return false;const end=a.ended||(a.paused&&a.duration>0&&isFinite(a.duration)&&a.currentTime>=a.duration-0.25);if(!end)return false;audLog.push("끝 신호 누락 → 다음으로");const cb=audCb;audCb=null;try{cb()}catch(e){}return true}
 function audStop(){audCb=null;AUD.own=Date.now();try{const a=audEl();a.onended=null;a.pause();a.removeAttribute("src");a.load()}catch(e){}}
 
