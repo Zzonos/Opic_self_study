@@ -881,6 +881,12 @@ function audEl(){if(!AUD.el){AUD.el=new Audio();AUD.el.preload="auto";
 function sysPaused(){player.sys=true;audLog.push("시스템이 재생을 멈춤 (알림 등)");mediaSession();
   // the interruption is usually short: try to continue for a while (works as long as the page is still awake)
   let n=0;clearInterval(player.sysT);player.sysT=setInterval(()=>{if(!player.sys||!player.on||player.paused||++n>8){clearInterval(player.sysT);return}sysResume(true)},1500)}
+function playingNow(){const a=AUD.el;return !!(a&&a.src&&!a.paused&&!a.ended)||(tts.ok&&speechSynthesis.speaking&&!speechSynthesis.paused)}
+function remotePlay(){if(!player.on)return;if(player.paused){playerPause();return}
+  if(playingNow()&&!player.sys){mediaSession();return}
+  player.sys=false;clearInterval(player.sysT);keepAlive(true);const a=AUD.el;audLog.push("잠금화면 ▶");
+  const restart=()=>{clearTimeout(player.t);player.t=null;player.busy=false;player.tok=(player.tok||0)+1;if(!player.segs.length)player.si=0;playerStep();mediaSession()};
+  if(a&&a.src&&a.paused&&!a.ended&&a.currentTime>0.1&&audCb){a.play().then(()=>mediaSession()).catch(restart)}else restart()}
 function sysResume(auto){if(!player.on)return;const a=AUD.el;player.sys=false;keepAlive(true);
   if(a&&a.src&&a.paused&&!a.ended&&a.currentTime>0.1){a.play().then(()=>{clearInterval(player.sysT);audLog.push(auto?"끼어든 소리 끝 → 자동으로 이어서":"이어서 재생");mediaSession()}).catch(()=>{player.sys=true;mediaSession()})}
   else{clearInterval(player.sysT);audLog.push("이어서 재생 (현재 문장)");playerStep();mediaSession()}}
@@ -1655,7 +1661,7 @@ function keepAlive(on){try{if(!keep){keep=new Audio(KEEP_URI);keep.loop=true;kee
 function mediaSession(){if(!("mediaSession" in navigator))return;try{const it=player.items[player.i]||{};
   navigator.mediaSession.metadata=new MediaMetadata({title:(it.en||"OSS").slice(0,80),artist:it.label||"OSS 무한 재생",album:"OSS · Opic Self Study"});
   navigator.mediaSession.playbackState=(player.paused||player.sys)?"paused":"playing";
-  const H={play:()=>{if(player.sys){sysResume(false);return}if(player.paused)playerPause()},pause:()=>{if(player.sys){player.sys=false;clearInterval(player.sysT)}if(!player.paused)playerPause()},nexttrack:playerNext,previoustrack:playerPrev,stop:playerStop};
+  const H={play:remotePlay,pause:()=>{if(player.sys){player.sys=false;clearInterval(player.sysT)}if(!player.paused)playerPause()},nexttrack:playerNext,previoustrack:playerPrev,stop:playerStop};
   for(const k in H){try{navigator.mediaSession.setActionHandler(k,H[k])}catch(e){}}}catch(e){}}
 
 /* ============ INFINITE PLAYER ============ */
