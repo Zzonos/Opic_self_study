@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261028-230739-7b5954">
+<html lang="ko" data-build="20261028-231349-4dbd9e">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -468,7 +468,7 @@ function syncCard(){if(window.claude?.use===undefined)return null;const n=unsync
 let pendingSync=null;
 let syncClose=false;
 (async()=>{const m=location.hash.match(/^#([sx])_(.+)$/);if(!m)return;syncClose=m[1]==="x";try{pendingSync=await unpackState(m[2]);history.replaceState(null,"",location.pathname+location.search)}catch(e){toast("가져온 기록을 읽을 수 없어요")}})();
-function applyPendingSync(){if(!pendingSync)return;const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;toast((window.claude?.use?"웹 계정 기록":"Claude 기록")+" "+n+"건을 합쳤어요");render();if(syncClose)syncDone(n);setTimeout(()=>clipSync(false),2000)}
+function applyPendingSync(){if(!pendingSync)return;const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;toast((window.claude?.use?"웹 계정 기록":"Claude 기록")+" "+n+"건을 합쳤어요");syncRender();if(syncClose)syncDone(n);setTimeout(()=>clipSync(false),2000)}
 async function syncDone(n){const ov=h("div",{style:"position:fixed;left:0;top:0;width:100%;height:100%;margin:0;padding:24px;box-sizing:border-box;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center"},h("div",{class:"card",style:"text-align:center"},h("h3",{},"통합 중…"),h("p",{class:"muted small",id:"sdmsg"},"계정에 저장하고 있어요")));document.body.append(ov);
   const msg=t=>{const el=$("#sdmsg");if(el)el.textContent=t};
   try{if(cloud.ref)await cloudPush(true);ov.querySelector("h3").textContent="통합 완료 ✓";msg(cloud.ref?"기록 "+n+"건이 "+(cloud.user?.email||"계정")+"에 저장됐어요. 홈 화면의 OSS 앱을 열면 반영되어 있어요. 이 화면은 그냥 두고 Claude 앱으로 돌아가면 됩니다.":"이 기기(브라우저)에만 저장됐어요. 홈 화면 앱에 반영하려면 로그인이 필요해요.")}catch(e){ov.querySelector("h3").textContent="저장 실패";msg(e.code||e.message||String(e));return}
@@ -607,7 +607,7 @@ async function apiCall1(input,opt={},fresh){const cfg=await apiKey(fresh);const 
 // switch the web app's AI between "none" (default) and the API relay
 const chatEyebrow=sc=>sc.en+" · "+chat.n+"턴"+(chatMode==="voice"?" · 말하기 모드":"")+" · "+modeLabel();
 const modeLabel=()=>window.claude?.use?"클로드 모드":(API.on&&sample)?"API 모드":"웹 모드";
-function apiApply(){if(window.claude?.use)return;const want=API.on&&isAdminUser()&&!!TTS_URL;const was=!!sample;sample=want?wrapSample(apiCall):null;if(was!==!!sample)render()}
+function apiApply(){if(window.claude?.use)return;const want=API.on&&isAdminUser()&&!!TTS_URL;const was=!!sample;sample=want?wrapSample(apiCall):null;if(was!==!!sample)syncRender()}
 async function apiStatus(){try{const u=firebase.auth().currentUser;if(!u)return {error:"로그인 필요"};const r=await fetch(TTS_URL+"/ai/status",{headers:{Authorization:"Bearer "+(await u.getIdToken())}});const j=await r.json().catch(()=>({}));return r.ok?j:{error:j.error||("HTTP "+r.status)}}catch(e){return {error:String(e.message||e)}}}
 function apiCard(){if(!WEB||!isAdminUser())return null;const st=h("p",{class:"muted small"},"");
   const test=h("p",{class:"small",style:"margin:4px 0 0"},"");const az=h("p",{class:"small",style:"margin:4px 0 0"},"");
@@ -1097,9 +1097,11 @@ function rateCtl(){const r=h("select",{id:"rate_"+Math.random().toString(36).sli
 
 /* ============ TIMER ============ */
 let timer={on:false,start:0,secs:0,int:null,el:null,bar:null};
-function timerStart(el,bar){timerStop();timer={on:true,start:Date.now(),secs:0,int:null,el,bar};timer.int=setInterval(()=>{timer.secs=Math.round((Date.now()-timer.start)/1000);if(el){el.textContent=fmt(timer.secs);el.classList.toggle("over",timer.secs>120)}if(bar)bar.style.width=Math.min(100,timer.secs/120*100)+"%"},250)}
+function timerStart(el,bar){timerStop();timer={on:true,start:Date.now(),secs:0,int:null,el,bar};timer.int=setInterval(()=>{timer.secs=Math.round((Date.now()-timer.start)/1000);const el=timer.el,bar=timer.bar;if(el){el.textContent=fmt(timer.secs);el.classList.toggle("over",timer.secs>120)}if(bar)bar.style.width=Math.min(100,timer.secs/120*100)+"%"},250)}
 // keyboard dictation (or typing) in the answer box starts the timer automatically, once per answer
 function autoTimer(ta,btn){ta.addEventListener("input",()=>{if(timer.on||ta._timed||!ta.value.trim())return;ta._timed=true;btn.click();timer.start-=1500;toast("말하기 시작 — 타이머가 자동으로 켜졌어요")})}
+let PDRAFT={q:"",text:""};
+function timerBind(el,bar){if(!timer.on)return false;timer.el=el;timer.bar=bar;return true}
 function timerStop(){if(timer.int)clearInterval(timer.int);timer.int=null;timer.on=false;return timer.secs}
 
 /* ============ VIEWS ============ */
@@ -1235,7 +1237,7 @@ function qKey(topic,q,s){if(s&&s.rp)return s.rp.id+"_"+s.step;if(topic.id==="adv
 function vAnswer(m,s){
   const {topic,q}=s;let secs=0;let fbBox=h("div",{class:"fb"});let ctl=null;
   const tEl=h("div",{class:"timer"},"0:00");const bar=h("div",{class:"bar"},h("i"));
-  const ta=h("textarea",{id:"ans_"+topic.id,placeholder:"여기에 말한 내용을 받아쓰기로 입력하세요. (휴대폰: 키보드의 마이크 키 / Windows: Win+H / Mac: 🎤 키 또는 Fn 두 번)"});
+  const ta=h("textarea",{id:"ans_"+topic.id,placeholder:"여기에 말한 내용을 받아쓰기로 입력하세요. (휴대폰: 키보드의 마이크 키 / Windows: Win+H / Mac: 🎤 키 또는 Fn 두 번)"});if(PDRAFT.q===q.q&&PDRAFT.text)ta.value=PDRAFT.text;ta.addEventListener("input",()=>{PDRAFT={q:q.q,text:ta.value}});
   const startBtn=h("button",{class:"btn primary",onclick:async()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작";}else{if(startBtn.textContent==="다시 시작"){try{if(mic&&mic._abort)await mic._abort()}catch(e){}ta.value="";ta.dispatchEvent(new Event("input"));fbBox.replaceChildren();evalBtn.disabled=false;secs=0;try{mic&&mic._reset&&mic._reset()}catch(e){}}ta._timed=true;timerStart(tEl,bar.firstChild);startBtn.textContent="답변 끝";if(mic&&mic._az){mic._start()}else ta.focus()}
     if(!timer.on&&mic&&mic._az&&mic._isOn&&mic._isOn())mic._finish()}},"말하기 시작");autoTimer(ta,startBtn);
   const evalBtn=h("button",{class:"btn primary",disabled:!sample,onclick:async()=>{
@@ -1250,14 +1252,15 @@ function vAnswer(m,s){
     try{const prog=fbBox.querySelector(".thinking span");const pron=mic&&mic._pron?mic._pron():null;const r=await evaluate(q.q,a,secs||Math.round(a.split(/\s+/).length/2.3),({text})=>{if(prog)prog.textContent="Claude가 평가 작성 중… "+(text||"").length+"자"},pron);
       const nf=fixNames(a,r.name_fixes);const a2=nf.text;if(nf.applied.length){ta.value=a2;audLog.push("이름 교정: "+nf.applied.join(", "))}
       renderFeedback(fbBox,r,q.q,a2);{const nn=nameNote(nf.applied);if(nn)fbBox.prepend(nn)}if(pron){const pc=pronCard(pron);const first=fbBox.firstChild;if(pc)first?first.after(pc):fbBox.append(pc)}if(r.model_target){S.models=S.models||{};S.models[q.q]=r.model_target;S.modelsAt=S.modelsAt||{};S.modelsAt[q.q]=Date.now()}
-      S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",tier:r._tier,...(pron?{pron}:{}),qt:q.t,tid:topic.id,q:q.q,a:a2,...(nf.applied.length?{nfix:nf.applied}:{}),sum:r.summary||"",str:(r.strengths||[]).slice(0,3),model:r.model_target||"",title:topic.en+" · "+(s.kind||""),level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:secs||0,fixes:(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}))});S.today.practice++;save();
+      S.log.push({date:todayStr(),ts:Date.now(),kind:"practice",tier:r._tier,...(pron?{pron}:{}),qt:q.t,tid:topic.id,q:q.q,a:a2,...(nf.applied.length?{nfix:nf.applied}:{}),sum:r.summary||"",str:(r.strengths||[]).slice(0,3),model:r.model_target||"",title:topic.en+" · "+(s.kind||""),level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:secs||0,fixes:(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}))});S.today.practice++;save();PDRAFT={q:"",text:""};
       const nextRp=s.rp&&s.step<13?h("button",{class:"btn primary",onclick:()=>{const st=s.step+1;go("practice",{topic,q:{t:"rp",q:s.rp["q"+st]},kind:"롤플레이 "+st+"번 · "+(st===12?"문제 해결":"관련 경험"),rp:s.rp,step:st})}},"다음: "+(s.step+1)+"번 →"):null;
       put(fbBox,h("div",{class:"row"},nextRp,h("button",{class:"btn",onclick:()=>{ta.value="";ta._timed=false;startBtn.textContent="말하기 시작";fbBox.replaceChildren();secs=0;tEl.textContent="0:00";bar.firstChild.style.width="0";evalBtn.disabled=false}},"같은 질문 다시"),h("button",{class:"btn",onclick:()=>go("practice")},"다른 질문")));
     }catch(e){console.warn("evaluate failed",e);fbBox.replaceChildren(h("p",{class:"small",style:"color:var(--bad)"},errMsg(e)),e?.message?h("p",{class:"muted small mono",style:"word-break:break-all"},String(e.message).slice(0,200)):null,(e.code!=="not_granted"&&e.code!=="sampling_disabled")?h("button",{class:"btn sm",onclick:()=>{evalBtn.disabled=false;evalBtn.click()}},"다시 시도"):null);if(e.code!=="not_granted"&&e.code!=="sampling_disabled")evalBtn.disabled=false}
     finally{stopBtn.hidden=true}
   }},"AI 평가 받기");
   const stopBtn=h("button",{class:"btn",hidden:true,onclick:()=>ctl?.abort()},"중지");
-  const mic=(azOn()?azMicBtn:micBtn)(ta,{assess:()=>PRON_ON,onFinal:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}},onStart:()=>{if(!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild);startBtn.textContent="답변 끝"}}});ta.addEventListener("input",()=>{ta._lastInput=Date.now()});
+  const mic=(azOn()?azMicBtn:micBtn)(ta,{assess:()=>PRON_ON,onFinal:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}},onStart:()=>{if(!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild)}else timerBind(tEl,bar.firstChild);startBtn.textContent="답변 끝"}});ta.addEventListener("input",()=>{ta._lastInput=Date.now()});
+  if(timerBind(tEl,bar.firstChild)){ta._timed=true;startBtn.textContent="답변 끝"}
   const scr=S.scripts[topic.id];const sIdx=topic.qs?topic.qs.indexOf(q):-1;const myScript=scr&&sIdx>=0?scr.scripts?.[sIdx]?.answer:null;
   put(m,
     h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("practice",topic.qs?{topic,q:null}:null)},"← 뒤로"),h("p",{class:"eyebrow",style:"margin-top:10px"},topic.en+" · "+(s.kind||"")),h("div",{class:"row",style:"flex-wrap:nowrap;align-items:flex-start"},h("p",{class:"q grow"},q.q),spkBtn(q.q,null,qKey(topic,q,s)))),
@@ -1583,6 +1586,7 @@ function vMock(m){
   const it=mock.items[mock.i];const n=mock.items.length;
   const tEl=h("div",{class:"timer"},"0:00");const bar=h("div",{class:"bar"},h("i"));
   const ta=h("textarea",{id:"mock_"+mock.i,placeholder:"받아쓰기로 답변 입력"});ta.value=it.a;ta.addEventListener("input",()=>{it.a=ta.value});
+  const reb=()=>{if(timerBind(tEl,bar.firstChild)){ta._timed=true;setTimeout(()=>{if(typeof sb!=="undefined"&&sb)sb.textContent="답변 끝"},0)}};
   const nav=h("div",{class:"mocknav"},...mock.items.map((x,i)=>h("i",{class:i<mock.i?"done":i===mock.i?"cur":""})));
   const next=async()=>{if(timer.on){it.secs=timerStop()||it.secs;sb.textContent="다시 시작"}if(mic&&mic._isOn&&mic._isOn())await mic._finish();it.a=ta.value.trim();if(mock.i<n-1){mock.i++;render()}else{mock.result="pending";render()}};
   let plays=0;const qText=h("p",{class:"q grow",style:"margin-top:10px"},it.q);const hid=h("div",{class:"hidden-q",style:"margin-top:10px"},"질문을 듣고 답하세요. 실제 시험처럼 재생은 2번까지 가능해요.");
@@ -1595,9 +1599,9 @@ function vMock(m){
   const sb=h("button",{class:"btn primary",onclick:async()=>{if(timer.on||micOn()){stopAll();return}
     if(sb.textContent==="다시 시작"){try{if(mic&&mic._abort)await mic._abort()}catch(e){}ta.value="";it.a="";it.secs=0;try{mic&&mic._reset&&mic._reset()}catch(e){}}ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝";
     if(mic){if(mic._az)mic._start();else if(!micOn())mic.onclick()}else ta.focus()}},"말하기 시작");autoTimer(ta,sb);
-  const mic=azOn()?azMicBtn(ta,{label:"🎙 마이크로 답하기 (Azure)",assess:false,onStart:()=>{if(!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝"}},onFinal:()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}})
+  const mic=azOn()?azMicBtn(ta,{label:"🎙 마이크로 답하기 (Azure)",assess:false,onStart:()=>{if(!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild)}else timerBind(tEl,bar.firstChild);sb.textContent="답변 끝"},onFinal:()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}})
     :SR_OK?micBtn(ta,{label:"🎤 마이크로 답하기",onFinal:()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}}):null;
-  if(mic&&!mic._az){const oc=mic.onclick;mic.onclick=()=>{const was=micOn();oc();if(!was&&micOn()&&!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝"}else if(was&&!micOn()&&timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}}
+  reb();if(mic&&!mic._az){const oc=mic.onclick;mic.onclick=()=>{const was=micOn();oc();if(!was&&micOn()){if(!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild)}else timerBind(tEl,bar.firstChild);sb.textContent="답변 끝"}else if(was&&!micOn()&&timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}}
   put(m,h("div",{},h("p",{class:"eyebrow"},"Question "+(mock.i+1)+" / "+n+" · 난이도 "+mockDiffLabel()+" · "+it.kind),nav,qText,hid,h("div",{class:"row",style:"margin-top:8px"},replay,reveal)),
     h("div",{class:"card"},h("div",{class:"row"},tEl,h("div",{class:"grow"},bar),sb),ta,mic?h("div",{class:"row"},mic):SR_OK?null:h("div",{class:"row"},micLink("🎤 마이크로 답하기")),
       h("div",{class:"row"},h("button",{class:"btn primary",onclick:next},mock.i<n-1?"다음 문항 →":"제출하고 채점"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"시험 중단"))));
