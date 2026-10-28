@@ -624,8 +624,15 @@ let RAWMIC=false;try{RAWMIC=localStorage.getItem("oss_rawmic")==="1"}catch(e){}
 function setRawMic(v){RAWMIC=!!v;try{localStorage.setItem("oss_rawmic",RAWMIC?"1":"0")}catch(e){}toast(RAWMIC?"잡음 제거 끔 — 조용한 곳에서 더 정확해요 (다음 녹음부터)":"잡음 제거 켬 — 시끄러운 곳에 적합 (다음 녹음부터)")}
 const rawMicBox=()=>h("label",{class:"row small",style:"cursor:pointer;gap:4px",title:"휴대폰의 잡음 제거·에코 제거·자동 음량을 끄고 원본 소리를 Azure에 보내요. 조용한 곳에서는 인식이 더 정확하고, 시끄러운 곳(차량 등)에서는 켜 두는 게 나아요."},h("input",{type:"checkbox",checked:RAWMIC,onchange:e=>setRawMic(e.target.checked)}),"조용한 곳 모드 (잡음 제거 끔)");
 let PRON_ON=false;try{PRON_ON=localStorage.getItem("oss_pron")==="1"}catch(e){}
-const HIFI=true;
-async function micStream(){if(MIC.stream&&MIC.raw!==RAWMIC&&!MIC.active)micRelease();if(MIC.stream&&MIC.stream.getAudioTracks().some(t=>t.readyState==="live")){MIC.last=Date.now();return MIC.stream}
+// normal: the mic closes while the AI talks (phone stays in media mode = good sound).
+// car mode: Bluetooth hands-free switches between "call" and "media" every time the mic opens/closes, which is slow
+// and drops my first words — so in the car the mic stays open for the whole conversation (call-quality sound, but stable).
+let CARMODE=false;try{CARMODE=localStorage.getItem("oss_carmode")==="1"}catch(e){}
+let HIFI=!CARMODE;
+function setCarMode(v){CARMODE=!!v;HIFI=!CARMODE;try{localStorage.setItem("oss_carmode",CARMODE?"1":"0")}catch(e){}
+  toast(CARMODE?"차량 모드 — 대화 내내 마이크를 켜 둬요 (블루투스 연결이 끊기지 않게)":"일반 모드 — AI가 말할 땐 마이크를 닫아 깨끗한 음질로 들어요")}
+async function micStream(){try{return await micStream1()}catch(e){if(e&&e.name==="NotAllowedError")throw e;await new Promise(r=>setTimeout(r,1000));return await micStream1()}}
+async function micStream1(){if(MIC.stream&&MIC.raw!==RAWMIC&&!MIC.active)micRelease();if(MIC.stream&&MIC.stream.getAudioTracks().some(t=>t.readyState==="live")){MIC.last=Date.now();return MIC.stream}
   MIC.stream=await navigator.mediaDevices.getUserMedia({audio:RAWMIC?{echoCancellation:false,noiseSuppression:false,autoGainControl:false}:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});MIC.hifi=HIFI;MIC.raw=RAWMIC;MIC.last=Date.now();return MIC.stream}
 const MIC_BTNS=new Set();
 // app went to the background: turn every microphone off (recognisers, voice detector, shared stream)
@@ -1465,7 +1472,7 @@ Reply with ONLY JSON: {"done":true} or {"done":false}`,{cache:false,modelTier:"q
   if(micBtn_&&micBtn_._isOn)micBtn_.addEventListener("click",()=>setTimeout(()=>{if(micBtn_._isOn())keepAlive(true);else if(!player.on)keepAlive(false)},800));
 
   const waitSel=h("select",{title:"말을 멈춘 뒤 얼마나 기다렸다 보낼지",onchange:e=>{chatWait=+e.target.value;try{localStorage.setItem("opic30_cwait",chatWait)}catch(x){}armAuto()}},...[[2,"2초 후 전송"],[4,"4초 후 전송"],[6,"6초 후 전송"],[10,"10초 후 전송"],[0,"직접 보내기"]].map(([v,l])=>h("option",{value:v,selected:chatWait===v},l)));waitSel.style.width="auto";
-  const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn_,h("button",{class:"btn",onclick:async()=>{clearTimeout(vt);try{if(micBtn_&&micBtn_._flush)await micBtn_._flush()}catch(e){}send()}},"지금 보내기"),waitSel,status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
+  const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn_,h("button",{class:"btn",onclick:async()=>{clearTimeout(vt);try{if(micBtn_&&micBtn_._flush)await micBtn_._flush()}catch(e){}send()}},"지금 보내기"),waitSel,(micBtn_&&micBtn_._az)?h("label",{class:"row small",style:"cursor:pointer;gap:4px",title:"블루투스(차량·이어폰)로 대화할 때 켜세요. 마이크를 계속 켜 두어 통화 연결이 끊겼다 붙었다 하지 않아요. 소리는 통화 음질이 돼요."},h("input",{type:"checkbox",checked:CARMODE,onchange:e=>setCarMode(e.target.checked)}),"🚗 차량·블루투스 모드"):null,status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
   put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow",id:"chat_cnt"},chatEyebrow(sc)),h("h2",{},sc.ko)),h("div",{class:"row"},h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_auto",checked:chat.auto,onchange:e=>chat.auto=e.target.checked}),"자동 읽기"),chatMode==="voice"?h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_hide",checked:chat.hide,onchange:e=>{chat.hide=e.target.checked;bub.classList.toggle("hidetext",chat.hide)}}),"상대 말 숨기기"):null,h("button",{class:"btn sm",onclick:()=>endChat()},"대화 끝내기"))),
     bub,
     h("div",{class:"chatin"},h("div",{class:"card",style:"gap:8px"},ta,inputRow,h("div",{class:"row"},h("div",{class:"grow"},prompt_ko),hintBtn),hintOut)));
