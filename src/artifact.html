@@ -1599,19 +1599,34 @@ function vScripts(m){
   const mine=TOPICS.filter(t=>t.id!=="intro"&&(S.profile.survey.includes(t.id)||t.group==="돌발"));
   put(m,h("div",{},h("p",{class:"eyebrow"},"My scripts"),h("h1",{},"주제별 스크립트")),aiNote(),
     h("div",{class:"note"},"내 프로필(직업·거주지)을 바탕으로 주제당 질문별 110–150단어 스크립트를 만들어요. 하루 1개씩 소리 내어 3번 읽고, 키워드만 보고 말해 보는 게 목표입니다."),
-    h("p",{class:"eyebrow"},"자기소개"),h("div",{class:"grid2"},scriptTile(TOPICS[0])),
+    (()=>{const n=TOPICS.reduce((a,t)=>a+modelCount(t),0);return n?h("div",{class:"note"},"연습에서 AI 평가를 받으면 내 말하기를 바탕으로 한 모범답안이 질문별로 저장돼요. 지금 "+n+"개 — '모범답안' 표시가 있는 주제를 열면 내 스크립트와 비교하고, 마음에 들면 내 스크립트로 저장할 수 있어요."):null})(),h("p",{class:"eyebrow"},"자기소개"),h("div",{class:"grid2"},scriptTile(TOPICS[0])),
     h("p",{class:"eyebrow"},"내 서베이 주제"),h("div",{class:"grid2"},...mine.filter(t=>t.group==="서베이").map(scriptTile)),
     h("p",{class:"eyebrow"},"돌발 주제"),h("div",{class:"grid2"},...mine.filter(t=>t.group==="돌발").map(scriptTile)));
 }
-function scriptTile(t){const has=!!S.scripts[t.id];return h("button",{class:"topic",onclick:()=>go("scripts",{topic:t})},h("span",{class:"row"},h("span",{class:"en grow"},t.en),has?h("span",{class:"chip good"},"저장됨"):null),h("span",{class:"ko"},t.ko))}
+// model answers made from my own speaking (practice → AI evaluation), per question
+const myModel=q=>((S.models||{})[q.q]||"").trim();
+const modelCount=t=>t.qs.filter(q=>myModel(q)).length;
+function saveModelAsScript(t,i,btn){const q=t.qs[i];const m=myModel(q);if(!m)return;const sc=S.scripts[t.id]||(S.scripts[t.id]={scripts:t.qs.map(()=>null),date:todayStr()});
+  sc.scripts=sc.scripts||[];const old=sc.scripts[i];sc.scripts[i]={...(old||{}),answer:m,fromModel:true,prev:old&&old.answer&&!old.fromModel?old.answer:(old&&old.prev)||""};sc.ts=Date.now();save();setTimeout(()=>{try{fillTrans()}catch(e){}},500);toast("내 스크립트로 저장했어요 — 듣기·연습에 바로 반영돼요");render()}
+function undoModelScript(t,i){const sc=S.scripts[t.id];const x=sc&&sc.scripts&&sc.scripts[i];if(!x||!x.prev)return;sc.scripts[i]={...x,answer:x.prev,fromModel:false,prev:""};sc.ts=Date.now();save();toast("원래 스크립트로 되돌렸어요");render()}
+function modelBlock(t,q,i){const m=myModel(q);if(!m)return null;const sc=S.scripts[t.id];const cur=sc&&sc.scripts&&sc.scripts[i];const same=cur&&cur.answer&&cur.answer.trim()===m;const at=(S.modelsAt||{})[q.q];
+  if(same)return h("div",{class:"row"},h("span",{class:"chip good"},"최근 모범답안을 내 스크립트로 사용 중"),cur.prev?h("button",{class:"btn sm ghost",onclick:()=>undoModelScript(t,i)},"원래 스크립트로 되돌리기"):null);
+  return h("div",{style:"border-left:3px solid var(--accent);padding:8px 10px;background:var(--bg);border-radius:8px;display:flex;flex-direction:column;gap:6px"},
+    h("span",{class:"small",style:"font-weight:600;color:var(--accent)"},"내 말하기 기반 모범답안"+(at?" · "+new Date(at).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"}):"")),
+    h("div",{class:"model",style:"margin:0"},m),
+    h("div",{class:"row"},spkBtn(m),h("button",{class:"btn sm",onclick:()=>copy(m)},"복사"),
+      same?h("span",{class:"chip good"},"내 스크립트로 사용 중"):h("button",{class:"btn sm primary",onclick:e=>saveModelAsScript(t,i,e.target)},cur&&cur.answer?"이걸로 내 스크립트 바꾸기":"내 스크립트로 저장"),
+      same&&cur.prev?h("button",{class:"btn sm ghost",onclick:()=>undoModelScript(t,i)},"원래 스크립트로 되돌리기"):null))}
+function scriptTile(t){const has=!!S.scripts[t.id];const mc=modelCount(t);return h("button",{class:"topic",onclick:()=>go("scripts",{topic:t})},h("span",{class:"row"},h("span",{class:"en grow"},t.en),mc?h("span",{class:"chip neutral"},"모범답안 "+mc):null,has?h("span",{class:"chip good"},"저장됨"):null),h("span",{class:"ko"},t.ko))}
 function vScriptTopic(m,t){
   const box=h("div",{style:"display:flex;flex-direction:column;gap:14px"});let ctl=null;
   const gen=async(btn)=>{if(!sample){toast(ERR.not_granted);return}btn.disabled=true;ctl=new AbortController();const stop=h("button",{class:"btn sm",onclick:()=>ctl.abort()},"중지");
     box.replaceChildren(h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"스크립트 작성 중… (20–60초)")),stop));
     try{const r=await genScript(t,null);S.scripts[t.id]={...r,date:todayStr(),ts:Date.now()};save();show();setTimeout(()=>fillTrans(),500)}catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)))}finally{btn.disabled=false}};
-  const show=()=>{const sc=S.scripts[t.id];if(!sc){box.replaceChildren(h("div",{class:"card"},h("p",{class:"muted"},"아직 스크립트가 없어요. 프로필을 설정에서 채운 뒤 생성하면 더 나다운 답변이 나옵니다."),h("div",{class:"row"},h("button",{class:"btn primary",onclick:e=>gen(e.target)},"AI로 스크립트 만들기"))));return}
+  const show=()=>{const sc=S.scripts[t.id];if(!sc){box.replaceChildren(h("div",{class:"card"},h("p",{class:"muted"},"아직 스크립트가 없어요. 프로필을 설정에서 채운 뒤 생성하면 더 나다운 답변이 나옵니다."),h("div",{class:"row"},h("button",{class:"btn primary",onclick:e=>gen(e.target)},"AI로 스크립트 만들기"))),
+      ...t.qs.map((q,i)=>myModel(q)?h("div",{class:"card"},h("span",{class:"chip neutral",style:"align-self:flex-start"},QT[q.t]),h("p",{class:"q",style:"font-size:16px"},q.q),modelBlock(t,q,i)):null).filter(Boolean));return}
     box.replaceChildren(h("div",{class:"row"},h("span",{class:"chip neutral"},sc.date+" 생성"),h("button",{class:"btn sm",onclick:()=>{S.today.script++;save();toast("오늘 스크립트 학습 체크!")}},"오늘 학습 완료 체크"),h("button",{class:"btn sm ghost",onclick:e=>gen(e.target)},"다시 생성")),
-      ...t.qs.map((q,i)=>{const s=sc.scripts?.[i];return h("div",{class:"card"},h("span",{class:"chip neutral",style:"align-self:flex-start"},QT[q.t]),h("p",{class:"q",style:"font-size:16px"},q.q),h("div",{class:"model"},s?.answer||"—"),h("div",{class:"row"},spkBtn(s?.answer||""),h("button",{class:"btn sm",onclick:()=>go("listen",{text:s?.answer,title:t.en+" · "+QT[q.t]})},"쉐도잉"),h("button",{class:"btn sm",onclick:()=>copy(s?.answer)},"복사"),h("button",{class:"btn sm",onclick:()=>go("practice",{topic:t,q,kind:QT[q.t]})},"말하기 연습")))}),
+      ...t.qs.map((q,i)=>{const s=sc.scripts?.[i];return h("div",{class:"card"},h("span",{class:"chip neutral",style:"align-self:flex-start"},QT[q.t]),h("p",{class:"q",style:"font-size:16px"},q.q),s?.fromModel?h("span",{class:"chip good",style:"align-self:flex-start"},"내 말하기 기반"):null,h("div",{class:"model"},s?.answer||"—"),h("div",{class:"row"},spkBtn(s?.answer||""),h("button",{class:"btn sm",onclick:()=>go("listen",{text:s?.answer,title:t.en+" · "+QT[q.t]})},"쉐도잉"),h("button",{class:"btn sm",onclick:()=>copy(s?.answer)},"복사"),h("button",{class:"btn sm",onclick:()=>go("practice",{topic:t,q,kind:QT[q.t]})},"말하기 연습")),modelBlock(t,q,i))}),
       sc.expressions?.length?h("div",{class:"card"},h("h3",{},"핵심 표현"),h("div",{class:"kx"},...sc.expressions.map(x=>h("div",{},h("span",{class:"en"},x.en),h("span",{class:"ko"},x.ko)))),h("button",{class:"btn sm",onclick:()=>addCards(sc.expressions,t.en)},"표현카드에 추가")):null)};
   show();
   put(m,h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("scripts")},"← 스크립트 목록"),h("p",{class:"eyebrow",style:"margin-top:10px"},t.ko),h("h1",{},t.en)),box);
