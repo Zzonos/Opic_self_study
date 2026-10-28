@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261028-231349-4dbd9e">
+<html lang="ko" data-build="20261029-075636-b7e7db">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1436,7 +1436,7 @@ function vChat(m){
       if(chat.auto){const micOn=()=>micBtn_&&micBtn_._isOn&&micBtn_._isOn();chat.speaking=true;chat.speakingText=spoken;chat.barged=false;let done=false;
         // Azure: the recognizer is paused while the AI talks; a local voice detector lets the user cut in
         let unv=null;if(false)unv=vadWatch({threshold:0.08,ms:400,onVoice:()=>{if(!chat.speaking)return;chat.barged=true;chat.speaking=false;if(unv){unv();unv=null}ttsStop();micBtn_._resume();status.textContent="듣는 중…"}});
-        const fin=()=>{if(unv){unv();unv=null}if(done)return;done=true;if(chat.barged)return;chat.speaking=false;if(micOn()){try{micBtn_._cut&&micBtn_._cut()}catch(x){}ta.value="";status.textContent="듣는 중…";if(micBtn_._resume)micBtn_._resume()}};
+        const fin=()=>{if(unv){unv();unv=null}if(done)return;done=true;if(chat.barged)return;chat.speaking=false;if(micOn()){try{micBtn_._cut&&micBtn_._cut()}catch(x){}ta.value="";status.textContent="듣는 중…";if(micBtn_._fresh)micBtn_._fresh();if(micBtn_._resume)micBtn_._resume()}};
         speak(spoken,{onend:fin,whole:true,chunks:parts});const t0=Date.now(),cap=Math.max(45000,spoken.length*200);
         const sg=setInterval(()=>{if(done){clearInterval(sg);return}const busy=!!tts.cur||(tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending))||(AUD.el&&!AUD.el.paused&&!AUD.el.ended);
           if((!busy&&Date.now()-t0>3000)||Date.now()-t0>cap){clearInterval(sg);fin()}},1000)}
@@ -1479,8 +1479,8 @@ Reply with ONLY JSON: {"done":true} or {"done":false}`,{cache:false,modelTier:"q
     const own=hw.filter(w=>!rw.has(w));if(own.length<2||own.length/hw.length<0.5)return; // mostly the reply's own words → echo
     let i=0;while(i<hw.length&&rw.has(hw[i]))i++;const mine=heard.split(/\s+/).slice(i).join(" ");
     chat.barged=true;chat.speaking=false;ttsStop();try{micBtn_._rebase&&micBtn_._rebase(mine)}catch(e){}status.textContent="듣는 중…";armAuto()};
-  const micOpts={gate:()=>!!chat.speaking,onHeard:null,onFinal:v=>{if(v.trim().length>2){clearTimeout(vt);send()}}};
-  const micBtn_=azOn()?azMicBtn(ta,{onFinal:micOpts.onFinal,idleStop:20000,assess:false,onState:s=>{status.textContent=s==="idle"?"⏸ 조용해서 녹음을 잠시 멈췄어요 — 말하면 다시 들어요":s==="listen"?"듣는 중…":s==="paused"?"":status.textContent}}):SR_OK?micBtn(ta,{...micOpts,keepAlive:true}):micLink();
+  const micOpts={gate:()=>!!(chat.speaking||chat.busy),onHeard:null,onFinal:v=>{if(v.trim().length>2){clearTimeout(vt);send()}}};
+  const micBtn_=azOn()?azMicBtn(ta,{onFinal:micOpts.onFinal,idleStop:20000,assess:false,onState:s=>{if(s==="listen")readyTone();status.textContent=s==="idle"?"⏸ 조용해서 녹음을 잠시 멈췄어요 — 말하면 다시 들어요":s==="listen"?"🎙 말하세요 — 듣는 중":s==="paused"?"":status.textContent}}):SR_OK?micBtn(ta,{...micOpts,keepAlive:true}):micLink();
   if(micBtn_&&micBtn_._isOn)micBtn_.addEventListener("click",()=>setTimeout(()=>{if(micBtn_._isOn())keepAlive(true);else if(!player.on)keepAlive(false)},800));
 
   const waitSel=h("select",{title:"말을 멈춘 뒤 얼마나 기다렸다 보낼지",onchange:e=>{chatWait=+e.target.value;try{localStorage.setItem("opic30_cwait",chatWait)}catch(x){}armAuto()}},...[[2,"2초 후 전송"],[4,"4초 후 전송"],[6,"6초 후 전송"],[10,"10초 후 전송"],[0,"직접 보내기"]].map(([v,l])=>h("option",{value:v,selected:chatWait===v},l)));waitSel.style.width="auto";
@@ -1492,12 +1492,15 @@ Reply with ONLY JSON: {"done":true} or {"done":false}`,{cache:false,modelTier:"q
   setTimeout(toEnd,50);
 }
 // the first topic of a chat: picked from the learner's profile and survey, avoiding the last few chats' openers
+// a soft short tone when the microphone is ready
+let TONE=null;function readyTone(){try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;TONE=TONE||new C();const ac=TONE;if(ac.state==="suspended")ac.resume();
+  const o=ac.createOscillator(),g=ac.createGain();o.type="sine";o.frequency.value=880;g.gain.setValueAtTime(0.0001,ac.currentTime);g.gain.exponentialRampToValueAtTime(0.08,ac.currentTime+0.02);g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+0.16);o.connect(g).connect(ac.destination);o.start();o.stop(ac.currentTime+0.18)}catch(e){}}
 function chatSeed(sc){if(sc.id!=="free"&&sc.id!=="interview")return "";const p=S.profile;const c=[];
   if(sc.id==="free"){if(p.job)c.push("their work ("+p.job+")");if(p.city)c.push("where they live ("+p.city+")");if(p.home)c.push("their home");if(p.family)c.push("the people they live with");if(p.hobby)c.push("their hobby ("+p.hobby+")");if(p.fav)c.push("something they like ("+p.fav+")");if(p.memory)c.push("a memorable experience they had")}
   for(const id of (p.survey||[])){const t=TOPICS.find(x=>x.id===id);if(t)c.push((sc.id==="free"?"their interest: ":"survey topic: ")+t.en)}
   if(!c.length)return "";let recent=[];try{recent=JSON.parse(localStorage.getItem("oss_chat_seeds")||"[]")}catch(e){}
   const fresh=c.filter(x=>!recent.includes(x));const pickd=pick(fresh.length?fresh:c,1)[0];try{localStorage.setItem("oss_chat_seeds",JSON.stringify([...recent,pickd].slice(-Math.min(6,Math.max(1,c.length-1)))))}catch(e){}return pickd}
-async function startChat(sc){chat={sc,turns:[],ui:[],n:0,busy:false,auto:true,hide:false,summary:null};render();try{if(WEB&&TTS_URL&&natOK(TIP_OPEN))natUrl(TIP_OPEN).catch(()=>{})}catch(e){}
+async function startChat(sc){try{if(azOn()){azSdk().catch(()=>{});azToken().catch(()=>{})}}catch(e){}chat={sc,turns:[],ui:[],n:0,busy:false,auto:true,hide:false,summary:null};render();try{if(WEB&&TTS_URL&&natOK(TIP_OPEN))natUrl(TIP_OPEN).catch(()=>{})}catch(e){}
   const bub=$("#bubbles");const w=h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")));bub.append(w);const seed=chatSeed(sc);
   try{const r=await sample.json([{role:"user",content:chatRules(sc)+"\n\nStart the conversation now with a natural greeting and your first question."+(seed?" Make the first question about "+seed+", personal to them (use the profile details), not about the weekend.":"")+" Reply with ONLY the JSON object (fix: null)."}],{cache:false,modelTier:"quick"});
     w.remove();const reply=String(r?.reply||"Hi! How's it going?");chat.turns.push({role:"user",content:"(start)"},{role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});render();if(chat.auto)speak(reply)}
@@ -2049,6 +2052,7 @@ function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false,gate=nul
   b._cut=()=>{base="";fin="";from=seen;pend=""};
   b._rebase=t=>{base=t?t.trim()+" ":"";fin="";from=seen;pend="";ta.value=base;ta.dispatchEvent(new Event("input"))};
   let want=false;b._wanted=()=>want;b._bg=()=>{want=false;if(on)stop()};b._abort=()=>{want=false;waitEnd=null;if(on)stop();base="";fin="";pend="";from=0;seen=0};
+  b._fresh=()=>{if(!on||!rec)return;pend="";base="";fin="";try{rec.abort?rec.abort():rec.stop()}catch(e){}};
   if(keepAlive)document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&want&&!on&&b.isConnected)b.onclick()});
   let pend="",settled=null;
   // make the words still being recognised final before the text is sent: ask the browser to close the
