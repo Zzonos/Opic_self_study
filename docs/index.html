@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261028-102104-decba0">
+<html lang="ko" data-build="20261028-103034-12948e">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1706,7 +1706,11 @@ try{Object.assign(player.opts,JSON.parse(localStorage.getItem("opic30_player")||
 if(player.opts.pause==null){player.opts.pause=player.opts.think!=null?Math.min(10,+player.opts.think||3):3}
 function scriptTopics(){return TOPICS.filter(t=>S.scripts[t.id]&&(S.scripts[t.id].scripts||[]).length)}
 function sampleTopics(){return TOPICS.filter(t=>t.id!=="intro"&&(S.profile.survey.includes(t.id)||t.group==="돌발"))}
+function modelTopics(){return TOPICS.filter(t=>t.qs.some(q=>myModel(q)))}
 function buildPlaylist(){const o=player.opts;const items=[];
+  if(o.mode==="model"){const sel=o.mtopics||[];for(const t of modelTopics().filter(t=>!sel.length||sel.includes(t.id)))t.qs.forEach((q,i)=>{const m=myModel(q);if(!m)return;
+      items.push({kind:"A",label:t.en+" · "+QT[q.t]+" · 모범답안",en:m,ko:"",ex:"",q:o.withQ?{en:q.q,ko:q.k||"",key:"q_"+t.id+"_"+i}:null})});
+    return o.shuffle?pick(items,items.length):items}
   if(o.mode==="sample"||o.mode==="script"){const store=o.mode==="sample"?(S.samples||{}):S.scripts;const sel=o.mode==="sample"?o.stopics:o.topics;
     const ts=(o.mode==="sample"?sampleTopics():scriptTopics()).filter(t=>store[t.id]&&(store[t.id].scripts||[]).length&&(!sel.length||sel.includes(t.id)));
     for(const t of ts)(store[t.id].scripts||[]).forEach((x,i)=>{const q=t.qs[i];if(!x||typeof x.answer!=="string"||!x.answer.trim())return;
@@ -1852,10 +1856,10 @@ function transBtn(){const all=[...new Set(transSources().flatMap(g=>g.sents))];c
   if(old.length){const b=h("button",{class:"btn sm primary",onclick:()=>run(b,all,true,"해석 만드는 중")},"✨ 해석 자연스럽게 다시 만들기 ("+all.length+"문장)");out.append(b)}
   if(missing.length&&!old.length){const b2=h("button",{class:"btn sm",onclick:()=>run(b2,missing,false,"해석 중")},"빠진 해석만 만들기 ("+missing.length+")");out.append(b2)}
   return out}
-function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem("opic30_player",JSON.stringify(o))}catch(e){}};
+function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{try{localStorage.setItem("opic30_player",JSON.stringify(o))}catch(e){}};
   const ck=(k,l)=>h("label",{},h("input",{type:"checkbox",id:"pl_"+k,checked:o[k],onchange:e=>{o[k]=e.target.checked;saveO()}}),l);
   const setMode=m=>{if(o.mode===m)return;o.mode=m;saveO();if(player.on){player.items=buildPlaylist();player.i=0;player.segs=[];player.si=0;audStop();if(tts.ok)speechSynthesis.cancel();if(!player.items.length){playerStop();toast("재생할 항목이 없어요")}else{clearTimeout(player.t);player.t=null;playerStep()}}render()};
-  const tabs=h("div",{class:"segs"},...[["sent","짧은 문장"],["sample","예시 스크립트"],["script","내 스크립트"]].map(([v,l])=>h("button",{class:"seg"+(o.mode===v?" on":""),onclick:()=>setMode(v)},l)));
+  const tabs=h("div",{class:"segs"},...[["sent","짧은 문장"],["sample","예시"],["script","내 스크립트"],["model","내 모범답안"]].map(([v,l])=>h("button",{class:"seg"+(o.mode===v?" on":""),style:"white-space:nowrap;font-size:13px;padding-left:4px;padding-right:4px;min-width:0",onclick:()=>setMode(v)},l)));
   const now=h("div",{class:"nowbox",id:"nowbox"},h("span",{class:"muted small"},"재생을 누르면 여기에 지금 나오는 문장이 표시돼요."));
   const sts=scriptTopics();const nScripts=sts.reduce((a,t)=>a+(S.scripts[t.id].scripts||[]).length,0);
   const pickTopics=(list,key,label)=>h("div",{class:"cks"},...list.map(t=>h("label",{},h("input",{type:"checkbox",checked:!o[key].length||o[key].includes(t.id),onchange:e=>{const all=list.map(x=>x.id);let cur=o[key].length?o[key].slice():all.slice();cur=e.target.checked?[...new Set([...cur,t.id])]:cur.filter(x=>x!==t.id);o[key]=cur.length===all.length?[]:cur;saveO();if(player.on){player.items=buildPlaylist();player.i=Math.min(player.i,Math.max(0,player.items.length-1))}}}),label(t))));
@@ -1889,10 +1893,16 @@ function vPlayer(){const o=player.opts;const saveO=()=>{try{localStorage.setItem
     h("div",{class:"cks"},ck("withQ","질문도 같이 듣기"),ck("shuffle","섞기")),
     ...common,
     h("div",{class:"note"},"설정의 프로필(직업·거주지 등)을 바탕으로 AI가 주제별 예시 답변을 만들어 두고 무한재생해요. 한 번 만들면 저장되어 웹에서도 들을 수 있고, 다시 만들고 싶으면 설정 → 초기화에서 예시만 지울 수 있어요. 예시는 녹음이 없어 기기 음성으로 나오므로 iPhone에서는 화면이 켜져 있을 때만 재생됩니다.")];
+  const mts=modelTopics();const nModels=mts.reduce((a,t)=>a+t.qs.filter(q=>myModel(q)).length,0);
+  const modelOpts=[h("p",{class:"eyebrow"},"주제 선택 · 내 말하기 기반 모범답안 "+nModels+"개"),
+    mts.length?pickTopics(mts,"mtopics",t=>t.ko+" ("+t.qs.filter(q=>myModel(q)).length+")"):h("p",{class:"muted small"},"아직 모범답안이 없어요. 연습 탭에서 말하고 AI 평가를 받으면 질문별로 쌓여요."),
+    h("div",{class:"cks"},ck("withQ","질문도 같이 듣기"),ck("shuffle","섞기")),
+    ...common,
+    h("div",{class:"note"},"연습에서 AI 평가를 받을 때 내가 말한 이야기를 목표 레벨로 다듬어 준 모범답안이에요. 질문마다 가장 최근 것만 들어가고, 같은 질문을 다시 연습하면 새 모범답안으로 바뀝니다.")];
   const box=h("div",{class:"card"},h("div",{class:"hdr"},h("div",{},h("h3",{},"무한 재생"),h("p",{class:"muted small"},"업무 중 배경으로 계속 듣기. 끝나면 처음부터 다시 반복합니다.")),rateCtl()),
     tabs,clipLine,now,
     h("div",{class:"row"},player.on?h("button",{class:"btn primary",onclick:playerPause},player.paused?"▶ 이어서":"⏸ 일시정지"):(()=>{const p=savedPos();return p?h("span",{class:"row"},h("button",{class:"btn primary",onclick:()=>playerStart(true)},"▶ 이어서 재생 ("+(p.i+1)+"/"+p.items.length+")"),h("button",{class:"btn",onclick:()=>playerStart(false)},"처음부터")):h("button",{class:"btn primary",onclick:()=>playerStart(false)},"▶ 무한 재생 시작")})(),player.on?h("button",{class:"btn",onclick:playerPrev},"◀◀ 이전"):null,player.on?h("button",{class:"btn",onclick:playerNext},"다음 ▶▶"):null,player.on?h("button",{class:"btn ghost",onclick:playerStop},"■ 끄기"):null),
-    ...(o.mode==="script"?scriptOpts:o.mode==="sample"?sampleOpts:sentOpts));
+    ...(o.mode==="script"?scriptOpts:o.mode==="sample"?sampleOpts:o.mode==="model"?modelOpts:sentOpts));
   if(player.on)setTimeout(updateNow,0);return box}
 
 /* ---- LISTEN ---- */
