@@ -1617,7 +1617,8 @@ function modelBlock(t,q,i){const m=myModel(q);if(!m)return null;const sc=S.scrip
     h("div",{class:"row"},spkBtn(m),h("button",{class:"btn sm",onclick:()=>copy(m)},"복사"),
       same?h("span",{class:"chip good"},"내 스크립트로 사용 중"):h("button",{class:"btn sm primary",onclick:e=>saveModelAsScript(t,i,e.target)},cur&&cur.answer?"이걸로 내 스크립트 바꾸기":"내 스크립트로 저장"),
       same&&cur.prev?h("button",{class:"btn sm ghost",onclick:()=>undoModelScript(t,i)},"원래 스크립트로 되돌리기"):null))}
-function scriptTile(t){const has=!!S.scripts[t.id];const mc=modelCount(t);return h("button",{class:"topic",onclick:()=>go("scripts",{topic:t})},h("span",{class:"row"},h("span",{class:"en grow"},t.en),mc?h("span",{class:"chip neutral"},"모범답안 "+mc):null,has?h("span",{class:"chip good"},"저장됨"):null),h("span",{class:"ko"},t.ko))}
+function scriptTile(t){const has=!!S.scripts[t.id];const mc=modelCount(t);return h("button",{class:"topic",onclick:()=>go("scripts",{topic:t})},h("span",{class:"en"},t.en),h("span",{class:"ko"},t.ko),
+    (has||mc)?h("span",{class:"row",style:"gap:4px;flex-wrap:wrap;margin-top:6px"},has?h("span",{class:"chip good"},"저장됨"):null,mc?h("span",{class:"chip neutral"},"모범답안 "+mc):null):null)}
 function vScriptTopic(m,t){
   const box=h("div",{style:"display:flex;flex-direction:column;gap:14px"});let ctl=null;
   const gen=async(btn)=>{if(!sample){toast(ERR.not_granted);return}btn.disabled=true;ctl=new AbortController();const stop=h("button",{class:"btn sm",onclick:()=>ctl.abort()},"중지");
