@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261028-101750-06ef55">
+<html lang="ko" data-build="20261028-102104-decba0">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1618,24 +1618,18 @@ function vScripts(m){
   const mine=TOPICS.filter(t=>t.id!=="intro"&&(S.profile.survey.includes(t.id)||t.group==="돌발"));
   put(m,h("div",{},h("p",{class:"eyebrow"},"My scripts"),h("h1",{},"주제별 스크립트")),aiNote(),
     h("div",{class:"note"},"내 프로필(직업·거주지)을 바탕으로 주제당 질문별 110–150단어 스크립트를 만들어요. 하루 1개씩 소리 내어 3번 읽고, 키워드만 보고 말해 보는 게 목표입니다."),
-    (()=>{const n=TOPICS.reduce((a,t)=>a+modelCount(t),0);return n?h("div",{class:"note"},"연습에서 AI 평가를 받으면 내 말하기를 바탕으로 한 모범답안이 질문별로 저장돼요. 지금 "+n+"개 — '모범답안' 표시가 있는 주제를 열면 내 스크립트와 비교하고, 마음에 들면 내 스크립트로 저장할 수 있어요."):null})(),h("p",{class:"eyebrow"},"자기소개"),h("div",{class:"grid2"},scriptTile(TOPICS[0])),
+    (()=>{const n=TOPICS.reduce((a,t)=>a+modelCount(t),0);return n?h("div",{class:"note"},"연습에서 AI 평가를 받으면 내 말하기를 바탕으로 한 모범답안이 질문별로 저장돼요. 지금 "+n+"개 — '모범답안' 표시가 있는 주제를 열면 질문별로 내 스크립트와 비교하고 쉐도잉할 수 있어요."):null})(),h("p",{class:"eyebrow"},"자기소개"),h("div",{class:"grid2"},scriptTile(TOPICS[0])),
     h("p",{class:"eyebrow"},"내 서베이 주제"),h("div",{class:"grid2"},...mine.filter(t=>t.group==="서베이").map(scriptTile)),
     h("p",{class:"eyebrow"},"돌발 주제"),h("div",{class:"grid2"},...mine.filter(t=>t.group==="돌발").map(scriptTile)));
 }
 // model answers made from my own speaking (practice → AI evaluation), per question
 const myModel=q=>((S.models||{})[q.q]||"").trim();
 const modelCount=t=>t.qs.filter(q=>myModel(q)).length;
-function saveModelAsScript(t,i,btn){const q=t.qs[i];const m=myModel(q);if(!m)return;const sc=S.scripts[t.id]||(S.scripts[t.id]={scripts:t.qs.map(()=>null),date:todayStr()});
-  sc.scripts=sc.scripts||[];const old=sc.scripts[i];sc.scripts[i]={...(old||{}),answer:m,fromModel:true,prev:old&&old.answer&&!old.fromModel?old.answer:(old&&old.prev)||""};sc.ts=Date.now();save();setTimeout(()=>{try{fillTrans()}catch(e){}},500);toast("내 스크립트로 저장했어요 — 듣기·연습에 바로 반영돼요");render()}
-function undoModelScript(t,i){const sc=S.scripts[t.id];const x=sc&&sc.scripts&&sc.scripts[i];if(!x||!x.prev)return;sc.scripts[i]={...x,answer:x.prev,fromModel:false,prev:""};sc.ts=Date.now();save();toast("원래 스크립트로 되돌렸어요");render()}
-function modelBlock(t,q,i){const m=myModel(q);if(!m)return null;const sc=S.scripts[t.id];const cur=sc&&sc.scripts&&sc.scripts[i];const same=cur&&cur.answer&&cur.answer.trim()===m;const at=(S.modelsAt||{})[q.q];
-  if(same)return h("div",{class:"row"},h("span",{class:"chip good"},"최근 모범답안을 내 스크립트로 사용 중"),cur.prev?h("button",{class:"btn sm ghost",onclick:()=>undoModelScript(t,i)},"원래 스크립트로 되돌리기"):null);
+function modelBlock(t,q,i){const m=myModel(q);if(!m)return null;const at=(S.modelsAt||{})[q.q];
   return h("div",{style:"border-left:3px solid var(--accent);padding:8px 10px;background:var(--bg);border-radius:8px;display:flex;flex-direction:column;gap:6px"},
     h("span",{class:"small",style:"font-weight:600;color:var(--accent)"},"내 말하기 기반 모범답안"+(at?" · "+new Date(at).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"}):"")),
     h("div",{class:"model",style:"margin:0"},m),
-    h("div",{class:"row"},spkBtn(m),h("button",{class:"btn sm",onclick:()=>copy(m)},"복사"),
-      same?h("span",{class:"chip good"},"내 스크립트로 사용 중"):h("button",{class:"btn sm primary",onclick:e=>saveModelAsScript(t,i,e.target)},cur&&cur.answer?"이걸로 내 스크립트 바꾸기":"내 스크립트로 저장"),
-      same&&cur.prev?h("button",{class:"btn sm ghost",onclick:()=>undoModelScript(t,i)},"원래 스크립트로 되돌리기"):null))}
+    h("div",{class:"row"},spkBtn(m),h("button",{class:"btn sm",onclick:()=>go("listen",{text:m,title:t.en+" · "+QT[q.t]+" · 모범답안"})},"쉐도잉"),h("button",{class:"btn sm",onclick:()=>copy(m)},"복사")))}
 function scriptTile(t){const has=!!S.scripts[t.id];const mc=modelCount(t);return h("button",{class:"topic",onclick:()=>go("scripts",{topic:t})},h("span",{class:"en"},t.en),h("span",{class:"ko"},t.ko),
     (has||mc)?h("span",{class:"row",style:"gap:4px;flex-wrap:wrap;margin-top:6px"},has?h("span",{class:"chip good"},"저장됨"):null,mc?h("span",{class:"chip neutral"},"모범답안 "+mc):null):null)}
 function vScriptTopic(m,t){
