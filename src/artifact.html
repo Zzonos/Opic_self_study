@@ -484,10 +484,15 @@ async function cloudAttach(u){cloud.user=u;cloud.ref=firebase.firestore().collec
   if(cloud.unsub)cloud.unsub();cloud.unsub=cloud.ref.onSnapshot(snap=>{if(!snap.exists||snap.metadata.hasPendingWrites)return;cloudApply(snap.data())});}
 // another device (or the Claude → web sync page) saved: always merge — never skip because this copy was touched more recently,
 // otherwise this copy would later push its older scripts/records over the account
-function cloudApply(d){if(!d)return;if((d.updatedAt||0)===cloud.lastPush)return;try{const before=JSON.stringify(S);mergeState(JSON.parse(d.state||"{}"),true);if(JSON.stringify(S)!==before){render();toast("계정의 새 기록을 반영했어요");setTimeout(()=>clipSync(false),3000);if((S.updatedAt||0)>(d.updatedAt||0))cloudPush(false)}}catch(e){}}
+// while I am answering (mock test, practice recording, a conversation) a sync from another device must not redraw the screen —
+// that would wipe the text box, detach the clock and stop the microphone. The merged data shows on the next screen change.
+function busyNow(){try{if(timer.on)return true;if(view==="mock"&&mock&&!mock.result)return true;if(view==="chat"&&chat&&!chat.summary)return true;
+  for(const b of [...AZ_BTNS,...MIC_BTNS])if(b.isConnected&&b._isOn&&b._isOn())return true}catch(e){}return false}
+function syncRender(msg){if(busyNow()){cloud.pendingRender=true;audLog.push("다른 기기 기록 반영(화면 유지)");return}render();if(msg)toast(msg)}
+function cloudApply(d){if(!d)return;if((d.updatedAt||0)===cloud.lastPush)return;try{const before=JSON.stringify(S);mergeState(JSON.parse(d.state||"{}"),true);if(JSON.stringify(S)!==before){syncRender("계정의 새 기록을 반영했어요");setTimeout(()=>clipSync(false),3000);if((S.updatedAt||0)>(d.updatedAt||0))cloudPush(false)}}catch(e){}}
 // foreground refresh: the realtime listener can be asleep after the app was in the background
 async function cloudRefresh(){try{if(cloud.ref){const snap=await cloud.ref.get({source:"server"});if(snap.exists)cloudApply(snap.data())}
-  if(docRef){const remote=await claudeLoad(docRef);if(remote&&(remote.updatedAt||0)>(S.updatedAt||0)){mergeState(remote,true);render();toast("다른 기기의 기록을 반영했어요")}}}catch(e){}}
+  if(docRef){const remote=await claudeLoad(docRef);if(remote&&(remote.updatedAt||0)>(S.updatedAt||0)){mergeState(remote,true);syncRender("다른 기기의 기록을 반영했어요")}}}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")cloudRefresh()});window.addEventListener("pageshow",e=>{if(e.persisted)cloudRefresh()});
 async function cloudPull(first){if(!cloud.ref)return;const snap=await cloud.ref.get();if(snap.exists){const d=snap.data();let remote={};try{remote=JSON.parse(d.state||"{}")}catch(e){}mergeState(remote,true);if(first)toast("계정 기록을 불러왔어요")}await cloudPush(true);setTimeout(()=>fillCardKo().then(()=>clipSync(false)),3000)}
 const HIST={};const hasDet=l=>!!(l&&(l.a||l.model||(l.pq&&l.pq.length)));
@@ -1558,7 +1563,7 @@ function vMock(m){
         h("p",{class:"muted small"},"현재 난이도 "+cur+". 목표 "+tgt()+" 권장 "+(DIFF_REC[tgt()]||{}).range+". 실제 시험에서도 이 선택은 결과에 큰 영향이 없고, 컨디션이 나쁠 때 한 단계 내리는 정도로 써요.")));return}
   const it=mock.items[mock.i];const n=mock.items.length;
   const tEl=h("div",{class:"timer"},"0:00");const bar=h("div",{class:"bar"},h("i"));
-  const ta=h("textarea",{id:"mock_"+mock.i,placeholder:"받아쓰기로 답변 입력"});ta.value=it.a;
+  const ta=h("textarea",{id:"mock_"+mock.i,placeholder:"받아쓰기로 답변 입력"});ta.value=it.a;ta.addEventListener("input",()=>{it.a=ta.value});
   const nav=h("div",{class:"mocknav"},...mock.items.map((x,i)=>h("i",{class:i<mock.i?"done":i===mock.i?"cur":""})));
   const next=async()=>{if(timer.on){it.secs=timerStop()||it.secs;sb.textContent="다시 시작"}if(mic&&mic._isOn&&mic._isOn())await mic._finish();it.a=ta.value.trim();if(mock.i<n-1){mock.i++;render()}else{mock.result="pending";render()}};
   let plays=0;const qText=h("p",{class:"q grow",style:"margin-top:10px"},it.q);const hid=h("div",{class:"hidden-q",style:"margin-top:10px"},"질문을 듣고 답하세요. 실제 시험처럼 재생은 2번까지 가능해요.");
