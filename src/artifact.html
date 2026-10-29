@@ -367,7 +367,7 @@ const CAT={filler:"시간 벌기",opener:"시작",connector:"연결",past:"과�
 
 /* ============ STATE ============ */
 const DEF={profile:{target:"IM3",name:"",age:"",job:"회사원 (직장인)",jobDetail:"",city:"",home:"아파트에서 가족과 거주",family:"",hobby:"",fav:"",personality:"",memory:"",extra:"",survey:["movies","park","music","jogging","dtravel"]},
-  log:[], scripts:{}, samples:{}, models:{}, texts:[], trans:{}, cards:{}, custom:[], today:{date:"",cards:0,script:0,practice:0}, updatedAt:0};
+  log:[], scripts:{}, samples:{}, models:{}, texts:[], trans:{}, cards:{}, custom:[], drill:{p:{}}, today:{date:"",cards:0,script:0,practice:0}, updatedAt:0};
 let S=structuredClone(DEF);
 let db=null, uid=null, sample=null, docRef=null;
 const todayStr=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
@@ -403,7 +403,7 @@ function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;mergeUsage(o.
   S.samples=S.samples||{};for(const [k,v] of Object.entries(o.samples||{}))if(newer(v,S.samples[k]))S.samples[k]=v;
   Object.assign(S.models=S.models||{},o.models||{});Object.assign(S.trans=S.trans||{},o.trans||{});if((o.transVer||0)>(S.transVer||0))S.transVer=o.transVer;if((o.transAllAt||0)>(S.transAllAt||0))S.transAllAt=o.transAllAt;Object.assign(S.cards,o.cards||{});
   for(const c of (o.custom||[])){const cur=S.custom.find(x=>x.en===c.en);if(!cur)S.custom.push(c);else if(c.ko&&(!cur.ko||(cur.koSrc==="mt"&&c.koSrc!=="mt"))){cur.ko=c.ko;if(c.koSrc)cur.koSrc=c.koSrc;else delete cur.koSrc}}for(const t of (o.texts||[]))if(!S.texts.some(x=>x.id===t.id||x.text===t.text))S.texts.push(t);
-  if(o.profile){const newer=(o.updatedAt||0)>(S.updatedAt||0);for(const [k,v] of Object.entries(o.profile)){const cur=S.profile[k];const empty=cur==null||cur===""||(Array.isArray(cur)&&!cur.length);if(newer||empty||(k==="survey"&&!fromCloud&&Array.isArray(v)&&v.length))S.profile[k]=v}}if(o.analysis&&(o.analysis.ts||0)>(S.analysis?.ts||0))S.analysis=o.analysis;if(o.today&&o.today.date===todayStr()){for(const k of ["cards","script","practice"])S.today[k]=Math.max(S.today[k]||0,o.today[k]||0)}if((o.updatedAt||0)>(S.updatedAt||0))S.updatedAt=o.updatedAt;if(!fromCloud)save();else{try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}
+  if(o.profile){const newer=(o.updatedAt||0)>(S.updatedAt||0);for(const [k,v] of Object.entries(o.profile)){const cur=S.profile[k];const empty=cur==null||cur===""||(Array.isArray(cur)&&!cur.length);if(newer||empty||(k==="survey"&&!fromCloud&&Array.isArray(v)&&v.length))S.profile[k]=v}}if(o.analysis&&(o.analysis.ts||0)>(S.analysis?.ts||0))S.analysis=o.analysis;if(o.drill&&o.drill.p){S.drill=S.drill&&S.drill.p?S.drill:{p:{}};for(const [k,v] of Object.entries(o.drill.p)){const cur=S.drill.p[k];if(!cur||(v&&(v.at||0)>(cur.at||0)))S.drill.p[k]=v}}if(o.today&&o.today.date===todayStr()){for(const k of ["cards","script","practice","drill"])S.today[k]=Math.max(S.today[k]||0,o.today[k]||0)}if((o.updatedAt||0)>(S.updatedAt||0))S.updatedAt=o.updatedAt;if(!fromCloud)save();else{try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}
 function ensureToday(){if(S.today.date!==todayStr()){S.today={date:todayStr(),cards:0,script:0,practice:0}}}
 
 /* ============ CLAUDE → WEB SYNC (state carried in the web URL hash) ============ */
@@ -1100,6 +1100,7 @@ function timerStop(){if(timer.int)clearInterval(timer.int);timer.int=null;timer.
 const VIEWS=[
  {id:"today",ko:"오늘",ic:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'},
  {id:"practice",ko:"연습",ic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>'},
+ {id:"drill",ko:"훈련",ic:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.8"/>'},
  {id:"chat",ko:"대화",ic:'<path d="M4 5h16v10H9l-5 4z"/><path d="M8 9h8M8 12h5"/>'},
  {id:"mock",ko:"모의시험",ic:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>'},
  {id:"scripts",ko:"스크립트",ic:'<path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6M9 13h6M9 17h6"/>'},
@@ -1109,10 +1110,10 @@ const VIEWS=[
 ];
 let view="today", sub=null, gated=false;
 function renderNav(){const n=$("#nav");n.replaceChildren(...VIEWS.map(v=>h("button",{class:view===v.id?"on":"",onclick:()=>go(v.id),"aria-label":v.ko},h("span",{html:`<svg viewBox="0 0 24 24">${v.ic}</svg>`}),v.ko)))}
-function go(v,s=null){view=v;sub=s;timerStop();if(!player.on)ttsStop();render();window.scrollTo({top:0})}
+function go(v,s=null){view=v;sub=s;if(v==="drill"&&!s)drill=null;timerStop();if(!player.on)ttsStop();render();window.scrollTo({top:0})}
 function render(){renderNav();ensureToday();for(const b of [...AZ_BTNS])try{b._kill()}catch(e){}const m=$("#main");m.replaceChildren();
   if(gated){$("#nav").hidden=true;put(m,h("div",{class:"login"},h("div",{},h("p",{class:"eyebrow"},"Opic Self Study"),h("div",{class:"brand"},"OSS"),h("p",{class:"muted",style:"margin-top:6px"},"이 앱은 Claude 계정으로 로그인한 사람만 쓸 수 있어요.")),h("div",{class:"card"},h("h3",{},"로그인이 필요해요"),h("p",{class:"small"},"Claude에 로그인한 뒤 이 링크를 다시 열어 주세요. 초대받은 계정으로 로그인하면 AI 대화·평가와 기록 저장이 본인 계정으로 동작합니다."),h("p",{class:"muted small"},"Claude 계정이 없다면 claude.ai에서 무료로 만들 수 있어요."))));return}
-  if(cloud.ok&&cloud.ready&&!cloud.user&&!cloud.skip){$("#nav").hidden=true;vLogin(m);return}$("#nav").hidden=false;({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings})[view](m);stampMode(m)}
+  if(cloud.ok&&cloud.ready&&!cloud.user&&!cloud.skip){$("#nav").hidden=true;vLogin(m);return}$("#nav").hidden=false;({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings,drill:vDrill})[view](m);stampMode(m)}
 // current mode next to the page's top label on every screen (웹 모드 / API 모드 / 클로드 모드)
 function stampMode(m){try{const eb=m.querySelector(".eyebrow");if(!eb||/모드/.test(eb.textContent))return;eb.append(h("span",{class:"modetag",style:"color:var(--accent)"}," · "+modeLabel()))}catch(e){}}
 
@@ -1143,7 +1144,8 @@ function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);if(sub&&sub.history)
       h("p",{class:"eyebrow"},"오늘의 루틴"),
       planItem(done[0],"워밍업: 표현카드 10장",`${t.cards}/10`,"5분",()=>go("cards")),
       planItem(done[1],"스크립트 1개 소리 내어 읽고 외우기",`${t.script}/1`,"10분",()=>go("scripts")),
-      planItem(done[2],"질문 3개 말하기 또는 AI 대화 + 피드백",`${t.practice}/3`,"15분",()=>go("practice"))),
+      planItem(done[2],"질문 3개 말하기 또는 AI 대화 + 피드백",`${t.practice}/3`,"15분",()=>go("practice")),
+      (()=>{try{const due=dDue().length;const P=DRILL_PATS.find(x=>dP(x.id).st<=5);const n=t.drill||0;return planItem(n>0&&!due,due?"약점 훈련: 복습 "+due+"문장":P?"약점 훈련: "+P.name+" "+dP(P.id).st+"단계":"약점 훈련: 복습 완료",`${n}회`,"10분",()=>{drill=due?{pid:"_review",stage:3,round:null}:P?{pid:P.id,stage:Math.min(5,dP(P.id).st)}:null;view="drill";sub=null;render();window.scrollTo({top:0})})}catch(e){return null}})()),
     (window.claude?.use&&unsyncedCount()>=3)?h("div",{class:"note",style:"align-items:center"},h("span",{class:"grow"},"웹 계정으로 안 보낸 기록이 "+unsyncedCount()+"건 있어요."),h("button",{class:"btn sm",onclick:syncToWeb},"웹으로 보내기")):null,
     h("div",{class:"card"},h("div",{class:"hdr"},h("h2",{},"레벨 추이"),h("button",{class:"btn sm",onclick:()=>go("today",{analysis:true})},"상세 분석 →")),logs.length?chart(logs.slice(-12)):h("p",{class:"muted small"},"연습을 시작하면 평가 레벨이 여기에 쌓여요. 목표선은 IM3입니다.")),
     h("div",{class:"card"},h("div",{class:"hdr"},h("h2",{},"최근 기록"),logs.length?h("button",{class:"btn sm",onclick:()=>go("today",{history:true})},"전체 보기 →"):null),logs.length?h("div",{class:"list"},...logs.slice(-6).reverse().map(l=>h("div",{class:"li",role:"button",style:"cursor:pointer",onclick:()=>go("today",{history:true,open:l.ts||l.date+l.title})},h("span",{class:"d"},l.date.slice(5)),h("span",{class:"grow"},l.title),lvChip(l.level)))):h("p",{class:"muted small"},"아직 기록이 없어요."),
@@ -1974,6 +1976,223 @@ function vCards(m){
     h("div",{class:"note"},"카드 앞면을 보고 먼저 입으로 말한 다음 뒤집어 확인하세요. AI 피드백에서 '표현카드에 추가'를 누르면 내 표현이 여기 쌓입니다."),
     S.custom.length?h("details",{class:"card"},h("summary",{},"내가 추가한 표현 ("+S.custom.length+")"),h("div",{class:"kx",style:"margin-top:8px"},...S.custom.map(c=>h("div",{},h("span",{class:"en"},c.en),h("span",{class:"ko"},c.ko),h("button",{class:"btn sm ghost",onclick:()=>{S.custom=S.custom.filter(x=>x.id!==c.id);deck.order=[];save();render()}},"삭제"))))):null);
 }
+
+/* ---- WEAK-POINT DRILL (약점 훈련) ----
+   A pattern ladder: 1 감 잡기 → 2 따라 말하기 → 3 틀에 단어만 바꾸기(시간 제한) → 4 질문에 한 문장 → 5 실전 답변.
+   Progress lives in S.drill (synced with the account like the rest of S). Stage-3 sentences then come back on a spaced schedule. */
+const DRILL_PATS=[
+ {id:"past",grp:"fix",name:"과거시제 이야기",short:"과거시제",rule:"Last ~로 시작한 이야기는 끝까지 과거형으로. 특히 불규칙 동사를 바로 꺼내는 연습이 핵심이에요.",ruleEn:"keep every verb in the simple past when telling a past story (irregular verbs: went, had, gave, took, made, swam, built, told, felt, got)",
+  key:/\b(\w+ed|went|had|gave|took|made|swam|built|told|felt|got|saw|was|were|did|came|ate|ran|bought|spent|met|left|thought|brought|taught|found|kept|sang|began|drove|rode|won|lost|wrote|read)\b/,qt:"exp",
+  ex:[["Last summer, I went to Jeju Island with my family.","지난여름에 가족과 제주도에 갔어요."],["We built a huge sandcastle and swam a lot.","커다란 모래성을 만들고 수영을 많이 했어요."],["When we got home, the house was a mess.","집에 도착하니 집이 엉망이었어요."]],
+  items:[["지난 주말에 가족이랑 집 근처 공원에 갔어요.","Last weekend, I went to a park near my home with my family."],["거기서 아이들이랑 축구를 했어요.","We played soccer with the kids there."],["아내한테 걱정 말라고 했어요.","I told my wife not to worry."],["제가 설거지를 하고 빨래를 했어요.","I washed the dishes and did the laundry."],["아이들을 씻겨 줬어요.","I gave the kids a shower."],["다 끝내고 나니 녹초가 됐어요.","When I finished, I was exhausted."],["하지만 정말 뿌듯했어요.","But I felt really proud."],["아이들이 어려서 케이블카를 탔어요.","My kids were young, so we took a cable car."],["중학교 때 친구가 MP3 파일을 줬어요.","In middle school, a friend gave me some MP3 files."],["추석에 대구까지 9시간 넘게 걸렸어요.","On Chuseok, it took over nine hours to get to Daegu."]],
+  qs:[["What did you do last weekend?","Last weekend, I went to Suji Sports Park and played soccer with my kids."],["Where did you go on your last trip?","Last summer, I went to Jeju Island with my family."],["What did you have for dinner yesterday?","I had grilled pork with my family at home."],["What was the last movie you watched?","I watched a comedy on Netflix last Saturday night."],["What did you do after work yesterday?","I went to the gym and lifted weights for an hour."]]},
+ {id:"pp",grp:"up",name:"have p.p.",short:"have p.p.",rule:"과거에 시작해서 지금까지 이어지면 I've + p.p. / I've been ~ since·for. 경험은 I've been to ~.",ruleEn:"present perfect (have/has + past participle) for things that started in the past and continue now, or life experience (I've been to ~, I've been ~ing since/for)",
+  key:/\b(have|has)( not| never| ever| always| just| already| really)? (\w+ed|been|had|gone|done|seen|made|taken|gotten|got|known|grown|become|given|eaten|run|heard|met|told|found|kept|spent|lost|won|felt|left|thought|bought|brought|taught|caught|read|written|driven|ridden|swum|sung|begun|come|changed|lived|worked)\b/,qt:"desc",
+  ex:[["I've been jogging every Sunday evening for a few years.","몇 년째 일요일 저녁마다 조깅을 하고 있어요."],["I've been a big fan of Linkin Park since middle school.","중학교 때부터 린킨파크 열성 팬이에요."],["I've gained some weight since my twins were born.","쌍둥이가 태어난 뒤로 살이 좀 쪘어요."]],
+  items:[["몇 년째 일요일마다 조깅을 하고 있어요.","I've been jogging every Sunday for a few years."],["쌍둥이가 태어난 뒤로 살이 좀 쪘어요.","I've gained some weight since my twins were born."],["중학교 때부터 린킨파크 팬이에요.","I've been a Linkin Park fan since middle school."],["수지에 산 지 꽤 됐어요.","I've lived in Suji for a long time."],["이 회사에서 오래 일했어요.","I've worked at this company for a long time."],["제주도는 두 번 가 봤어요.","I've been to Jeju Island twice."],["요즘 살을 빼려고 노력하고 있어요.","I've been trying to lose weight lately."],["제 음악 취향은 많이 바뀌었어요.","My taste in music has changed a lot."],["거기는 한 번도 가 본 적이 없어요.","I've never been there."],["조깅 실력이 많이 늘었어요.","I've gotten much better at jogging."]],
+  qs:[["How long have you lived in your home?","I've lived in my apartment in Suji for a long time."],["How long have you worked at your company?","I've worked at a car parts company for many years."],["How long have you been jogging?","I've been jogging every Sunday for a few years."],["Have you ever been to Jeju Island?","Yes, I have. I've been there twice with my family."],["How has your taste in music changed?","My taste has changed a lot. I've been into rap since college."]]},
+ {id:"ever",grp:"up",name:"ever",short:"ever",rule:"ever는 혼자 쓰지 않아요. 최상급 + I've ever p.p. / ever since / Have you ever ~? → Yes, I have.",ruleEn:"'ever' in: superlative + I've ever + past participle (the best ~ I've ever seen), 'ever since', or answering 'Have you ever ~?' with 'Yes, I have'",
+  key:/\bever\b|\byes,? i have\b|\bnever\b/,qt:"exp",
+  ex:[["It's the saddest movie I've ever seen.","제가 본 영화 중 가장 슬픈 영화예요."],["It was the best trip I've ever had with my family.","가족과 간 여행 중 최고였어요."],["I fell in love with rock, and I've been a fan ever since.","록에 빠졌고, 그때부터 쭉 팬이에요."]],
+  items:[["제가 본 영화 중 가장 슬픈 영화예요.","It's the saddest movie I've ever seen."],["가족과 간 여행 중 최고였어요.","It was the best trip I've ever had with my family."],["제가 가 본 공원 중 최고예요.","It's the best park I've ever been to."],["인생에서 가장 긴 운전이었어요.","It was the longest drive I've ever had."],["제가 먹어 본 음식 중 가장 맛있었어요.","It was the most delicious food I've ever had."],["그때부터 쭉 팬이에요.","I've been a fan ever since."],["그때부터 쭉 랩에 빠져 있어요.","I've been into rap ever since."],["조깅을 시작한 뒤로 훨씬 건강해졌어요.","Ever since I started jogging, I've felt much healthier."],["네, 있어요. 사실 지난주에 그랬어요.","Yes, I have. Actually, it happened last week."],["평생 그렇게 피곤했던 적이 없어요.","I've never been so tired in my life."]],
+  qs:[["What's the best movie you've ever seen?","The best movie I've ever seen is a war movie about two brothers."],["What's the best trip you've ever taken?","The best trip I've ever taken was to Jeju Island with my family."],["Have you ever had a problem while traveling?","Yes, I have. Our flight was delayed for three hours once."],["What's the most delicious food you've ever eaten?","The most delicious food I've ever eaten was fresh seafood in Sokcho."],["Have you ever cancelled plans with a friend?","Yes, I have. I cancelled a party last week because I was too busy."]]},
+ {id:"help",grp:"fix",name:"help · make + 동사",short:"help/make",rule:"help me 뒤에는 동사원형, make me feel 뒤에는 형용사. 'good to me', 'remove my stress' 대신 이 틀 하나로 이유를 말해요.",ruleEn:"'It helps me + base verb' and 'It makes me feel + adjective' to give reasons",
+  key:/\b(helps?|helped) me \w+|\bmakes? me feel\b|\bmade me feel\b/,qt:"routine",
+  ex:[["Music helps me relieve stress.","음악은 스트레스를 푸는 데 도움이 돼요."],["Ballads make me feel relaxed.","발라드를 들으면 마음이 편해져요."],["Jogging helps me clear my head.","조깅은 머리를 맑게 해 줘요."]],
+  items:[["음악은 스트레스를 푸는 데 도움이 돼요.","Music helps me relieve stress."],["발라드를 들으면 마음이 편해져요.","Ballads make me feel relaxed."],["로이킴 노래 덕분에 아침에 잠이 깨요.","Roy Kim's songs help me wake up in the morning."],["조깅은 머리를 맑게 해 줘요.","Jogging helps me clear my head."],["빠른 음악은 힘이 나게 해요.","Fast music makes me feel energetic."],["코미디 영화는 일을 잊게 해 줘요.","Comedies help me forget about work."],["운동은 살 빼는 데 도움이 돼요.","Working out helps me lose weight."],["그 일로 정말 뿌듯했어요.","It made me feel really proud."]],
+  qs:[["Why do you like listening to music?","Music helps me relieve stress after a long day."],["Why do you go jogging?","Jogging helps me clear my head and lose weight."],["How do you relieve stress?","Watching comedies helps me forget about work."],["Why do you like ballads?","Ballads make me feel calm and relaxed."],["How does exercise help you?","Working out makes me feel energetic."]]},
+ {id:"ing",grp:"fix",name:"-ing 자리",short:"-ing",rule:"go jogging(to 없음), enjoy·like·spend time 뒤 -ing, first time -ing, while -ing. 동사 뒤에 to를 붙일지 -ing를 붙일지 고민하지 않게 덩어리로 외워요.",ruleEn:"verb + -ing patterns: go jogging, enjoy/like doing, spend time doing, my first time doing, while doing",
+  key:/\b\w+ing\b/,qt:"routine",
+  ex:[["I go jogging every Sunday evening.","일요일 저녁마다 조깅하러 가요."],["We spend time playing soccer at the park.","공원에서 축구하며 시간을 보내요."],["I drive to work while listening to music.","음악을 들으면서 운전해서 출근해요."]],
+  items:[["일요일 저녁마다 조깅하러 가요.","I go jogging every Sunday evening."],["트랙을 따라 걷는 걸 즐겨요.","I enjoy walking along the track."],["공원에서 아이들과 축구하며 시간을 보내요.","I spend time playing soccer with my kids at the park."],["록 음악을 처음 들어 본 거였어요.","It was my first time listening to rock music."],["차에서 음악 듣는 걸 좋아해요.","I like listening to music in the car."],["음악을 들으면서 운전해서 출근해요.","I drive to work while listening to music."],["우리는 소풍 가는 걸 좋아해요.","We like going on picnics."],["맨발로 걷는 사람이 많아요.","Many people enjoy walking barefoot."]],
+  qs:[["What do you usually do on weekends?","I usually spend time playing soccer with my kids."],["What do you enjoy doing at the park?","I enjoy jogging along the track."],["What do you do while you drive?","I like listening to ballads while driving to work."],["What do you like doing after work?","I like watching Netflix with a cold beer."],["How do you spend time with your family?","We spend time going on picnics together."]]},
+ {id:"link",grp:"fix",name:"연결어",short:"연결어",rule:"and·so로만 길게 잇지 말고 After that / When we got home / While we were there / because / where·which로 문장을 나눠요. after·when 뒤엔 주어+동사.",ruleEn:"linking words instead of only 'and/so': After that, When ~, While ~, The best part was that ~, because ~, where ~, which ~ (with a subject and verb after when/after)",
+  key:/\b(after that|after i|after we|when (i|we|my)|while (i|we)|the best part|because|where|which|at first|then)\b/,qt:"exp",
+  ex:[["After that, we went to a seafood restaurant.","그다음에 해산물 식당에 갔어요."],["When we got home, the house was a mess.","집에 도착했을 때 집이 엉망이었어요."],["The best part was that my kids loved the beach.","제일 좋았던 건 아이들이 바다를 정말 좋아했다는 거예요."]],
+  items:[["그다음에 해산물 식당에 갔어요.","After that, we went to a seafood restaurant."],["집에 도착했을 때 집이 엉망이었어요.","When we got home, the house was a mess."],["거기 있는 동안 커다란 모래성을 만들었어요.","While we were there, we built a huge sandcastle."],["제일 좋았던 건 아이들이 바다를 정말 좋아했다는 거예요.","The best part was that my kids loved the beach."],["처음엔 쉬울 줄 알았는데 정말 힘들었어요.","At first I thought it was easy, but it was really hard."],["물이 얕은 해변 근처 호텔에 묵었어요.","We stayed at a hotel near a beach where the water was shallow."],["제 일은 전공과 관련 있는데, 전공은 전자공학이었어요.","My job is related to my major, which was electronics."],["일을 잊게 해 줘서 코미디를 좋아해요.","I like comedies because they help me forget about work."]],
+  qs:[["What did you do after you got home last weekend?","When we got home, I washed the dishes, and after that I did the laundry."],["What was the best part of your last trip?","The best part was that my kids loved the beach."],["Why do you like your favorite park?","I like it because it has a soft running track."],["Where did you stay on your last trip?","We stayed at a hotel near a beach where the water was shallow."],["What was hard when you first started jogging?","At first I couldn't run one kilometer, but I kept trying."]]},
+ {id:"close",grp:"fix",name:"마무리 한 줄",short:"마무리",rule:"답이 끊기지 않게 마지막 문장을 미리 정해 둬요. That's why ~ / So that's my ~ / Looking back, ~ / It was totally worth it.",ruleEn:"finishing an answer with a clear closing line: That's why ~, So that's my ~, Looking back, ~, It was totally worth it, That's how ~",
+  key:/\b(that is why|so that is|that is how|looking back|worth it|that is a little bit about me|that is pretty much it)\b/,qt:"desc",
+  ex:[["That's why it's my favorite place.","그래서 거기가 제가 제일 좋아하는 곳이에요."],["Looking back, it was one of the best days of my life.","돌이켜 보면 인생 최고의 날 중 하루였어요."],["It was tough, but it was totally worth it.","힘들었지만 충분히 그럴 가치가 있었어요."]],
+  items:[["그래서 거기가 제가 제일 좋아하는 곳이에요.","That's why it's my favorite place."],["그게 제 평소 주말 루틴이에요.","So that's my usual weekend routine."],["돌이켜 보면 인생 최고의 날 중 하루였어요.","Looking back, it was one of the best days of my life."],["힘들었지만 충분히 그럴 가치가 있었어요.","It was tough, but it was totally worth it."],["제 소개는 이 정도예요.","That's a little bit about me."],["그렇게 해서 조깅을 시작하게 됐어요.","That's how I got into jogging."],["그래서 저는 발라드를 좋아해요.","That's why I like ballads."]],
+  qs:[["Describe your favorite park in two or three sentences.","It's close to my home and has a soft track. That's why it's my favorite place."],["Tell me about your weekend routine in two or three sentences.","I play soccer with my kids and go jogging on Sunday evening. So that's my usual weekend routine."],["Tell me briefly about a memorable trip.","We went to Jeju and built sandcastles with the kids. Looking back, it was one of the best trips of my life."],["Briefly introduce yourself.","I'm a circuit design engineer, and I live in Suji with my wife and twins. That's a little bit about me."],["Tell me briefly why you like your favorite music.","Ballads help me relax after work. That's why I like them."]]},
+ {id:"usedto",grp:"up",name:"예전 vs 요즘 (used to)",short:"used to",rule:"비교 문제 필수. 예전엔 했지만 지금은 안 하면 I used to ~. 요즘은 These days, ~. 비교는 Compared to the past, ~ / ~er than before.",ruleEn:"comparing past and present: I used to ~ (but not now), These days ~, Compared to the past ~, ~er than before",
+  key:/\bused to\b|\bcompared to\b|\bthese days\b|\b\w+er than\b|\bthan (before|in the past|it used to)\b|\bback in the day\b|\bthe biggest difference\b/,qt:"compare",
+  ex:[["I used to go to the movie theater every weekend, but these days I watch movies at home.","예전엔 주말마다 영화관에 갔는데, 요즘은 집에서 영화를 봐요."],["Compared to the past, banking is much more convenient now.","예전에 비해 은행 업무가 훨씬 편해졌어요."],["I used to listen to rock a lot, but now I mostly listen to ballads.","예전엔 록을 많이 들었는데, 지금은 주로 발라드를 들어요."]],
+  items:[["예전엔 운동에 정말 게을렀어요.","I used to be really lazy about exercise."],["예전엔 록을 많이 들었어요.","I used to listen to rock a lot."],["예전엔 주말마다 영화관에 갔어요.","I used to go to the movie theater every weekend."],["요즘은 주로 집에서 넷플릭스를 봐요.","These days, I mostly watch Netflix at home."],["예전엔 현금을 들고 다녔는데 요즘은 거의 안 들고 다녀요.","I used to carry cash, but these days I hardly ever do."],["예전에 비해 쇼핑이 훨씬 편해졌어요.","Compared to the past, shopping is much more convenient."],["지금 집이 예전 집보다 훨씬 넓어요.","My current home is much bigger than my old one."],["예전엔 1km도 힘들었는데 지금은 10km를 뛰어요.","I used to struggle to run one kilometer, but now I can run ten."],["가장 큰 차이는 이제 모든 게 온라인이라는 거예요.","The biggest difference is that everything is online now."]],
+  qs:[["How have movie theaters changed since you were young?","I used to go to the theater every weekend, but these days I watch movies at home."],["How is your current home different from your old one?","My current home is much bigger than my old one."],["How has your taste in music changed?","I used to listen to rock, but now I mostly listen to ballads."],["How has banking changed over the years?","Compared to the past, banking is much easier because everything is on my phone."],["How has your exercise habit changed?","I used to be lazy, but now I go jogging every Sunday."]]},
+ {id:"would",grp:"up",name:"상상·제안 (would)",short:"would",rule:"사실이 아닌 상상은 If I had ~, I would ~. 바람은 I'd love to ~. 롤플레이 대안 제시는 Would it be possible to ~? / Would you like to ~?",ruleEn:"would: hypotheticals (If I had ~, I would ~ / If I were ~, I would ~), wishes (I'd love to ~), polite suggestions in role-plays (Would it be possible to ~? Would you like to ~?)",
+  key:/\bwould\b/,qt:"compare",q5:()=>[...ROLEPLAYS.map(r=>({q:r.q12,k:r.k12,ko:"롤플레이 · "+r.ko,t:"rp"})),{q:ADVANCED[0],k:ADVANCED_KO[0],ko:"고난도",t:"adv"}],
+  ex:[["If I had more free time, I would travel abroad more often.","시간이 더 있으면 해외여행을 더 자주 갈 거예요."],["I'd love to visit Jeju again with my kids.","아이들이랑 제주도에 다시 가고 싶어요."],["Would it be possible to change the date?","날짜를 바꾸는 게 가능할까요?"]],
+  items:[["시간이 더 있으면 해외여행을 더 자주 갈 거예요.","If I had more free time, I would travel abroad more often."],["아이들이랑 제주도에 다시 가고 싶어요.","I'd love to visit Jeju again with my kids."],["날짜를 바꾸는 게 가능할까요?","Would it be possible to change the date?"],["제가 상사라면 재택근무를 허용할 거예요.","If I were the boss, I would let people work from home."],["돈이 많으면 더 큰 집을 살 거예요.","If I had a lot of money, I would buy a bigger house."],["대신 다음 주에 만나는 건 어때요?","Would you like to meet next week instead?"],["살이 빠지면 정말 기분 좋을 거예요.","I would feel great if I lost some weight."],["골라야 한다면 시골보다 도시를 고를 거예요.","If I had to choose, I would pick the city over the countryside."]],
+  qs:[["If you could travel anywhere, where would you go?","I would go to Hawaii with my family."],["If you had a free day tomorrow, what would you do?","I would sleep in and take my kids to the park."],["What would you do if you won the lottery?","I would buy a bigger house for my family."],["Your friend's party is today, but you're sick. What would you suggest?","Would you like to meet next weekend instead?"],["If you could change one thing about your job, what would it be?","I would make my working hours more flexible."]]},
+ {id:"twist",grp:"up",name:"반전·사건 이야기",short:"반전",rule:"경험 답변에 사건을 넣으면 IM3 이상으로 들려요. At first I thought ~, but it turned out ~ / All of a sudden, ~ / As soon as ~, ~ / Luckily, ~ / In the end, ~",ruleEn:"storytelling twists: At first I thought ~ but it turned out ~, All of a sudden ~, As soon as ~, Luckily ~, In the end ~",
+  key:/\bturned out\b|\ball of a sudden\b|\bsuddenly\b|\bas soon as\b|\bluckily\b|\bout of the blue\b|\bin the end\b|\bat that moment\b/,qt:"exp",
+  ex:[["At first I thought it would be easy, but it turned out to be really hard.","처음엔 쉬울 줄 알았는데 알고 보니 엄청 힘들었어요."],["All of a sudden, it started pouring.","갑자기 비가 쏟아지기 시작했어요."],["Luckily, there was another restaurant nearby.","다행히 근처에 다른 식당이 있었어요."]],
+  items:[["처음엔 쉬울 줄 알았는데 알고 보니 엄청 힘들었어요.","At first I thought it would be easy, but it turned out to be really hard."],["갑자기 비가 쏟아지기 시작했어요.","All of a sudden, it started pouring."],["집에 도착하자마자 아이들이 잠들었어요.","As soon as we got home, the kids fell asleep."],["다행히 근처에 다른 식당이 있었어요.","Luckily, there was another restaurant nearby."],["알고 보니 표가 다 매진이었어요.","It turned out that the tickets were sold out."],["그 순간 정말 당황했어요.","At that moment, I really panicked."],["결국 모든 게 잘 해결됐어요.","In the end, everything worked out fine."],["공원에 도착하자마자 아이들이 뛰어나갔어요.","As soon as we got to the park, the kids ran off."]],
+  qs:[["Tell me about something unexpected that happened on a trip.","All of a sudden, it started raining, so we went to a museum instead."],["Have you ever had a problem at a restaurant?","It turned out that they had lost our reservation."],["What happened the last time you got stuck in traffic?","As soon as we left Seoul, the traffic got really bad."],["Tell me about a time a plan didn't go as expected.","At first I thought the gym was closed, but it turned out they had changed the hours."],["How did your last trip end?","In the end, everything worked out fine, and the kids had a great time."]]},
+ {id:"explain",grp:"up",name:"강조·의견 틀",short:"강조",rule:"이유와 의견을 한 단계 고급스럽게. What I like most about it is that ~ / The thing is, ~ / I'd say ~ / The reason I ~ is that ~ / not only A but also B",ruleEn:"framing reasons and opinions: What I like most about it is that ~, The thing is ~, I'd say ~, The reason I ~ is that ~, not only ~ but also ~",
+  key:/\bwhat i (like|love)( the)? most\b|\bthe thing is\b|\bi would say\b|\bnot only\b|\bthe reason (why )?i\b|\bmy favorite part\b|\bto be honest\b/,qt:"desc",
+  ex:[["What I like most about it is that it's close to my home.","제가 가장 좋아하는 점은 집에서 가깝다는 거예요."],["The thing is, I love eating too much.","문제는 먹는 걸 너무 좋아한다는 거예요."],["I'd say I go there about three times a week.","일주일에 세 번쯤 간다고 할게요."]],
+  items:[["제가 가장 좋아하는 점은 집에서 가깝다는 거예요.","What I like most about it is that it's close to my home."],["문제는 시간이 별로 없다는 거예요.","The thing is, I don't have much time."],["일주일에 세 번쯤 간다고 할게요.","I'd say I go there about three times a week."],["거기는 운동뿐 아니라 산책하기에도 좋아요.","It's not only good for working out but also for taking walks."],["제가 발라드를 좋아하는 이유는 마음이 편해지기 때문이에요.","The reason I like ballads is that they make me feel relaxed."],["제가 가장 좋아하는 부분은 넓은 잔디밭이에요.","My favorite part is the big grass field."],["문제는 먹는 걸 너무 좋아한다는 거예요.","The thing is, I love eating too much."],["솔직히 말하면 요리는 잘 못해요.","To be honest, I'm not very good at cooking."]],
+  qs:[["What do you like most about your neighborhood?","What I like most about it is that there's a big park nearby."],["Why do you like your favorite park?","The reason I like it is that it has a soft running track."],["How often do you work out?","I'd say I work out about five times a week."],["What's the hardest part of losing weight?","The thing is, I love eating too much."],["What is your gym good for?","It's not only good for lifting weights but also for running."]]},
+ {id:"feel",grp:"up",name:"감정 강조 (so·such·too)",short:"so·such",rule:"very만 반복하지 말고: so 형용사 that ~ / It was such a 형용사+명사 / too 형용사 to ~",ruleEn:"emphasis instead of repeating 'very': so + adjective + that ~, such a + adjective + noun, too + adjective + to ~",
+  key:/\bso \w+ that\b|\bsuch an? \w+\b|\btoo \w+ to\b/,qt:"exp",
+  ex:[["I was so tired that I fell asleep right away.","너무 피곤해서 바로 잠들었어요."],["It was such a great trip.","정말 멋진 여행이었어요."],["My kids were too young to walk up the mountain.","아이들이 너무 어려서 산을 걸어 올라갈 수 없었어요."]],
+  items:[["너무 피곤해서 바로 잠들었어요.","I was so tired that I fell asleep right away."],["정말 멋진 여행이었어요.","It was such a great trip."],["아이들이 너무 어려서 산을 걸어 올라갈 수 없었어요.","My kids were too young to walk up the mountain."],["영화가 너무 슬퍼서 친구랑 같이 울었어요.","The movie was so sad that my friend and I cried."],["너무 배불러서 더 못 먹었어요.","I was too full to eat anymore."],["해변이 너무 예뻐서 다시 가고 싶어요.","The beach was so beautiful that I want to go back."],["정말 긴 하루였어요.","It was such a long day."],["차가 너무 막혀서 9시간이나 걸렸어요.","The traffic was so bad that it took nine hours."]],
+  qs:[["How did you feel after your last workout?","I was so tired that I went to bed early."],["What was your last trip like?","It was such a great trip, and the kids loved it."],["Tell me about the saddest movie you've seen.","It was so sad that my friend and I cried."],["What was hard about traveling with young kids?","They were too young to walk up the mountain."],["How was your last Chuseok?","The traffic was so bad that it took nine hours to get to Daegu."]]}
+];
+const DRILL_STAGES=["감 잡기","따라 말하기","단어만 바꾸기","한 문장 답하기","실전 답변"];
+const DRILL_BOX=[0,1,3,7,14,30];
+const dPat=id=>DRILL_PATS.find(p=>p.id===id);
+const dState=()=>{S.drill=S.drill&&typeof S.drill==="object"?S.drill:{p:{}};S.drill.p=S.drill.p||{};return S.drill};
+const dP=id=>{const d=dState();d.p[id]=d.p[id]||{st:1,at:0,i:{},s2:{}};const p=d.p[id];p.i=p.i||{};p.s2=p.s2||{};return p};
+const dTouch=p=>{p.at=Date.now();S.today.drill=(S.today.drill||0)+1;save()};
+const addDays=(n)=>{const d=new Date();d.setDate(d.getDate()+n);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+// spoken-answer matching: expand contractions, drop punctuation, then word-level LCS similarity
+const DR_CONTR=[[/\bi'm\b/g,"i am"],[/\b(\w+)'ve\b/g,"$1 have"],[/\b(\w+)'ll\b/g,"$1 will"],[/\b(\w+)'re\b/g,"$1 are"],[/\b(\w+)'d\b/g,"$1 would"],[/\bcan't\b/g,"cannot"],[/\bwon't\b/g,"will not"],[/\b(\w+)n't\b/g,"$1 not"],[/\b(it|that|there|what|he|she|who|here|let)'s\b/g,"$1 is"],[/\bcan not\b/g,"cannot"]];
+function dNorm(t){let x=String(t||"").toLowerCase().replace(/[’‘`]/g,"'");for(const [a,b] of DR_CONTR)x=x.replace(a,b);
+  x=x.replace(/\b(\d+)\s*(km|kilometers?)\b/g,"$1 kilometers").replace(/\bten\b/g,"10").replace(/\bnine\b/g,"9").replace(/\bfive\b/g,"5").replace(/\bone\b/g,"1").replace(/\btwo\b/g,"2").replace(/\bthree\b/g,"3");
+  return x.replace(/[^a-z0-9' ]+/g," ").replace(/'/g,"").replace(/\s+/g," ").trim()}
+function dSim(a,b){const x=dNorm(a).split(" ").filter(Boolean),y=dNorm(b).split(" ").filter(Boolean);if(!x.length||!y.length)return 0;
+  const L=Array.from({length:x.length+1},()=>new Array(y.length+1).fill(0));for(let i=1;i<=x.length;i++)for(let j=1;j<=y.length;j++)L[i][j]=x[i-1]===y[j-1]?L[i-1][j-1]+1:Math.max(L[i-1][j],L[i][j-1]);
+  return 2*L[x.length][y.length]/(x.length+y.length)}
+// word diff for feedback: target words the learner missed are marked
+function dDiff(said,target){const x=dNorm(said).split(" ").filter(Boolean);const tw=String(target).split(/\s+/);const have=new Map();for(const w of x)have.set(w,(have.get(w)||0)+1);
+  return h("span",{},...tw.map((w,i)=>{const n=dNorm(w).split(" ")[0]||"";const ok=n&&have.get(n)>0;if(ok)have.set(n,have.get(n)-1);return h("span",{style:ok?"":"color:var(--bad);font-weight:600;text-decoration:underline"},(i?" ":"")+w)}))}
+// the learner's own mistakes from AI feedback, sorted into patterns
+function dClassify(f){const w=String(f.why||f.w||"");const b=String(f.better||f.b||"");const o=String(f.original||f.o||"");const out=[];
+  if(/과거/.test(w))out.push("past");if(/현재완료|have p\.?p|have \+ ?p/i.test(w)||/\b(i|we)('ve| have) (been|gained|lived|worked|gotten)\b/i.test(b))out.push("pp");
+  if(/\bever\b/i.test(b)&&!/\bever\b/i.test(o))out.push("ever");if(/\bhelps? me\b|\bmakes? me feel\b|\bmade me feel\b/i.test(b)&&!/\bhelps? me \w+\b|\bmake me feel\b/i.test(o))out.push("help");
+  if(/-ing|동명사|ing를|ing 형태/.test(w))out.push("ing");if(/연결|관계사|접속|after 뒤|when 뒤|because 뒤/.test(w))out.push("link");if(/마무리|클로저|닫/.test(w))out.push("close");const nb=dNorm(b),no=dNorm(o);for(const P of DRILL_PATS)if(P.grp==="up"&&P.id!=="pp"&&P.id!=="ever"&&P.key.test(nb)&&!P.key.test(no))out.push(P.id);return out}
+function dMistakes(pid){const out=[];const seen=new Set();for(const l of S.log||[]){for(const f of (l.fixes||[])){const o=f.original||f.o,b=f.better||f.b;if(!o||!b||seen.has(b))continue;
+    if(dClassify(f).includes(pid)){seen.add(b);out.push({ko:"고쳐 말하기 · “"+o+"”",en:String(b).split(" / ")[0],why:f.why||f.w||"",mine:true,ts:l.ts||Date.parse(l.date)||0})}}}return out}
+function dItems(pid){const P=dPat(pid);return [...P.items.map(([ko,en])=>({ko,en})),...dMistakes(pid).slice(-12)]}
+function dDue(){const out=[];for(const P of DRILL_PATS){const p=dP(P.id);if(p.st<4)continue;for(const it of dItems(P.id)){const r=p.i[txtHash(it.en)];if(!r||!r.d||r.d<=todayStr())out.push({...it,pid:P.id})}}return out}
+function dAnswers(){if(dAnswers.n===S.log.length&&dAnswers.v)return dAnswers.v;dAnswers.n=S.log.length;return dAnswers.v=(S.log||[]).flatMap(l=>[l.a,...(l.pq||[]).map(x=>x.a)]).filter(Boolean).map(dNorm)}
+function dUsed(P){return dAnswers().filter(a=>P.key.test(a)).length}
+function dNewMistakes(pid){const p=dP(pid);if(!p.m)return 0;return dMistakes(pid).filter(x=>x.ts>p.m).length}
+function dRecord(pid,it,ok,fast){const p=dP(pid);const k=txtHash(it.en);const r=p.i[k]=p.i[k]||{b:0,d:"",n:0,ok:0};r.n++;
+  if(ok&&fast){r.ok++;r.b=Math.min(DRILL_BOX.length-1,(r.b||0)+1)}else if(ok){r.b=Math.max(1,r.b||0)}else r.b=0;r.d=addDays(ok&&fast?DRILL_BOX[r.b]:ok?1:0);dTouch(p)}
+function dLimit(pid,it){const r=dP(pid).i[txtHash(it.en)];return (r&&r.b>=2)?3:5}
+function dAdvance(pid,to){const p=dP(pid);const up=p.st<to;if(up){p.st=to;if(to>5)p.m=Date.now()}if(to>5&&!up)p.m=Date.now();dTouch(p);if(up)toast(to>5?"훈련 완료! 이제 복습으로 유지해요":to+"단계가 열렸어요")}
+// speech or typing into one answer box: Web Speech / Azure on the web build, keyboard dictation inside Claude
+function dInput(onSubmit,{rows=2,ph="말하거나 입력하고 Enter"}={}){const ta=h("textarea",{id:"ans_drill",rows,style:"min-height:"+(rows>2?150:64)+"px",placeholder:ph,autocapitalize:"sentences"});
+  ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&rows<=2){e.preventDefault();onSubmit(ta.value)}});
+  ta.addEventListener("input",()=>{if(!ta._first&&ta.value.trim())ta._first=Date.now()});
+  let mic=null;try{mic=(azOn()?azMicBtn:micBtn)(ta,{assess:false,onFinal:v=>{if(rows<=2&&v&&v.trim())onSubmit(v)}})}catch(e){mic=null}
+  return {ta,mic:mic||micLink()}}
+
+let drill=null;
+function vDrill(m){if(drill&&drill.pid)return vDrillPat(m);
+  const due=dDue();
+  const dots=st=>h("span",{class:"row",style:"gap:3px"},...[1,2,3,4,5].map(k=>h("i",{style:`display:inline-block;width:14px;height:6px;border-radius:3px;background:${st>k?"var(--accent)":st===k?"var(--warn)":"var(--line)"}`})));
+  put(m,h("div",{},h("p",{class:"eyebrow"},"Weak-point drill · 오늘 "+(S.today.drill||0)+"회"),h("h1",{},"약점 훈련")),
+    h("div",{class:"note"},h("span",{},"내 답변 기록에서 자주 틀린 패턴과, 거의 안 쓰지만 쓰면 점수가 오르는 표현을 모았어요. 패턴마다 5단계를 올라가고, 3단계부터는 ",h("b",{},"정확하게 + 빠르게(5초→3초)")," 말해야 통과해요.")),
+    due.length?h("div",{class:"card",style:"border-color:var(--accent)"},h("div",{class:"hdr"},h("div",{},h("h3",{},"오늘 복습 "+due.length+"문장"),h("p",{class:"muted small"},"완료한 패턴의 문장이 1·3·7·14일 간격으로 돌아와요.")),h("button",{class:"btn primary",onclick:()=>{drill={pid:"_review",stage:3,round:null};render()}},"복습 시작"))):null,
+    ...[["fix","자주 틀리는 것 — 실수 고치기"],["up","안 쓰지만 쓰면 점수 오르는 것 — 새 무기"]].flatMap(([g,label])=>{const recG=DRILL_PATS.find(P=>P.grp===g&&dP(P.id).st<=5);return [h("p",{class:"eyebrow",style:"margin-top:6px"},label),
+    h("div",{class:"list"},...DRILL_PATS.filter(P=>P.grp===g).map(P=>{const rec=recG;const p=dP(P.id);const nm=dNewMistakes(P.id);const mine=dMistakes(P.id).length;const used=g==="up"?dUsed(P):null;
+      return h("div",{class:"li",role:"button",style:"cursor:pointer;flex-wrap:wrap;"+(rec===P?"border-color:var(--accent)":""),onclick:()=>{drill={pid:P.id,stage:Math.min(5,p.st)};render()}},
+        h("div",{class:"grow",style:"min-width:150px"},h("div",{style:"font-weight:600"},P.name,rec===P?h("span",{class:"chip",style:"margin-left:6px"},"추천"):null,nm?h("span",{class:"chip bad",style:"margin-left:6px"},"새 실수 "+nm):null),
+          h("div",{class:"muted small"},(p.st>5?"완료 · 복습 중":(p.st)+"단계 "+DRILL_STAGES[p.st-1])+(used!=null?" · 내 답변에서 사용 "+used+"회":"")+(mine?" · 내 실수 "+mine+"개 포함":""))),dots(p.st))}))]}),
+    h("p",{class:"muted small"},"기록은 계정에 저장돼 휴대폰·PC 어디서 열어도 이어서 할 수 있어요."));
+}
+function dHeader(P,p){return h("div",{},h("button",{class:"btn sm ghost",onclick:()=>{drill=null;render()}},"← 약점 훈련"),h("p",{class:"eyebrow",style:"margin-top:10px"},P?P.name:"복습"),
+  P?h("div",{class:"segs",style:"margin-top:8px"},...DRILL_STAGES.map((s,k)=>h("button",{class:"seg"+(drill.stage===k+1?" on":""),disabled:k+1>p.st,style:k+1>p.st?"opacity:.4":"",onclick:()=>{drill={pid:P.id,stage:k+1};render()}},(k+1)+" "+(window.innerWidth<520?"":s)))):null)}
+function vDrillPat(m){if(drill.pid==="_review")return dStage3(m,null,null);const P=dPat(drill.pid);const p=dP(P.id);
+  put(m,dHeader(P,p),h("h1",{},DRILL_STAGES[drill.stage-1]));
+  ({1:dStage1,2:dStage2,3:dStage3,4:dStage4,5:dStage5})[drill.stage](m,P,p)}
+function dStage1(m,P,p){put(m,h("div",{class:"card"},h("h3",{},"언제 쓰나"),h("p",{},P.rule)),
+  h("div",{class:"card"},h("h3",{},"내 이야기로 만든 예문"),...P.ex.map(([en,ko])=>h("div",{class:"row",style:"align-items:flex-start;flex-wrap:nowrap"},spkBtn(en),h("div",{class:"grow"},h("div",{style:"font-weight:500"},en),h("div",{class:"muted small"},ko))))),
+  h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{dAdvance(P.id,2);drill.stage=2;render()}},"이해했어요 → 따라 말하기")))}
+function dStage2(m,P,p){const list=[...P.ex,...P.items.slice(0,3).map(([ko,en])=>[en,ko])];const done=list.filter(([en])=>p.s2[txtHash(en)]).length;
+  let i=list.findIndex(([en])=>!p.s2[txtHash(en)]);if(i<0)i=drill.i2||0;const [en,ko]=list[i];const fb=h("div",{});
+  const check=v=>{const s=dSim(v,en);if(s>=0.8){p.s2[txtHash(en)]=1;dTouch(p);if(list.every(([e])=>p.s2[txtHash(e)])){dAdvance(P.id,3);drill.stage=3}render()}else fb.replaceChildren(h("div",{class:"fix"},h("span",{class:"w"},"조금 달라요 ("+Math.round(s*100)+"%) — 빨간 단어를 신경 써서 다시"),dDiff(v,en)),h("div",{class:"row"},h("button",{class:"btn sm ghost",onclick:()=>{p.s2[txtHash(en)]=1;dTouch(p);render()}},"맞게 말했는데 인식이 틀렸어요")))};
+  const inp=dInput(check);
+  put(m,h("p",{class:"muted small mono"},done+" / "+list.length+" 문장 통과"),
+    h("div",{class:"card"},h("div",{class:"row",style:"flex-wrap:nowrap"},spkBtn(en),h("div",{class:"grow"},h("div",{class:"q"},en),h("div",{class:"muted small"},ko))),
+      h("p",{class:"muted small"},"듣고 → 똑같은 리듬으로 따라 말하기. I've, That's 같은 줄임말은 한 덩어리로."),inp.ta,h("div",{class:"row"},inp.mic,h("button",{class:"btn",onclick:()=>check(inp.ta.value)},"확인")),fb));
+  setTimeout(()=>speak(en),300)}
+// stage 3 (and daily review): Korean cue → say the English within the time limit
+function dStage3(m,P,p){const review=!P;let R=drill.round;
+  if(!R){const pool=review?pick(dDue(),10):(()=>{const base=pick(dItems(P.id).filter(x=>!x.mine),7);const mine=pick(dMistakes(P.id),3);return pick([...base,...mine],10)})();
+    R=drill.round={list:pool.map(x=>({...x,pid:x.pid||P.id})),i:0,ok:0,fast:0,fast0:0,n0:pool.length,res:[]}}
+  if(review)put(m,dHeader(null,null),h("h1",{},"오늘 복습"));
+  if(!R.list.length){put(m,h("p",{class:"muted"},"복습할 문장이 없어요."));return}
+  if(R.i>=R.list.length){const acc=R.fast0/Math.max(1,R.n0);const pass=!review&&acc>=0.8;if(pass&&p.st<4)dAdvance(P.id,4);
+    put(m,h("div",{class:"card"},h("h2",{},(review?"복습 끝":pass?"통과!":"한 번 더")),h("p",{},"첫 시도 "+R.n0+"문장 중 제한 시간 안에 정확 "+R.fast0+" · 다시 나온 문장 포함 정확 "+R.ok+" / "+R.list.length),
+      !review&&!pass?h("p",{class:"muted small"},"제한 시간 안에 80% 이상 맞히면 4단계가 열려요. 틀린 문장은 바로 다시 나와요."):null,
+      h("div",{class:"list"},...R.res.map(r=>h("div",{class:"li"},h("span",{},r.fast?"✅":r.ok?"🐢":"❌"),h("div",{class:"grow"},h("div",{},r.en),h("div",{class:"muted small"},r.ko))))),
+      h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{drill.round=null;if(pass){drill.stage=4}render()}},pass?"4단계로":"다시 하기"),h("button",{class:"btn",onclick:()=>{drill=null;render()}},"목록으로"))));return}
+  const it=R.list[R.i];const lim=dLimit(it.pid,it);const t0=Date.now();const fb=h("div",{});let answered=false;
+  const bar=h("div",{class:"bar"},h("i",{style:"transition:none;width:100%"}));const tEl=h("span",{class:"mono small muted"},lim+"초");
+  const iv=setInterval(()=>{if(!bar.isConnected){clearInterval(iv);return}const el=(Date.now()-t0)/1000;const left=Math.max(0,lim-el);bar.firstChild.style.width=(left/lim*100)+"%";bar.firstChild.style.background=left<=1?"var(--bad)":"var(--accent)";tEl.textContent=left>0?left.toFixed(1)+"초":"시간 초과 — 그래도 말해 보세요"},100);
+  const next=()=>{R.i++;render()};
+  const finish=(v,forceOk)=>{if(answered)return;answered=true;clearInterval(iv);const start=inp.ta._first||Date.now();const rt=(start-t0)/1000;
+    const s=dSim(v,it.en);const ok=forceOk||s>=0.85;const fast=ok&&rt<=lim;R.res.push({...it,ok,fast});if(ok)R.ok++;if(fast){R.fast++;if(!it.retry)R.fast0++}dRecord(it.pid,it,ok,fast);
+    if(!ok){R.list.push({...it,retry:true})}
+    fb.replaceChildren(h("div",{class:"fix",style:"border-left-color:"+(fast?"var(--good)":ok?"var(--warn)":"var(--bad)")},h("span",{class:"b"},fast?"정확 + 빠름 ("+rt.toFixed(1)+"초)":ok?"정확하지만 느려요 ("+rt.toFixed(1)+"초) — 입에 붙을 때까지":"다시 — 정답과 비교해 보세요"),
+      h("div",{},dDiff(v,it.en)),it.why?h("span",{class:"w"},it.why):null),
+      h("div",{class:"row"},spkBtn(it.en),!ok?h("button",{class:"btn sm ghost",onclick:()=>{R.res.pop();R.list.pop();answered=false;finish(it.en,true)}},"맞게 말했는데 인식이 틀렸어요"):null,h("button",{class:"btn primary",onclick:next},"다음 →")));
+    if(!ok)speak(it.en)};
+  const inp=dInput(v=>finish(v));
+  put(m,h("p",{class:"muted small mono"},(R.i+1)+" / "+R.list.length+(it.retry?" · 다시 나온 문장":"")+(review?" · "+(dPat(it.pid)?.short||""):"")),
+    h("div",{class:"card"},h("p",{class:"eyebrow"},it.mine?"내 답변에서 나온 실수":"한국어 → 영어로 바로 말하기"),h("div",{class:"q"},it.ko),
+      h("div",{class:"row",style:"flex-wrap:nowrap"},h("div",{class:"grow"},bar),tEl),inp.ta,
+      h("div",{class:"row"},inp.mic,h("button",{class:"btn",onclick:()=>finish(inp.ta.value)},"확인"),h("button",{class:"btn ghost",onclick:()=>finish("")},"모르겠어요")),fb));
+  setTimeout(()=>{try{inp.ta.focus()}catch(e){}},50)}
+// stage 4: a question that needs the pattern; one-sentence answer judged by Claude (or by the pattern check when AI is off)
+async function dJudge(P,q,a){if(sample){try{const r=await sample.json(`You are an English tutor for a Korean OPIc learner (target ${tgt()}).
+Target pattern: ${P.ruleEn}.
+Question: "${q}"
+Learner's short answer (voice-dictated; ignore capitals and punctuation): "${a}"
+Judge only two things: did the learner use the target pattern, and is the sentence correct enough to say in the exam (small slips that a listener would not notice are fine)?
+Reply with ONLY JSON: {"ok":true,"used":true,"better":"a natural corrected answer that keeps the learner's meaning and uses the pattern","why":"한국어 한 줄 설명"}`,{cache:false,modelTier:"quick"});if(r&&typeof r.ok==="boolean")return r}catch(e){}}
+  const used=P.key.test(dNorm(a));return {ok:null,used,better:null,why:used?"패턴은 들어갔어요. 아래 예시와 비교해 스스로 채점해 주세요.":"이 질문에 필요한 패턴이 안 보여요."}}
+function dStage4(m,P,p){const Q=P.qs;drill.q4=drill.q4||{i:0,ok:0,res:[]};const st=drill.q4;
+  if(st.i>=Q.length){const pass=st.ok>=4;if(pass&&p.st<5)dAdvance(P.id,5);
+    put(m,h("div",{class:"card"},h("h2",{},pass?"통과!":"한 번 더"),h("p",{},st.ok+" / "+Q.length+" 문장 성공"),!pass?h("p",{class:"muted small"},"5개 중 4개 이상 맞히면 5단계가 열려요."):null,
+      h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{drill.q4=null;if(pass)drill.stage=5;render()}},pass?"5단계로":"다시 하기"))));return}
+  const [q,model]=Q[st.i];const fb=h("div",{});let done=false;
+  const nextBtn=()=>h("button",{class:"btn primary",onclick:()=>{st.i++;render()}},"다음 →");
+  const grade=ok=>{if(done)return;done=true;st.res.push(ok);if(ok)st.ok++;dTouch(p)};
+  const check=async v=>{v=(v||"").trim();if(v.length<3){toast("한 문장으로 답해 주세요");return}fb.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i")));
+    const r=await dJudge(P,q,v);if(!fb.isConnected)return;
+    if(r.ok===null){fb.replaceChildren(h("div",{class:"fix",style:"border-left-color:var(--warn)"},h("span",{class:"w"},r.why),h("span",{class:"b"},"예시: "+model)),
+        h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{grade(false);st.i++;render()}},"틀렸어요"),h("button",{class:"btn primary",onclick:()=>{grade(true);st.i++;render()}},"맞게 썼어요")));return}
+    grade(r.ok&&r.used!==false);
+    fb.replaceChildren(h("div",{class:"fix",style:"border-left-color:"+(r.ok?"var(--good)":"var(--bad)")},h("span",{class:"b"},r.ok?"좋아요!":"아쉬워요"),r.better?h("span",{},"더 자연스럽게: "+r.better):null,r.why?h("span",{class:"w"},r.why):null),
+      h("div",{class:"row"},r.better?spkBtn(r.better):null,nextBtn()))};
+  const inp=dInput(check);
+  put(m,h("p",{class:"muted small mono"},(st.i+1)+" / "+Q.length+" · 성공 "+st.ok),
+    h("div",{class:"card"},h("p",{class:"eyebrow"},"이 패턴을 넣어 한 문장으로"),h("div",{class:"row",style:"flex-wrap:nowrap"},spkBtn(q),h("div",{class:"q grow"},q)),
+      h("details",{},h("summary",{class:"muted small"},"힌트"),h("p",{class:"small",style:"margin-top:6px"},P.rule)),inp.ta,
+      h("div",{class:"row"},inp.mic,h("button",{class:"btn primary",onclick:()=>check(inp.ta.value)},sample?"AI 확인":"확인")),fb));
+  setTimeout(()=>speak(q),300)}
+// stage 5: a real OPIc question, 1–2 minutes, the pattern must appear (and be correct) at least once
+function dStage5(m,P,p){const pool=P.q5?P.q5().map(x=>({t:{ko:x.ko,en:x.ko,id:"x"},q:{q:x.q,k:x.k,t:x.t}})):TOPICS.flatMap(t=>allQs(t).filter(q=>q.t===P.qt).map(q=>({t,q})));drill.q5=drill.q5||pick(pool,1)[0];const {t,q}=drill.q5;
+  const fb=h("div",{});const inp=dInput(()=>{},{rows:6,ph:"1–2분 동안 답하세요. 받아쓰기(휴대폰: 키보드 🎤 / Windows: Win+H)나 마이크 버튼으로 입력돼요."});
+  const go5=async()=>{const a=inp.ta.value.trim();if(a.split(/\s+/).length<25){toast("조금 더 길게 답해 주세요 (25단어 이상)");return}
+    fb.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"확인 중…")));let r=null;
+    if(sample){try{r=await sample.json(`You check whether a Korean OPIc learner (target ${tgt()}) used one target pattern in a spoken answer.
+Target pattern: ${P.ruleEn}.
+Question: "${q.q}"
+Answer (voice-dictated): """${a}"""
+Find every place the learner used (or should have used) the pattern. Reply with ONLY JSON:
+{"used":2,"correct":true,"quotes":["learner's phrase that used it correctly"],"fixes":[{"original":"learner's phrase","better":"corrected phrase using the pattern","why":"한국어 한 줄"}],"summary":"한국어 1-2문장: 패턴을 잘 썼는지, 다음에 어디에 넣으면 좋을지"}
+"correct" is true when the pattern appears at least once and is used correctly every time (or the misuses are minor). Give at most 3 fixes.`,{cache:false})}catch(e){r=null}}
+    if(!fb.isConnected)return;
+    if(!r){const used=P.key.test(dNorm(a));fb.replaceChildren(h("div",{class:"fix",style:"border-left-color:var(--warn)"},h("span",{class:"w"},used?"패턴이 들어간 것 같아요. 맞게 썼는지 스스로 확인해 주세요.":"패턴이 안 보여요."),h("span",{class:"small"},"규칙: "+P.rule)),
+        h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{drill.q5=null;render()}},"다른 질문"),h("button",{class:"btn primary",onclick:()=>{dAdvance(P.id,6);drill=null;render()}},"맞게 썼어요 — 완료")));return}
+    const pass=r.correct&&(r.used||0)>=1;if(pass)dAdvance(P.id,6);else dTouch(p);
+    p.r5={ts:Date.now(),q:q.q,pass,used:r.used||0};save();
+    fb.replaceChildren(h("div",{class:"card",style:"border-color:"+(pass?"var(--good)":"var(--warn)")},h("h3",{},pass?"실전에서도 썼어요! 패턴 완료":"아직이에요 — 한 번 더"),h("p",{class:"small"},r.summary||""),
+        ...(r.quotes||[]).map(x=>h("div",{class:"small",style:"color:var(--good)"},"✓ "+x)),
+        ...(r.fixes||[]).map(f=>h("div",{class:"fix"},h("span",{class:"o"},f.original),h("span",{class:"b"},f.better),h("span",{class:"w"},f.why))),
+        h("div",{class:"row"},pass?h("button",{class:"btn primary",onclick:()=>{drill=null;render()}},"목록으로"):h("button",{class:"btn primary",onclick:()=>{inp.ta.value="";fb.replaceChildren()}},"다시 답하기"),h("button",{class:"btn",onclick:()=>{drill.q5=null;render()}},"다른 질문"))))};
+  put(m,h("div",{class:"note"},h("span",{},"미션: 이 답변에 ",h("b",{},P.name)," 패턴을 1번 이상 맞게 넣기. "+P.rule)),
+    h("div",{class:"card"},h("p",{class:"eyebrow"},t.ko+(QT[q.t]?" · "+QT[q.t]:"")),h("div",{class:"row",style:"flex-wrap:nowrap"},spkBtn(q.q),h("div",{class:"q grow"},q.q)),h("p",{class:"muted small"},q.k),
+      inp.ta,h("div",{class:"row"},inp.mic,h("button",{class:"btn primary",onclick:go5},sample?"AI 확인":"확인"),h("button",{class:"btn ghost",onclick:()=>{drill.q5=null;render()}},"다른 질문")),fb))}
 
 /* ---- SETTINGS ---- */
 function vSettings(m){
