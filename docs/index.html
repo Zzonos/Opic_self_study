@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261030-103828-75cb05">
+<html lang="ko" data-build="20261030-103917-05617c">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1133,7 +1133,9 @@ function renderNav(){const n=$("#nav");n.replaceChildren(...VIEWS.map(v=>h("butt
 function go(v,s=null){view=v;sub=s;if(inPrac(v)){LASTPRAC=v;try{localStorage.setItem("oss_lastprac",v)}catch(e){}}if(v==="drill"&&!s)drill=null;timerStop();if(!player.on)ttsStop();render();window.scrollTo({top:0})}
 function render(){renderNav();ensureToday();for(const b of [...AZ_BTNS])try{b._kill()}catch(e){}const m=$("#main");m.replaceChildren();
   if(gated){$("#nav").hidden=true;put(m,h("div",{class:"login"},h("div",{},h("p",{class:"eyebrow"},"Opic Self Study"),h("div",{class:"brand"},"OSS"),h("p",{class:"muted",style:"margin-top:6px"},"이 앱은 Claude 계정으로 로그인한 사람만 쓸 수 있어요.")),h("div",{class:"card"},h("h3",{},"로그인이 필요해요"),h("p",{class:"small"},"Claude에 로그인한 뒤 이 링크를 다시 열어 주세요. 초대받은 계정으로 로그인하면 AI 대화·평가와 기록 저장이 본인 계정으로 동작합니다."),h("p",{class:"muted small"},"Claude 계정이 없다면 claude.ai에서 무료로 만들 수 있어요."))));return}
-  if(cloud.ok&&cloud.ready&&!cloud.user&&!cloud.skip){$("#nav").hidden=true;vLogin(m);return}$("#nav").hidden=false;({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings,drill:vDrill})[view](m);stampMode(m);if(inPrac(view)&&!sub&&!(view==="chat"&&chat&&chat.summary)){const hd=[...m.children].find(c=>c.matches(".eyebrow,.hdr")||c.querySelector(".eyebrow"));const tb=pracTabs();if(hd)hd.after(tb);else m.prepend(tb)}}
+  if(cloud.ok&&cloud.ready&&!cloud.user&&!cloud.skip){$("#nav").hidden=true;vLogin(m);return}$("#nav").hidden=false;({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings,drill:vDrill})[view](m);stampMode(m);if(inPrac(view)&&!sub&&!(view==="chat"&&chat&&chat.summary)){const hd=[...m.children].find(c=>c.matches(".eyebrow")||c.querySelector(".eyebrow"));const tb=pracTabs();
+    // page label on top, then the tabs, then the title (and its buttons)
+    if(hd&&hd.matches(".eyebrow"))hd.after(tb);else if(hd){const eb=hd.querySelector(".eyebrow");hd.before(eb);eb.after(tb)}else m.prepend(tb)}}
 // current mode next to the page's top label on every screen (웹 모드 / API 모드 / 클로드 모드)
 function stampMode(m){try{const eb=m.querySelector(".eyebrow");if(!eb||/모드/.test(eb.textContent))return;eb.append(h("span",{class:"modetag",style:"color:var(--accent)"}," · "+modeLabel()))}catch(e){}}
 
