@@ -1218,8 +1218,8 @@ function vPractice(m){
     (t.more||[]).length?h("div",{class:"list"},...t.more.map(q=>h("button",{class:"topic",onclick:()=>go("practice",{topic:t,q,kind:QT[q.t]})},h("span",{class:"chip neutral",style:"align-self:flex-start"},QT[q.t]),h("span",{},q.q)))):null,
     h("div",{class:"row"},h("button",{class:"btn",onclick:()=>go("scripts",{topic:t})},"이 주제 스크립트 보기")));return}
   put(m,
-    h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},"Question bank · "+TOPICS.reduce((a,t)=>a+allQs(t).length,0)+"문항"),h("h1",{},"질문 연습"))),
-    h("div",{class:"row"},h("button",{class:"btn primary",onclick:randomQ},"랜덤 질문 1개")),
+    h("p",{class:"eyebrow"},"Question bank · "+TOPICS.reduce((a,t)=>a+allQs(t).length,0)+"문항"),
+    h("div",{class:"hdr",style:"align-items:center;flex-wrap:nowrap"},h("h1",{},"질문 연습"),h("button",{class:"btn primary",style:"flex-shrink:0",onclick:randomQ},"랜덤 질문 1개")),
     aiNote(),
     h("div",{class:"note"},"질문을 고르고 타이머를 켠 뒤 소리 내어 말하세요. 말한 내용은 키보드의 받아쓰기(마이크 키)로 입력하면 AI가 레벨을 평가하고 IM3·IH 모범답안을 만들어 줍니다."),
     ...section("내 서베이 주제",mine),
