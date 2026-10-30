@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261030-000712-9e8a32">
+<html lang="ko" data-build="20261030-094217-4926ac">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -609,7 +609,7 @@ async function apiCall1(input,opt={},fresh){const cfg=await apiKey(fresh);const 
   if(!text.trim()){const x=new Error("empty");x.code="upstream_error";x.empty=true;throw x}
   return {text,truncated:stop==="max_tokens",modelTierApplied:"api:"+model}}
 // switch the web app's AI between "none" (default) and the API relay
-const chatEyebrow=sc=>sc.en+" · "+chat.n+"턴"+(chatMode==="voice"?" · 말하기 모드":"")+" · "+modeLabel();
+const chatEyebrow=sc=>sc.en+" · "+chat.n+"턴"+(hfChat()?" · 핸즈프리":chatMode==="voice"?" · 말하기 모드":"")+" · "+modeLabel();
 const modeLabel=()=>window.claude?.use?"클로드 모드":(API.on&&sample)?"API 모드":"웹 모드";
 function apiApply(){if(window.claude?.use)return;const want=API.on&&isAdminUser()&&!!TTS_URL;const was=!!sample;sample=want?wrapSample(apiCall):null;if(was!==!!sample)syncRender()}
 async function apiStatus(){try{const u=firebase.auth().currentUser;if(!u)return {error:"로그인 필요"};const r=await fetch(TTS_URL+"/ai/status",{headers:{Authorization:"Bearer "+(await u.getIdToken())}});const j=await r.json().catch(()=>({}));return r.ok?j:{error:j.error||("HTTP "+r.status)}}catch(e){return {error:String(e.message||e)}}}
@@ -647,13 +647,10 @@ let RAWMIC=false;try{RAWMIC=localStorage.getItem("oss_rawmic")==="1"}catch(e){}
 function setRawMic(v){RAWMIC=!!v;try{localStorage.setItem("oss_rawmic",RAWMIC?"1":"0")}catch(e){}toast(RAWMIC?"잡음 제거 끔 — 조용한 곳에서 더 정확해요 (다음 녹음부터)":"잡음 제거 켬 — 시끄러운 곳에 적합 (다음 녹음부터)")}
 const rawMicBox=()=>h("label",{class:"row small",style:"cursor:pointer;gap:4px",title:"휴대폰의 잡음 제거·에코 제거·자동 음량을 끄고 원본 소리를 Azure에 보내요. 조용한 곳에서는 인식이 더 정확하고, 시끄러운 곳(차량 등)에서는 켜 두는 게 나아요."},h("input",{type:"checkbox",checked:RAWMIC,onchange:e=>setRawMic(e.target.checked)}),"조용한 곳 모드 (잡음 제거 끔)");
 let PRON_ON=false;try{PRON_ON=localStorage.getItem("oss_pron")==="1"}catch(e){}
-// normal: the mic closes while the AI talks (phone stays in media mode = good sound).
-// car mode: Bluetooth hands-free switches between "call" and "media" every time the mic opens/closes, which is slow
-// and drops my first words — so in the car the mic stays open for the whole conversation (call-quality sound, but stable).
-let CARMODE=false;try{CARMODE=localStorage.getItem("oss_carmode")==="1"}catch(e){}
-let HIFI=!CARMODE;
-function setCarMode(v){CARMODE=!!v;HIFI=!CARMODE;try{localStorage.setItem("oss_carmode",CARMODE?"1":"0")}catch(e){}
-  toast(CARMODE?"차량 모드 — 대화 내내 마이크를 켜 둬요 (블루투스 연결이 끊기지 않게)":"일반 모드 — AI가 말할 땐 마이크를 닫아 깨끗한 음질로 들어요")}
+// normal conversation: the mic closes while the AI talks (phone stays in media mode = good sound).
+// hands-free conversation (API mode only, e.g. in the car): the mic stays open for the whole conversation, so Bluetooth
+// does not switch between "call" and "media" every turn (call-quality sound, but stable), and listening starts by itself.
+const HIFI=true;const hfChat=()=>!!(chat&&chat.hf);
 async function micStream(){try{return await micStream1()}catch(e){if(e&&e.name==="NotAllowedError")throw e;await new Promise(r=>setTimeout(r,1000));return await micStream1()}}
 async function micStream1(){if(MIC.stream&&MIC.raw!==RAWMIC&&!MIC.active)micRelease();if(MIC.stream&&MIC.stream.getAudioTracks().some(t=>t.readyState==="live")){MIC.last=Date.now();return MIC.stream}
   MIC.stream=await navigator.mediaDevices.getUserMedia({audio:RAWMIC?{echoCancellation:false,noiseSuppression:false,autoGainControl:false}:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});MIC.hifi=HIFI;MIC.raw=RAWMIC;MIC.last=Date.now();return MIC.stream}
@@ -1417,7 +1414,9 @@ function vChat(m){
     h("div",{class:"card"},h("h3",{},"모드"),h("div",{class:"cks"},h("label",{},h("input",{type:"radio",name:"cmode",value:"text",checked:chatMode==="text",onchange:()=>{chatMode="text";saveMode()}}),"텍스트 모드 — 입력하고 보내기"),h("label",{},h("input",{type:"radio",name:"cmode",value:"voice",checked:chatMode==="voice",onchange:()=>{chatMode="voice";saveMode()}}),"말하기 모드 — 말하면 자동 전송, 답은 음성으로")),
       h("p",{class:"muted small"},"말하기 모드: 마이크 버튼을 누르면 키보드 받아쓰기가 열려요. 말을 멈추고 2초가 지나면 자동으로 보내고, 상대의 답은 읽어 줍니다. 이 앱은 마이크에 직접 접근할 수 없어서 받아쓰기 엔진은 iPhone 키보드(Siri 받아쓰기)를 씁니다.")),
     h("p",{class:"eyebrow"},"상대 고르기"),
-    h("div",{class:"scen"},...SCEN.map(sc=>h("button",{class:"topic",disabled:!sample,onclick:()=>startChat(sc)},h("span",{class:"en"},sc.ko),h("span",{class:"ko"},sc.desc)))),
+    h("div",{class:"scen"},...SCEN.flatMap(sc=>{const tile=h("button",{class:"topic",disabled:!sample,onclick:()=>startChat(sc)},h("span",{class:"en"},sc.ko),h("span",{class:"ko"},sc.desc));
+      if(sc.id!=="free"||!azOn())return [tile];
+      return [tile,h("button",{class:"topic",disabled:!sample,onclick:()=>{micStream().catch(()=>{});startChat(sc,{hf:true})}},h("span",{class:"en"},"자유 대화 (핸즈프리) 🚗"),h("span",{class:"ko"},"버튼 없이 말로만 대화 — 운전·블루투스용. 마이크가 계속 켜져 있어요"))]})),
     S.log.filter(l=>l.kind==="chat").length?h("div",{class:"card"},h("h3",{},"지난 대화"),h("div",{class:"list"},...S.log.filter(l=>l.kind==="chat").slice(-5).reverse().map(l=>h("div",{class:"li"},h("span",{class:"d"},l.date.slice(5)),h("span",{class:"grow"},l.title),lvChip(l.level))))):null);return}
   if(chat.summary)return vChatSummary(m);
   const sc=chat.sc;const bub=h("div",{class:"bubbles",id:"bubbles"});
@@ -1432,7 +1431,7 @@ function vChat(m){
   const ta=h("textarea",{id:"chat_in",style:"min-height:64px",placeholder:"입력하거나 받아쓰기로 말하세요 — "+DICT_HINT});
   // Enter sends, Shift+Enter makes a new line (ignored while a Korean/IME word is still being composed)
   ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){e.preventDefault();send()}});
-  const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ttsStop();ta.value="";let dz=[];try{dz=micBtn_&&micBtn_._doubt?micBtn_._doubt():[]}catch(e){}try{micBtn_&&micBtn_._cut&&micBtn_._cut();if(micBtn_&&micBtn_._pause)Promise.resolve(micBtn_._pause()).then(()=>{if(HIFI&&micBtn_._az&&!MIC.active){micRelease();audLog.push("AI 차례: 마이크 닫음 (일반 음질)")}})}catch(e){}chat.busy=true;
+  const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ttsStop();ta.value="";let dz=[];try{dz=micBtn_&&micBtn_._doubt?micBtn_._doubt():[]}catch(e){}try{micBtn_&&micBtn_._cut&&micBtn_._cut();if(micBtn_&&micBtn_._pause)Promise.resolve(micBtn_._pause()).then(()=>{if(!hfChat()&&micBtn_._az&&!MIC.active){micRelease();audLog.push("AI 차례: 마이크 닫음 (일반 음질)")}})}catch(e){}chat.busy=true;
     const meU={who:"me",text:t,dz};chat.ui.push(meU);chat.turns.push({role:"user",content:t});const meTurn=chat.turns[chat.turns.length-1];let meEl=render1(meU);bub.append(meEl);const w=render1({who:"wait"});bub.append(w);toEnd();
     const pre=new Set();const warm=t=>{if(!t||pre.has(t)||!chat.auto||!(WEB&&TTS_URL))return;pre.add(t);try{if(natOK(t))natUrl(t).catch(()=>{})}catch(e){}};
     const str=(src,k)=>{const m=new RegExp('"'+k+'"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"').exec(src);if(!m)return null;try{return JSON.parse('"'+m[1]+'"')}catch(e){return null}};
@@ -1501,7 +1500,7 @@ Reply with ONLY JSON: {"done":true} or {"done":false}`,{cache:false,modelTier:"q
   if(micBtn_&&micBtn_._isOn)micBtn_.addEventListener("click",()=>setTimeout(()=>{if(micBtn_._isOn())keepAlive(true);else if(!player.on)keepAlive(false)},800));
 
   const waitSel=h("select",{title:"말을 멈춘 뒤 얼마나 기다렸다 보낼지",onchange:e=>{chatWait=+e.target.value;try{localStorage.setItem("opic30_cwait",chatWait)}catch(x){}armAuto()}},...[[2,"2초 후 전송"],[4,"4초 후 전송"],[6,"6초 후 전송"],[10,"10초 후 전송"],[0,"직접 보내기"]].map(([v,l])=>h("option",{value:v,selected:chatWait===v},l)));waitSel.style.width="auto";
-  const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn_,h("button",{class:"btn",onclick:async()=>{clearTimeout(vt);try{if(micBtn_&&micBtn_._flush)await micBtn_._flush()}catch(e){}send()}},"지금 보내기"),waitSel,(micBtn_&&micBtn_._az)?h("label",{class:"row small",style:"cursor:pointer;gap:4px",title:"블루투스(차량·이어폰)로 대화할 때 켜세요. 마이크를 계속 켜 두어 통화 연결이 끊겼다 붙었다 하지 않아요. 소리는 통화 음질이 돼요."},h("input",{type:"checkbox",checked:CARMODE,onchange:e=>setCarMode(e.target.checked)}),"🚗 차량·블루투스 모드"):null,status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
+  const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn_,h("button",{class:"btn",onclick:async()=>{clearTimeout(vt);try{if(micBtn_&&micBtn_._flush)await micBtn_._flush()}catch(e){}send()}},"지금 보내기"),waitSel,status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
   put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow",id:"chat_cnt"},chatEyebrow(sc)),h("h2",{},sc.ko)),h("div",{class:"row"},h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_auto",checked:chat.auto,onchange:e=>chat.auto=e.target.checked}),"자동 읽기"),chatMode==="voice"?h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_hide",checked:chat.hide,onchange:e=>{chat.hide=e.target.checked;bub.classList.toggle("hidetext",chat.hide)}}),"상대 말 숨기기"):null,h("button",{class:"btn sm",onclick:()=>endChat()},"대화 끝내기"))),
     bub,
     h("div",{class:"chatin"},h("div",{class:"card",style:"gap:8px"},ta,inputRow,h("div",{class:"row"},h("div",{class:"grow"},prompt_ko),hintBtn),hintOut)));
@@ -1517,10 +1516,13 @@ function chatSeed(sc){if(sc.id!=="free"&&sc.id!=="interview")return "";const p=S
   for(const id of (p.survey||[])){const t=TOPICS.find(x=>x.id===id);if(t)c.push((sc.id==="free"?"their interest: ":"survey topic: ")+t.en)}
   if(!c.length)return "";let recent=[];try{recent=JSON.parse(localStorage.getItem("oss_chat_seeds")||"[]")}catch(e){}
   const fresh=c.filter(x=>!recent.includes(x));const pickd=pick(fresh.length?fresh:c,1)[0];try{localStorage.setItem("oss_chat_seeds",JSON.stringify([...recent,pickd].slice(-Math.min(6,Math.max(1,c.length-1)))))}catch(e){}return pickd}
-async function startChat(sc){try{if(azOn()){azSdk().catch(()=>{});azToken().catch(()=>{})}}catch(e){}chat={sc,turns:[],ui:[],n:0,busy:false,auto:true,hide:false,summary:null};render();try{if(WEB&&TTS_URL&&natOK(TIP_OPEN))natUrl(TIP_OPEN).catch(()=>{})}catch(e){}
+async function startChat(sc,opt){const hf=!!(opt&&opt.hf&&azOn());if(hf)chatMode="voice";try{if(azOn()){azSdk().catch(()=>{});azToken().catch(()=>{})}}catch(e){}chat={sc,turns:[],ui:[],n:0,busy:false,auto:true,hide:false,summary:null,hf};render();try{if(WEB&&TTS_URL&&natOK(TIP_OPEN))natUrl(TIP_OPEN).catch(()=>{})}catch(e){}
   const bub=$("#bubbles");const w=h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")));bub.append(w);const seed=chatSeed(sc);
   try{const r=await sample.json([{role:"user",content:chatRules(sc)+"\n\nStart the conversation now with a natural greeting and your first question."+(seed?" Make the first question about "+seed+", personal to them (use the profile details), not about the weekend.":"")+" Reply with ONLY the JSON object (fix: null)."}],{cache:false,modelTier:"quick"});
-    w.remove();const reply=String(r?.reply||"Hi! How's it going?");chat.turns.push({role:"user",content:"(start)"},{role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});render();if(chat.auto)speak(reply)}
+    w.remove();const reply=String(r?.reply||"Hi! How's it going?");chat.turns.push({role:"user",content:"(start)"},{role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});render();
+    const listen=()=>{if(!chat||!chat.hf)return;const b=[...AZ_BTNS].find(x=>x.isConnected);if(b&&!b._isOn())b._start()};
+    const tryListen=()=>{if(!chat||!chat.hf)return;if(tts.cur||(AUD.el&&!AUD.el.paused&&!AUD.el.ended)){setTimeout(tryListen,1000);return}listen()};
+    if(chat.auto){speak(reply,{onend:listen});setTimeout(tryListen,Math.max(6000,reply.length*80))}else listen()}
   catch(e){w.remove();bub.append(h("div",{class:"note"},errMsg(e)))}}
 async function endChat(){if(!chat)return;if(!player.on)keepAlive(false);const mine=chat.ui.filter(u=>u.who==="me");if(mine.length<2){chat=null;render();return}
   chat.summary="pending";render()}
