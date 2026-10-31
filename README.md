@@ -51,6 +51,11 @@ tools/tts/          # 음성 클립 생성 스크립트 (Kokoro / Mimic3, 오프
 - 상태: `S.drill.p[패턴id] = {st:현재 단계(6=완료), at, m:완료 시각, s2:{따라 말하기 통과}, i:{문장해시:{b:박스,d:다음 복습일,n,ok}}, r5}` — Claude db·Firebase 모두 S 통째로 저장, `mergeState()`가 패턴별 `at` 최신본으로 병합
 - 내 실수 자동 수집: `dClassify(fix)`가 S.log의 fixes를 설명 문구/정규식으로 패턴 분류 → `dMistakes()`
 - 정답 판정: 단어 LCS 유사도 `dSim()` ≥ 0.85(따라 말하기 0.8), 반응 시간은 입력 시작 시점 기준
+- 시간(3단계): 시계는 마이크가 듣기 시작한 뒤부터(`onStart`). 말 시작 4초→3초가 '빠름' 기준, 끝까지는 `dDoneLimit()` = 2초+단어수÷2 목표(느려도 통과). 내 실수 문장은 +2초
+- 자동 판정 `dAutoJudge()`: 마지막 단어가 들리면 0.4초 뒤, 아니면 근접 일치 후 1.5초 멈춤. '말하기 끝'은 박스 글자로 즉시 판정(`submitNow`)
+- 내 실수 문장의 한국어 단서: 고친 문장을 `translateSents()`로 번역해 `S.trans`에 캐시(`dKo`/`dKoFill`)
+- 이어 하기: 진행 중인 라운드/질문/초안을 기기 localStorage `oss_drill_cur`에 저장(36시간), `dResume()`로 복원, 목록 맨 위 '이어서 하기' 카드
+- 음성인식: 훈련 화면의 '휴대폰 음성인식 사용' 체크박스(`DRILL_SR`, localStorage `oss_drill_sr`)
 
 ## 로드맵
 - [ ] API 키 직접 연결 옵션 (웹에서도 AI 평가·대화)

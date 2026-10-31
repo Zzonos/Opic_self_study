@@ -2107,11 +2107,24 @@ function dInput(onSubmit,{rows=2,ph="말하거나 입력하고 Enter",onStart=nu
   return {ta,mic:mic||micLink(),real:!!mic,submitNow}}
 
 let drill=null;
+// the drill in progress (round, question, draft) is kept on this device, so closing the app resumes where I was
+const DSAVE_KEY="oss_drill_cur",DSAVE_TTL=36*3600e3;
+function dSaveAll(){try{return JSON.parse(localStorage.getItem(DSAVE_KEY)||"{}")||{}}catch(e){return {}}}
+function dSave(){if(!drill||!drill.pid)return;try{const all=dSaveAll();const q5=drill.q5?{tid:drill.q5.t&&drill.q5.t.id,t:drill.q5.t&&drill.q5.t.id==="x"?drill.q5.t:null,q:drill.q5.q}:null;
+  all[drill.pid]={stage:drill.stage,round:drill.round||null,q4:drill.q4||null,q5,d5:drill.d5||"",at:Date.now()};all._last=drill.pid;localStorage.setItem(DSAVE_KEY,JSON.stringify(all))}catch(e){}}
+function dLoad(pid){const v=dSaveAll()[pid];return v&&Date.now()-(v.at||0)<DSAVE_TTL?v:null}
+// pick up the saved part of this stage when it has not started yet in this session
+function dResume(){if(!drill||!drill.pid||drill._resumed)return;drill._resumed=1;const v=dLoad(drill.pid);if(!v||v.stage!==drill.stage)return;
+  if(!drill.round&&v.round&&v.round.i<v.round.list.length){drill.round=v.round;if(v.round.res.length>v.round.i)v.round.i=v.round.res.length}if(!drill.q4&&v.q4){if(v.q4.res.length>v.q4.i)v.q4.i=v.q4.res.length;drill.q4=v.q4}
+  if(!drill.q5&&v.q5){const t=v.q5.t||TOPICS.find(x=>x.id===v.q5.tid);if(t)drill.q5={t,q:v.q5.q}}if(!drill.d5&&v.d5)drill.d5=v.d5}
 function vDrill(m){if(drill&&drill.pid)return vDrillPat(m);
   const due=dDue();
   const dots=st=>h("span",{class:"row",style:"gap:3px"},...[1,2,3,4,5].map(k=>h("i",{style:`display:inline-block;width:14px;height:6px;border-radius:3px;background:${st>k?"var(--accent)":st===k?"var(--warn)":"var(--line)"}`})));
   put(m,h("div",{},h("p",{class:"eyebrow"},"Weak-point drill · 오늘 "+(S.today.drill||0)+"회"),h("h1",{},"약점 훈련")),
     h("div",{class:"note"},h("span",{},"내 답변 기록에서 자주 틀린 패턴과, 거의 안 쓰지만 쓰면 점수가 오르는 표현을 모았어요. 패턴마다 5단계를 올라가고, 3단계부터는 ",h("b",{},"정확하게 + 빠르게(마이크가 켜진 뒤 4초→3초 안에 말 시작)")," 말해야 통과해요.")),
+    (()=>{const pid=dSaveAll()._last;const v=pid&&dLoad(pid);if(!v)return null;const P=pid==="_review"?null:dPat(pid);if(pid!=="_review"&&!P)return null;
+      const r=v.stage===3&&v.round&&v.round.i<v.round.list.length?" · "+(Math.max(v.round.i,v.round.res.length)+1)+" / "+v.round.list.length+" 문장":v.stage===4&&v.q4&&v.q4.res.length<5?" · "+(v.q4.res.length+1)+" / 5":v.stage===5&&(v.d5||v.q5)?" · 답변 작성 중":"";if(!r)return null;
+      return h("div",{class:"card",style:"border-color:var(--warn)"},h("div",{class:"hdr"},h("div",{},h("h3",{},"이어서 하기"),h("p",{class:"muted small"},(P?P.name+" · "+v.stage+"단계":"오늘 복습")+r)),h("button",{class:"btn primary",onclick:()=>{drill={pid,stage:v.stage};render()}},"이어서")))})(),
     due.length?h("div",{class:"card",style:"border-color:var(--accent)"},h("div",{class:"hdr"},h("div",{},h("h3",{},"오늘 복습 "+due.length+"문장"),h("p",{class:"muted small"},"완료한 패턴의 문장이 1·3·7·14일 간격으로 돌아와요.")),h("button",{class:"btn primary",onclick:()=>{drill={pid:"_review",stage:3,round:null};render()}},"복습 시작"))):null,
     ...[["fix","자주 틀리는 것 — 실수 고치기"],["up","안 쓰지만 쓰면 점수 오르는 것 — 새 무기"]].flatMap(([g,label])=>{const recG=DRILL_PATS.find(P=>P.grp===g&&dP(P.id).st<=5);return [h("p",{class:"eyebrow",style:"margin-top:6px"},label),
     h("div",{class:"list"},...DRILL_PATS.filter(P=>P.grp===g).map(P=>{const rec=recG;const p=dP(P.id);const nm=dNewMistakes(P.id);const mine=dMistakes(P.id).length;const used=g==="up"?dUsed(P):null;
@@ -2126,9 +2139,9 @@ function dSrToggle(){if(!azOn()||!SR_OK)return null;const cb=h("input",{type:"ch
   return h("label",{class:"muted small",style:"display:inline-flex;align-items:center;gap:6px;cursor:pointer"},cb,"휴대폰 음성인식 사용 (Azure 안 씀)")}
 function dHeader(P,p){return h("div",{},h("div",{class:"row",style:"justify-content:space-between;align-items:center"},h("button",{class:"btn sm ghost",onclick:()=>{drill=null;render()}},"← 약점 훈련"),dSrToggle()),h("p",{class:"eyebrow",style:"margin-top:10px"},P?P.name:"복습"),
   P?h("div",{class:"segs",style:"margin-top:8px"},...DRILL_STAGES.map((s,k)=>h("button",{class:"seg"+(drill.stage===k+1?" on":""),disabled:k+1>p.st,style:k+1>p.st?"opacity:.4":"",onclick:()=>{drill={pid:P.id,stage:k+1};render()}},(k+1)+" "+(window.innerWidth<520?"":s)))):null)}
-function vDrillPat(m){if(drill.pid==="_review")return dStage3(m,null,null);const P=dPat(drill.pid);const p=dP(P.id);
+function vDrillPat(m){dResume();if(drill.pid==="_review"){dStage3(m,null,null);dSave();return}const P=dPat(drill.pid);const p=dP(P.id);
   put(m,dHeader(P,p),h("h1",{},DRILL_STAGES[drill.stage-1]));
-  ({1:dStage1,2:dStage2,3:dStage3,4:dStage4,5:dStage5})[drill.stage](m,P,p)}
+  ({1:dStage1,2:dStage2,3:dStage3,4:dStage4,5:dStage5})[drill.stage](m,P,p);dSave()}
 function dStage1(m,P,p){put(m,h("div",{class:"card"},h("h3",{},"언제 쓰나"),h("p",{},P.rule)),
   h("div",{class:"card"},h("h3",{},"내 이야기로 만든 예문"),...P.ex.map(([en,ko])=>h("div",{class:"row",style:"align-items:flex-start;flex-wrap:nowrap"},spkBtn(en),h("div",{class:"grow"},h("div",{style:"font-weight:500"},en),h("div",{class:"muted small"},ko))))),
   h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{dAdvance(P.id,2);drill.stage=2;render()}},"이해했어요 → 따라 말하기")))}
@@ -2176,7 +2189,7 @@ function dStage3(m,P,p){const review=!P;let R=drill.round;
     if(answered){if(!retryMode||forceOk)return;const s2=dSim(v,it.en);const ok2=s2>=0.85;if(ok2)retryMode=false;
       fb2.replaceChildren(h("div",{class:"fix",style:"border-left-color:"+(ok2?"var(--good)":"var(--bad)")},h("span",{class:"b"},ok2?"✅ 이번엔 맞았어요! (기록은 첫 시도로 남고, 라운드 끝에 한 번 더 나와요)":"아직 달라요 ("+Math.round(s2*100)+"%) — 빨간 단어를 신경 써서 다시"),ok2?null:h("div",{},dDiff(v,it.en))));return}
     answered=true;try{const b=inp.mic;if(b&&b._isOn&&b._isOn()&&!b._auto)b._abort()}catch(e){}clearInterval(iv);if(!t0)t0=Date.now();const start=inp.ta._first||Date.now();const rt=Math.max(0,(start-t0)/1000);const tt=Math.max(rt,((inp.ta._last||Date.now())-t0)/1000);const slow=tt>dlim;
-    const s=dSim(v,it.en);const ok=forceOk||s>=0.85;const fast=ok&&rt<=lim;R.res.push({...it,ok,fast});if(ok)R.ok++;if(fast){R.fast++;if(!it.retry)R.fast0++}dRecord(it.pid,it,ok,fast);
+    const s=dSim(v,it.en);const ok=forceOk||s>=0.85;const fast=ok&&rt<=lim;R.res.push({...it,ok,fast});if(ok)R.ok++;if(fast){R.fast++;if(!it.retry)R.fast0++}dRecord(it.pid,it,ok,fast);dSave();
     if(!ok){R.list.push({...it,retry:true});retryMode=true}
     fb.replaceChildren(fb2,h("div",{class:"fix",style:"border-left-color:"+(fast?"var(--good)":ok?"var(--warn)":"var(--bad)")},h("span",{class:"b"},fast?"정확 + 빠름 (시작 "+rt.toFixed(1)+"초"+(slow?" · 끝까지 "+tt.toFixed(1)+"초 🐢":"")+")":ok?"정확하지만 시작이 느려요 ("+rt.toFixed(1)+"초 / "+lim+"초) — 입에 붙을 때까지":"다시 — 정답과 비교해 보세요"),
       fast&&slow?h("span",{class:"muted small"},"시작은 빨랐어요. 끝까지 목표 "+dlim+"초 — 통과에는 영향 없어요."):null,
@@ -2217,7 +2230,7 @@ function dStage4(m,P,p){const Q=P.qs;drill.q4=drill.q4||{i:0,ok:0,res:[]};const 
       h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{drill.q4=null;if(pass)drill.stage=5;render()}},pass?"5단계로":"다시 하기"))));return}
   const [q,model]=Q[st.i];const fb=h("div",{});let done=false;
   const nextBtn=()=>h("button",{class:"btn primary",onclick:()=>{st.i++;render()}},"다음 →");
-  const grade=ok=>{if(done)return;done=true;st.res.push(ok);if(ok)st.ok++;dTouch(p)};
+  const grade=ok=>{if(done)return;done=true;st.res.push(ok);if(ok)st.ok++;dTouch(p);dSave()};
   const check=async v=>{v=(v||"").trim();if(v.length<3){toast("한 문장으로 답해 주세요");return}fb.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i")));
     const r=await dJudge(P,q,v);if(!fb.isConnected)return;
     if(r.ok===null){fb.replaceChildren(h("div",{class:"fix",style:"border-left-color:var(--warn)"},h("span",{class:"w"},r.why),h("span",{class:"b"},"예시: "+model)),
@@ -2234,6 +2247,7 @@ function dStage4(m,P,p){const Q=P.qs;drill.q4=drill.q4||{i:0,ok:0,res:[]};const 
 // stage 5: a real OPIc question, 1–2 minutes, the pattern must appear (and be correct) at least once
 function dStage5(m,P,p){const pool=P.q5?P.q5().map(x=>({t:{ko:x.ko,en:x.ko,id:"x"},q:{q:x.q,k:x.k,t:x.t}})):TOPICS.flatMap(t=>allQs(t).filter(q=>q.t===P.qt).map(q=>({t,q})));drill.q5=drill.q5||pick(pool,1)[0];const {t,q}=drill.q5;
   const fb=h("div",{});const inp=dInput(()=>{},{rows:6,ph:"1–2분 동안 답하세요. 받아쓰기(휴대폰: 키보드 🎤 / Windows: Win+H)나 마이크 버튼으로 입력돼요."});
+  if(drill.d5)inp.ta.value=drill.d5;inp.ta.addEventListener("input",()=>{drill.d5=inp.ta.value;dSave()});
   const go5=async()=>{const a=inp.ta.value.trim();if(a.split(/\s+/).length<25){toast("조금 더 길게 답해 주세요 (25단어 이상)");return}
     fb.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"확인 중…")));let r=null;
     if(sample){try{r=await sample.json(`You check whether a Korean OPIc learner (target ${tgt()}) used one target pattern in a spoken answer.
@@ -2245,16 +2259,16 @@ Find every place the learner used (or should have used) the pattern. Reply with 
 "correct" is true when the pattern appears at least once and is used correctly every time (or the misuses are minor). Give at most 3 fixes.`,{cache:false})}catch(e){r=null}}
     if(!fb.isConnected)return;
     if(!r){const used=P.key.test(dNorm(a));fb.replaceChildren(h("div",{class:"fix",style:"border-left-color:var(--warn)"},h("span",{class:"w"},used?"패턴이 들어간 것 같아요. 맞게 썼는지 스스로 확인해 주세요.":"패턴이 안 보여요."),h("span",{class:"small"},"규칙: "+P.rule)),
-        h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{drill.q5=null;render()}},"다른 질문"),h("button",{class:"btn primary",onclick:()=>{dAdvance(P.id,6);drill=null;render()}},"맞게 썼어요 — 완료")));return}
+        h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{drill.q5=null;drill.d5="";render()}},"다른 질문"),h("button",{class:"btn primary",onclick:()=>{dAdvance(P.id,6);drill=null;render()}},"맞게 썼어요 — 완료")));return}
     const pass=r.correct&&(r.used||0)>=1;if(pass)dAdvance(P.id,6);else dTouch(p);
     p.r5={ts:Date.now(),q:q.q,pass,used:r.used||0};save();
     fb.replaceChildren(h("div",{class:"card",style:"border-color:"+(pass?"var(--good)":"var(--warn)")},h("h3",{},pass?"실전에서도 썼어요! 패턴 완료":"아직이에요 — 한 번 더"),h("p",{class:"small"},r.summary||""),
         ...(r.quotes||[]).map(x=>h("div",{class:"small",style:"color:var(--good)"},"✓ "+x)),
         ...(r.fixes||[]).map(f=>h("div",{class:"fix"},h("span",{class:"o"},f.original),h("span",{class:"b"},f.better),h("span",{class:"w"},f.why))),
-        h("div",{class:"row"},pass?h("button",{class:"btn primary",onclick:()=>{drill=null;render()}},"목록으로"):h("button",{class:"btn primary",onclick:()=>{inp.ta.value="";fb.replaceChildren()}},"다시 답하기"),h("button",{class:"btn",onclick:()=>{drill.q5=null;render()}},"다른 질문"))))};
+        h("div",{class:"row"},pass?h("button",{class:"btn primary",onclick:()=>{drill=null;render()}},"목록으로"):h("button",{class:"btn primary",onclick:()=>{inp.ta.value="";drill.d5="";dSave();fb.replaceChildren()}},"다시 답하기"),h("button",{class:"btn",onclick:()=>{drill.q5=null;drill.d5="";render()}},"다른 질문"))))};
   put(m,h("div",{class:"note"},h("span",{},"미션: 이 답변에 ",h("b",{},P.name)," 패턴을 1번 이상 맞게 넣기. "+P.rule)),
     h("div",{class:"card"},h("p",{class:"eyebrow"},t.ko+(QT[q.t]?" · "+QT[q.t]:"")),h("div",{class:"row",style:"flex-wrap:nowrap"},spkBtn(q.q),h("div",{class:"q grow"},q.q)),h("p",{class:"muted small"},q.k),
-      inp.ta,h("div",{class:"row"},inp.mic,h("button",{class:"btn primary",onclick:go5},sample?"AI 확인":"확인"),h("button",{class:"btn ghost",onclick:()=>{drill.q5=null;render()}},"다른 질문")),fb))}
+      inp.ta,h("div",{class:"row"},inp.mic,h("button",{class:"btn primary",onclick:go5},sample?"AI 확인":"확인"),h("button",{class:"btn ghost",onclick:()=>{drill.q5=null;drill.d5="";render()}},"다른 질문")),fb))}
 
 /* ---- SETTINGS ---- */
 function vSettings(m){
