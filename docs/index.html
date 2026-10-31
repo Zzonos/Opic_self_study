@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261031-172224-f76d97">
+<html lang="ko" data-build="20261031-173505-2a5e8d">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -2118,10 +2118,12 @@ function dInput(onSubmit,{rows=2,ph="말하거나 입력하고 Enter",onStart=nu
   ta.addEventListener("input",()=>{const v=ta.value.trim();if(v){if(!ta._first)ta._first=Date.now();if(v!==ta._lv){ta._lv=v;ta._last=Date.now()}}});
   let mic=null;try{mic=(azOn()&&!(DRILL_SR&&SR_OK)?azMicBtn:micBtn)(ta,{assess:false,fresh:true,onStart,onFinal:v=>{if(rows<=2&&v&&v.trim())onSubmit(v)}})}catch(e){mic=null}
   // speaking again: start from an empty box (a new try, not more words added to the last one)
-  if(mic)mic.addEventListener("click",()=>{if((mic._isOn&&mic._isOn())||(mic._live&&mic._live()))return;ta.value="";ta._lv="";mic._auto=0;try{mic._reset&&mic._reset()}catch(e){}},{capture:true});
+  // judge right away with what is in the box (no waiting for the recogniser to settle)
+  const submitNow=()=>{const v=ta.value;try{mic&&mic._abort&&mic._abort()}catch(e){}onSubmit(v)};
+  if(mic)mic.addEventListener("click",e=>{if(mic._isOn&&mic._isOn()){if(rows<=2&&ta.value.trim()){e.stopImmediatePropagation();submitNow()}return}if(mic._live&&mic._live())return;ta.value="";ta._lv="";mic._auto=0;try{mic._reset&&mic._reset()}catch(e){}},{capture:true});
   // the phone's own recognition has no "listening now" event: count from the tap
   if(mic&&!mic._az&&onStart)mic.addEventListener("click",()=>{if(mic._isOn&&mic._isOn())onStart()});
-  return {ta,mic:mic||micLink(),real:!!mic}}
+  return {ta,mic:mic||micLink(),real:!!mic,submitNow}}
 
 let drill=null;
 function vDrill(m){if(drill&&drill.pid)return vDrillPat(m);
@@ -2154,7 +2156,7 @@ function dStage2(m,P,p){const list=[...P.ex,...P.items.slice(0,3).map(([ko,en])=
   const check=v=>{const s=dSim(v,en);if(s>=0.8){p.s2[txtHash(en)]=1;dTouch(p);if(list.every(([e])=>p.s2[txtHash(e)])){dAdvance(P.id,3);drill.stage=3}render()}else fb.replaceChildren(h("div",{class:"fix"},h("span",{class:"w"},"조금 달라요 ("+Math.round(s*100)+"%) — 빨간 단어를 신경 써서 다시"),dDiff(v,en)),h("div",{class:"row"},h("button",{class:"btn sm ghost",onclick:()=>{p.s2[txtHash(en)]=1;dTouch(p);render()}},"맞게 말했는데 인식이 틀렸어요")))};
   const inp=dInput(check);
   // speaking: once the words heard match the sentence, stop listening and pass by itself (no extra tap)
-  inp.ta.addEventListener("input",()=>{const b=inp.mic;if(b&&b._isOn&&b._isOn()&&!b._auto&&dSim(inp.ta.value,en)>=0.8){b._auto=1;b._finish&&b._finish()}});
+  inp.ta.addEventListener("input",()=>{const b=inp.mic;if(b&&b._isOn&&b._isOn()&&!b._auto&&dSim(inp.ta.value,en)>=0.8){b._auto=1;inp.submitNow()}});
   put(m,h("p",{class:"muted small mono"},done+" / "+list.length+" 문장 통과"),
     h("div",{class:"card"},h("div",{class:"row",style:"flex-wrap:nowrap"},spkBtn(en),h("div",{class:"grow"},h("div",{class:"q"},en),h("div",{class:"muted small"},ko))),
       h("p",{class:"muted small"},"듣고 → 똑같은 리듬으로 따라 말하기. I've, That's 같은 줄임말은 한 덩어리로."),inp.ta,h("div",{class:"row"},inp.mic,h("button",{class:"btn",onclick:()=>check(inp.ta.value)},"확인")),fb));
@@ -2200,7 +2202,7 @@ function dStage3(m,P,p){const review=!P;let R=drill.round;
   const koReady=it.mine&&!ko0&&sample?dKoFill([it]).then(()=>{if(koEl.isConnected)koEl.textContent=dKo(it)||"(한국어 뜻을 못 만들었어요 — 아래 틀린 표현을 고쳐 말해 보세요)"}):Promise.resolve();
   if(!inp.real)inp.ta.addEventListener("keydown",go0,{once:true});
   // sentence heard correctly: stop listening and judge at once (the end time is the last word heard)
-  inp.ta.addEventListener("input",()=>{const b=inp.mic;if((!answered||retryMode)&&b&&b._isOn&&b._isOn()&&!b._auto&&dSim(inp.ta.value,it.en)>=0.85){b._auto=1;b._finish&&b._finish()}});
+  inp.ta.addEventListener("input",()=>{const b=inp.mic;if((!answered||retryMode)&&b&&b._isOn&&b._isOn()&&!b._auto&&dSim(inp.ta.value,it.en)>=0.85){b._auto=1;inp.submitNow()}});
   put(m,h("p",{class:"muted small mono"},(R.i+1)+" / "+R.list.length+(it.retry?" · 다시 나온 문장":"")+(review?" · "+(dPat(it.pid)?.short||""):"")),
     h("div",{class:"card"},h("p",{class:"eyebrow"},it.mine?"내 답변에서 나온 실수 → 맞는 문장으로 고쳐 말하기":"한국어 → 영어로 바로 말하기"),
       it.mine?h("div",{},koEl,
