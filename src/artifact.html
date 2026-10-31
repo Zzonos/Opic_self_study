@@ -2119,7 +2119,7 @@ function dAdvance(pid,to){const p=dP(pid);const up=p.st<to;if(up){p.st=to;if(to>
 function dInput(onSubmit,{rows=2,ph="말하거나 입력하고 Enter",onStart=null}={}){const ta=h("textarea",{id:"ans_drill",rows,style:"min-height:"+(rows>2?150:64)+"px",placeholder:ph,autocapitalize:"sentences"});
   ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&rows<=2){e.preventDefault();onSubmit(ta.value)}});
   ta.addEventListener("input",()=>{const v=ta.value.trim();if(v){if(!ta._first)ta._first=Date.now();if(v!==ta._lv){ta._lv=v;ta._last=Date.now()}}});
-  let mic=null;try{mic=(azOn()&&!(DRILL_SR&&SR_OK)?azMicBtn:micBtn)(ta,{assess:false,fresh:true,onStart,onFinal:v=>{if(rows<=2&&v&&v.trim())onSubmit(v)}})}catch(e){mic=null}
+  let mic=null;try{mic=(azOn()&&!(DRILL_SR&&SR_OK&&!SR_BAD)?azMicBtn:micBtn)(ta,{assess:false,fresh:true,onStart,onFinal:v=>{if(rows<=2&&v&&v.trim())onSubmit(v)}})}catch(e){mic=null}
   // speaking again: start from an empty box (a new try, not more words added to the last one)
   // judge right away with what is in the box (no waiting for the recogniser to settle)
   const submitNow=()=>{const v=ta.value;try{mic&&mic._abort&&mic._abort()}catch(e){}onSubmit(v)};
@@ -2366,7 +2366,12 @@ function aiGate(){const box=h("span",{class:"row",style:"gap:6px"});const note=h
   box.append(btn,note);return box}
 // every phone recogniser ever started: a phone can listen with one at a time, and one left half-open
 // (e.g. stopped while the app was in the background) blocks the next — so a new start aborts them all first
-const SR_ALL=new Set();let SR_BG=false;const srLog=t=>{audLog.push("휴대폰 음성인식 "+t);if(audLog.length>30)audLog.shift()};
+const SR_ALL=new Set();let SR_BG=false,SR_ONE=null,SR_FRESH=false,SR_MISS=0,SR_BAD=false;
+// a recogniser with its life-cycle log wired once (handlers set per session; _st is the current session's record)
+function srNew(){const R=window.SpeechRecognition||window.webkitSpeechRecognition;const r=new R();r._live=false;const st=()=>r._st||{};
+  if(r.addEventListener){r.addEventListener("start",()=>{st().s=1});r.addEventListener("audiostart",()=>{st().a=1});r.addEventListener("speechstart",()=>{st().sp=1});
+    r.addEventListener("result",e=>{const s=st();s.r=(s.r||0)+1;try{s.ch=Array.from(e.results).map(x=>x[0].transcript).join(" ").length}catch(x){}});
+    r.addEventListener("end",()=>{r._live=false;const s=r._st;r._st=null;s&&s.end&&s.end()})}return r}const srLog=t=>{audLog.push("휴대폰 음성인식 "+t);if(audLog.length>30)audLog.shift()};
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")SR_BG=true});
 function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false,gate=null,onHeard=null}={}){if(!SR_OK)return null;const b=h("button",{class:"btn primary"},label);MIC_BTNS.add(b);let on=false;let waitEnd=null;let t0s=0,retried=false,wdN=0,wdInt=false;
   b._isOn=()=>on;b._finish=()=>new Promise(res=>{if(!on){res();return}waitEnd=res;try{rec?.stop()}catch(e){}setTimeout(()=>{if(waitEnd===res){waitEnd=null;if(on)stop();res()}},2500)});
@@ -2375,21 +2380,25 @@ function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false,gate=nul
   // after the text was sent (chat), drop everything recognised so far so it is not sent again
   b._cut=()=>{base="";fin="";from=seen;pend=""};
   b._rebase=t=>{base=t?t.trim()+" ":"";fin="";from=seen;pend="";ta.value=base;ta.dispatchEvent(new Event("input"))};
-  let want=false;b._wanted=()=>want;b._bg=()=>{want=false;if(on){const r=rec;stop();try{r&&r.abort&&r.abort()}catch(e){}}};b._abort=()=>{want=false;waitEnd=null;if(on)stop();base="";fin="";pend="";from=0;seen=0};
+  let want=false;b._wanted=()=>want;b._bg=()=>{want=false;if(on){const r=rec;stop();try{r&&r.abort&&r.abort()}catch(e){}}};b._abort=()=>{want=false;waitEnd=null;if(on){if(rec&&rec._st)rec._st.by="제출";stop()}base="";fin="";pend="";from=0;seen=0};
   b._fresh=()=>{if(!on||!rec)return;pend="";base="";fin="";try{rec.abort?rec.abort():rec.stop()}catch(e){}};
   if(keepAlive)document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&want&&!on&&b.isConnected)b.onclick()});
   let pend="",settled=null;
   // make the words still being recognised final before the text is sent: ask the browser to close the
   // session (it then finalises them); keepAlive starts listening again right after
   b._flush=()=>new Promise(res=>{if(!on||!rec||!pend.trim())return res();settled=res;try{rec.stop()}catch(e){}setTimeout(()=>{if(settled===res){settled=null;res()}},1800)});
-  b.onclick=()=>{const busy=!!tts.cur;ttsStop();if(on){want=false;stop();return}if(!wdInt)wdN=0;const R=window.SpeechRecognition||window.webkitSpeechRecognition;rec=new R();const prev=SR_ALL.size;for(const r of SR_ALL){try{r.abort()}catch(e){}}SR_ALL.clear();SR_ALL.add(rec);t0s=Date.now();
-    {const me=rec,st={a:0,r:0,ch:0};srLog("시작"+(prev?" (이전 "+prev+"개 끊음)":"")+(SR_BG?" · 백그라운드 복귀 후":""));SR_BG=false;
-     me.onstart=()=>{st.s=1};me.onaudiostart=()=>{st.a=1};if(me.addEventListener){me.addEventListener("result",e=>{st.r++;try{st.ch=Array.from(e.results).map(x=>x[0].transcript).join(" ").length}catch(x){}});
-     me.addEventListener("end",()=>srLog("종료 "+((Date.now()-t0s)/1000).toFixed(0)+"초: 시작신호 "+(st.s?"O":"X")+" · 소리 "+(st.a?"O":"X")+" · 결과 "+st.r+"회 "+st.ch+"자"))}
+  b.onclick=()=>{const busy=!!tts.cur;ttsStop();if(on){want=false;if(rec&&rec._st)rec._st.by="사용자";stop();return}if(!wdInt)wdN=0;
+    // iPhone: a second recogniser object often hears sound but never returns words, so keep one and start it again;
+    // after a session that heard sound but returned nothing, try a brand-new one instead
+    let r0=SR_ONE&&!SR_ONE._live&&!SR_FRESH?SR_ONE:null;const prev=[...SR_ALL].filter(r=>r!==r0&&r._live).length;
+    for(const r of SR_ALL)if(r!==r0&&r._live){try{r.abort()}catch(e){}}SR_ALL.clear();rec=r0||srNew();SR_ONE=rec;SR_ALL.add(rec);t0s=Date.now();
+    {const me=rec,st={a:0,r:0,ch:0,by:"브라우저"};me._st=st;srLog("시작"+(r0?" (재사용)":" (새로)")+(prev?" · 이전 "+prev+"개 끊음":"")+(SR_BG?" · 백그라운드 복귀 후":""));SR_BG=false;
+     st.end=()=>{const sec=(Date.now()-t0s)/1000;srLog("종료 "+sec.toFixed(0)+"초 ("+st.by+"): 시작신호 "+(st.s?"O":"X")+" · 소리 "+(st.a?"O":"X")+" · 말소리 "+(st.sp?"O":"X")+" · 결과 "+st.r+"회 "+st.ch+"자");
+       if(keepAlive)return;if(st.r){SR_FRESH=false;SR_MISS=0}else if(st.a&&sec>=3){SR_MISS++;SR_FRESH=true;if(SR_MISS>=2&&!SR_BAD){SR_BAD=true;srLog("응답 없음 반복 → 이번 접속 동안 대체 방식 사용");toast(azOn()?"휴대폰 음성인식이 응답하지 않아 Azure로 받아쓸게요":"휴대폰 음성인식이 응답하지 않아요 — 새로고침해 주세요 (진행 상황은 저장돼요)");if(azOn())setTimeout(()=>{if(view==="drill")render()},600)}}};
      // watchdog: iPhone sometimes starts a recogniser that never hears anything (no error, no result) — after 6s of
      // nothing, swap in a fresh one (what was said is kept); twice at most, then tell the user how to recover
-     if(!keepAlive)setTimeout(()=>{if(!on||rec!==me||st.r||!b.isConnected)return;
-       if(wdN<2){wdN++;srLog("응답 없음 "+((Date.now()-t0s)/1000).toFixed(0)+"초 (시작신호 "+(st.s?"O":"X")+" · 소리 "+(st.a?"O":"X")+") → 새로 시작 "+wdN+"회");stop();try{me.abort()}catch(e){}
+     if(!keepAlive)setTimeout(()=>{if(!on||rec!==me||me._st!==st||st.r||!b.isConnected)return;
+       if(wdN<2){wdN++;st.by="자동 재시작";SR_FRESH=true;stop();try{me.abort()}catch(e){}
          setTimeout(()=>{if(b.isConnected&&!on){wdInt=true;try{b.onclick()}finally{wdInt=false}}},300)}
        else toast("음성인식이 응답하지 않으면 새로고침해 주세요 (진행 상황은 저장돼요)")},6000)}rec.lang="en-US";rec.continuous=true;rec.interimResults=true;base=ta.value?ta.value.trim()+" ":"";fin="";from=0;seen=0;
     rec.onresult=e=>{if(!on||(e.target&&e.target!==rec))return;retried=false;let interim="";fin="";seen=e.results.length;for(let i=from;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t+" ";else interim+=t}pend=interim;
@@ -2402,10 +2411,12 @@ function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false,gate=nul
       if(e.error==="not-allowed")toast("마이크 권한을 허용해 주세요 (설정 → Safari → 마이크)");else if(e.error!=="no-speech"&&e.error!=="aborted")toast("음성인식이 멈췄어요 ("+e.error+") — 다시 눌러 주세요");stop()};
     rec.onend=()=>{if(on&&keepAlive&&!waitEnd){// the browser closed the session by itself: keep what was heard and listen again
         pend="";if(settled){const s2=settled;settled=null;setTimeout(s2,0)}
-        base=ta.value?ta.value.replace(/\s+$/,"")+" ":"";fin="";from=0;seen=0;const old=rec;setTimeout(()=>{if(!on||rec!==old)return;try{rec.start()}catch(e){try{const R2=window.SpeechRecognition||window.webkitSpeechRecognition;const n=new R2();n.lang="en-US";n.continuous=true;n.interimResults=true;n.onresult=old.onresult;n.onerror=old.onerror;n.onend=old.onend;rec=n;SR_ALL.add(n);n.start()}catch(x){stop()}}},150);return}
+        base=ta.value?ta.value.replace(/\s+$/,"")+" ":"";fin="";from=0;seen=0;const old=rec;setTimeout(()=>{if(!on||rec!==old)return;try{rec.start();rec._live=true}catch(e){try{const R2=window.SpeechRecognition||window.webkitSpeechRecognition;const n=new R2();n.lang="en-US";n.continuous=true;n.interimResults=true;n.onresult=old.onresult;n.onerror=old.onerror;n.onend=old.onend;rec=n;SR_ALL.add(n);n.start()}catch(x){stop()}}},150);return}
       if(on){stop();ta.value=(base+fin).trim();ta.dispatchEvent(new Event("input"));onFinal&&onFinal(ta.value)}if(waitEnd){const w=waitEnd;waitEnd=null;w()}};
     // the question was still being read aloud: give the phone a moment to switch the audio from playing to listening
-    const go=r=>{try{r.start()}catch(e){toast("음성 인식을 시작할 수 없어요");stop()}};on=true;want=true;b.textContent="■ 말하기 끝";b.classList.add("rec");
+    const go=r=>{try{r.start();r._live=true}catch(e){if(r===SR_ONE&&!r._retry){// the kept recogniser would not start again: use a new one
+          const n=srNew();n._st=r._st;r._st=null;n.lang=r.lang;n.continuous=true;n.interimResults=true;n.onresult=r.onresult;n.onerror=r.onerror;n.onend=r.onend;n._retry=1;rec=n;SR_ONE=n;SR_ALL.clear();SR_ALL.add(n);srLog("재사용 실패 → 새로");go(n);return}
+        toast("음성 인식을 시작할 수 없어요");stop()}};on=true;want=true;b.textContent="■ 말하기 끝";b.classList.add("rec");
     if(busy){const r=rec;setTimeout(()=>{if(on&&rec===r)go(r)},350)}else go(rec)};
   return b}
 // web build: auto-refresh when a newer version is deployed (home-screen apps cache the old page)
