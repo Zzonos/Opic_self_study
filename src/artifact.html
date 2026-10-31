@@ -2140,10 +2140,14 @@ function dStage2(m,P,p){const list=[...P.ex,...P.items.slice(0,3).map(([ko,en])=
     h("div",{class:"card"},h("div",{class:"row",style:"flex-wrap:nowrap"},spkBtn(en),h("div",{class:"grow"},h("div",{class:"q"},en),h("div",{class:"muted small"},ko))),
       h("p",{class:"muted small"},"듣고 → 똑같은 리듬으로 따라 말하기. I've, That's 같은 줄임말은 한 덩어리로."),inp.ta,h("div",{class:"row"},inp.mic,h("button",{class:"btn",onclick:()=>check(inp.ta.value)},"확인")),fb));
   setTimeout(()=>speak(en),300)}
+// my own mistakes have no Korean cue: use the Korean of the corrected sentence (shared translation cache, made on demand in API mode)
+function dKo(it){const ss=splitSent(it.en);return ss.length&&ss.every(x=>S.trans&&S.trans[x])?ss.map(x=>S.trans[x]).join(" "):""}
+let dKoP=null;function dKoFill(items){const miss=[...new Set(items.filter(x=>x.mine).flatMap(x=>splitSent(x.en)).filter(x=>!(S.trans&&S.trans[x])))];if(!miss.length||!sample)return Promise.resolve();
+  const p=(dKoP||Promise.resolve()).then(()=>translateSents(miss.filter(x=>!S.trans[x]))).catch(e=>{audLog.push("훈련 한국어 뜻 실패: "+String(e&&e.message||e).slice(0,60))});dKoP=p;return p}
 // stage 3 (and daily review): Korean cue → say the English within the time limit
 function dStage3(m,P,p){const review=!P;let R=drill.round;
   if(!R){const pool=review?pick(dDue(),10):(()=>{const base=pick(dItems(P.id).filter(x=>!x.mine),7);const mine=pick(dMistakes(P.id),3);return pick([...base,...mine],10)})();
-    R=drill.round={list:pool.map(x=>({...x,pid:x.pid||P.id})),i:0,ok:0,fast:0,fast0:0,n0:pool.length,res:[]}}
+    R=drill.round={list:pool.map(x=>({...x,pid:x.pid||P.id})),i:0,ok:0,fast:0,fast0:0,n0:pool.length,res:[]};dKoFill(R.list)}
   if(review)put(m,dHeader(null,null),h("h1",{},"오늘 복습"));
   if(!R.list.length){put(m,h("p",{class:"muted"},"복습할 문장이 없어요."));return}
   if(R.i>=R.list.length){const acc=R.fast0/Math.max(1,R.n0);const pass=!review&&acc>=0.8;if(pass&&p.st<4)dAdvance(P.id,4);
@@ -2172,20 +2176,24 @@ function dStage3(m,P,p){const review=!P;let R=drill.round;
       h("div",{class:"row"},spkBtn(it.en),!ok?h("button",{class:"btn sm ghost",onclick:()=>{R.res.pop();R.list.pop();answered=false;retryMode=false;fb2.replaceChildren();finish(it.en,true)}},"맞게 말했는데 인식이 틀렸어요"):null,h("button",{class:"btn primary",onclick:next},"다음 →")));
     if(!ok)speak(it.en)};
   const inp=dInput(v=>finish(v),{onStart:go0});
+  // the Korean to say (my mistakes: Korean of the corrected sentence; may still be on its way)
+  const ko0=it.mine?dKo(it):"";const koEl=it.mine?h("div",{class:"q"},ko0||(sample?"한국어 뜻 만드는 중…":"(한국어 뜻은 API 모드에서 만들어져요 — 아래 틀린 표현을 고쳐 말해 보세요)")):null;
+  const koReady=it.mine&&!ko0&&sample?dKoFill([it]).then(()=>{if(koEl.isConnected)koEl.textContent=dKo(it)||"(한국어 뜻을 못 만들었어요 — 아래 틀린 표현을 고쳐 말해 보세요)"}):Promise.resolve();
   if(!inp.real)inp.ta.addEventListener("keydown",go0,{once:true});
   // sentence heard correctly: stop listening and judge at once (the end time is the last word heard)
   inp.ta.addEventListener("input",()=>{const b=inp.mic;if((!answered||retryMode)&&b&&b._isOn&&b._isOn()&&!b._auto&&dSim(inp.ta.value,it.en)>=0.85){b._auto=1;b._finish&&b._finish()}});
   put(m,h("p",{class:"muted small mono"},(R.i+1)+" / "+R.list.length+(it.retry?" · 다시 나온 문장":"")+(review?" · "+(dPat(it.pid)?.short||""):"")),
     h("div",{class:"card"},h("p",{class:"eyebrow"},it.mine?"내 답변에서 나온 실수 → 맞는 문장으로 고쳐 말하기":"한국어 → 영어로 바로 말하기"),
-      it.mine?h("div",{},h("div",{class:"muted small"},"내가 말한 틀린 표현"),h("div",{class:"q"},it.o||String(it.ko).replace(/^고쳐 말하기 · “|”$/g,"")),
-        h("p",{class:"small",style:"margin:6px 0 0"},h("b",{},"고칠 점: "),it.why||(dPat(it.pid)?.rule||"")),
+      it.mine?h("div",{},koEl,
+        h("div",{style:"margin-top:8px;padding:8px 10px;border-radius:10px;background:var(--bg2,rgba(0,0,0,.04))"},h("div",{class:"muted small"},"내가 말한 틀린 표현"),h("div",{style:"font-weight:500"},it.o||String(it.ko).replace(/^고쳐 말하기 · “|”$/g,"")),
+        h("p",{class:"small",style:"margin:6px 0 0"},h("b",{},"고칠 점: "),it.why||(dPat(it.pid)?.rule||""))),
         h("details",{style:"margin-top:4px"},h("summary",{class:"muted small"},"정답 문장 보기 (막히면)"),h("div",{class:"row",style:"flex-wrap:nowrap;margin-top:4px"},spkBtn(it.en),h("div",{class:"grow"},it.en))))
       :h("div",{class:"q"},it.ko),
       h("p",{class:"muted small",style:"margin:2px 0"},"⏱ 마이크가 켜진 뒤 "+lim+"초 안에 말을 시작하면 '빠름'. 끝까지는 "+dlim+"초 목표(느려도 통과)."),
       h("div",{class:"row",style:"flex-wrap:nowrap"},h("div",{class:"grow"},bar),tEl),inp.ta,
       h("div",{class:"row"},inp.mic,h("button",{class:"btn",onclick:()=>finish(inp.ta.value)},"확인"),h("button",{class:"btn ghost",onclick:()=>finish("")},"모르겠어요")),fb));
   // Azure: start listening by itself (the clock starts only once it is really listening)
-  if(inp.mic&&inp.mic._az&&inp.mic._start)Promise.resolve().then(()=>{if(inp.mic.isConnected&&!answered)inp.mic._start()});
+  if(inp.mic&&inp.mic._az&&inp.mic._start)koReady.then(()=>{if(inp.mic.isConnected&&!answered)inp.mic._start()});
   else if(!inp.real)setTimeout(()=>{try{inp.ta.focus()}catch(e){}},50)}
 // stage 4: a question that needs the pattern; one-sentence answer judged by Claude (or by the pattern check when AI is off)
 async function dJudge(P,q,a){if(sample){try{const r=await sample.json(`You are an English tutor for a Korean OPIc learner (target ${tgt()}).
