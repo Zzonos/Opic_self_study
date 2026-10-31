@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261031-165330-2ea7b6">
+<html lang="ko" data-build="20261031-165749-4755fd">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -2168,7 +2168,7 @@ function dStage3(m,P,p){const review=!P;let R=drill.round;
       !review&&!pass?h("p",{class:"muted small"},"제한 시간 안에 80% 이상 맞히면 4단계가 열려요. 틀린 문장은 바로 다시 나와요."):null,
       h("div",{class:"list"},...R.res.map(r=>h("div",{class:"li"},h("span",{},r.fast?"✅":r.ok?"🐢":"❌"),h("div",{class:"grow"},h("div",{},r.en),h("div",{class:"muted small"},r.ko))))),
       h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{drill.round=null;if(pass){drill.stage=4}render()}},pass?"4단계로":"다시 하기"),h("button",{class:"btn",onclick:()=>{drill=null;render()}},"목록으로"))));return}
-  const it=R.list[R.i];const lim=dLimit(it.pid,it);const dlim=dDoneLimit(it.pid,it);let t0=0;const fb=h("div",{});let answered=false;
+  const it=R.list[R.i];const lim=dLimit(it.pid,it);const dlim=dDoneLimit(it.pid,it);let t0=0;const fb=h("div",{});let answered=false,retryMode=false;const fb2=h("div",{});
   const bar=h("div",{class:"bar"},h("i",{style:"transition:none;width:100%"}));const tEl=h("span",{class:"mono small muted",style:"white-space:nowrap"},"마이크 준비 중…");
   // two clocks: "start speaking" (the real test) and, once speaking, "finish the sentence" (soft goal)
   const iv=setInterval(()=>{if(!bar.isConnected){clearInterval(iv);return}if(!t0){tEl.textContent=inp.real?"🎙 마이크를 켜면 시작":"입력하면 시작";return}const el=(Date.now()-t0)/1000;const f=inp.ta._first;
@@ -2176,18 +2176,22 @@ function dStage3(m,P,p){const review=!P;let R=drill.round;
     else{const left=Math.max(0,dlim-el);bar.firstChild.style.width=(left/dlim*100)+"%";bar.firstChild.style.background=left>0?"var(--good)":"var(--warn)";tEl.textContent=left>0?"말 끝내기 "+left.toFixed(1)+"초":"🐢 천천히 끝까지 (실패 아님)"}},100);
   const go0=()=>{if(!t0){t0=Date.now();try{readyTone()}catch(e){}}};
   const next=()=>{R.i++;render()};
-  const finish=(v,forceOk)=>{if(answered)return;answered=true;clearInterval(iv);if(!t0)t0=Date.now();const start=inp.ta._first||Date.now();const rt=Math.max(0,(start-t0)/1000);const tt=Math.max(rt,((inp.ta._last||Date.now())-t0)/1000);const slow=tt>dlim;
+  const finish=(v,forceOk)=>{
+    // wrong the first time: trying again on the same card is judged too (practice; the record keeps the first try and the sentence comes back at the end of the round)
+    if(answered){if(!retryMode||forceOk)return;const s2=dSim(v,it.en);const ok2=s2>=0.85;if(ok2)retryMode=false;
+      fb2.replaceChildren(h("div",{class:"fix",style:"border-left-color:"+(ok2?"var(--good)":"var(--bad)")},h("span",{class:"b"},ok2?"✅ 이번엔 맞았어요! (기록은 첫 시도로 남고, 라운드 끝에 한 번 더 나와요)":"아직 달라요 ("+Math.round(s2*100)+"%) — 빨간 단어를 신경 써서 다시"),ok2?null:h("div",{},dDiff(v,it.en))));return}
+    answered=true;clearInterval(iv);if(!t0)t0=Date.now();const start=inp.ta._first||Date.now();const rt=Math.max(0,(start-t0)/1000);const tt=Math.max(rt,((inp.ta._last||Date.now())-t0)/1000);const slow=tt>dlim;
     const s=dSim(v,it.en);const ok=forceOk||s>=0.85;const fast=ok&&rt<=lim;R.res.push({...it,ok,fast});if(ok)R.ok++;if(fast){R.fast++;if(!it.retry)R.fast0++}dRecord(it.pid,it,ok,fast);
-    if(!ok){R.list.push({...it,retry:true})}
-    fb.replaceChildren(h("div",{class:"fix",style:"border-left-color:"+(fast?"var(--good)":ok?"var(--warn)":"var(--bad)")},h("span",{class:"b"},fast?"정확 + 빠름 (시작 "+rt.toFixed(1)+"초"+(slow?" · 끝까지 "+tt.toFixed(1)+"초 🐢":"")+")":ok?"정확하지만 시작이 느려요 ("+rt.toFixed(1)+"초 / "+lim+"초) — 입에 붙을 때까지":"다시 — 정답과 비교해 보세요"),
+    if(!ok){R.list.push({...it,retry:true});retryMode=true}
+    fb.replaceChildren(fb2,h("div",{class:"fix",style:"border-left-color:"+(fast?"var(--good)":ok?"var(--warn)":"var(--bad)")},h("span",{class:"b"},fast?"정확 + 빠름 (시작 "+rt.toFixed(1)+"초"+(slow?" · 끝까지 "+tt.toFixed(1)+"초 🐢":"")+")":ok?"정확하지만 시작이 느려요 ("+rt.toFixed(1)+"초 / "+lim+"초) — 입에 붙을 때까지":"다시 — 정답과 비교해 보세요"),
       fast&&slow?h("span",{class:"muted small"},"시작은 빨랐어요. 끝까지 목표 "+dlim+"초 — 통과에는 영향 없어요."):null,
       h("div",{},dDiff(v,it.en)),it.why?h("span",{class:"w"},it.why):null),
-      h("div",{class:"row"},spkBtn(it.en),!ok?h("button",{class:"btn sm ghost",onclick:()=>{R.res.pop();R.list.pop();answered=false;finish(it.en,true)}},"맞게 말했는데 인식이 틀렸어요"):null,h("button",{class:"btn primary",onclick:next},"다음 →")));
+      h("div",{class:"row"},spkBtn(it.en),!ok?h("button",{class:"btn sm ghost",onclick:()=>{R.res.pop();R.list.pop();answered=false;retryMode=false;fb2.replaceChildren();finish(it.en,true)}},"맞게 말했는데 인식이 틀렸어요"):null,h("button",{class:"btn primary",onclick:next},"다음 →")));
     if(!ok)speak(it.en)};
   const inp=dInput(v=>finish(v),{onStart:go0});
   if(!inp.real)inp.ta.addEventListener("keydown",go0,{once:true});
   // sentence heard correctly: stop listening and judge at once (the end time is the last word heard)
-  inp.ta.addEventListener("input",()=>{const b=inp.mic;if(!answered&&b&&b._isOn&&b._isOn()&&!b._auto&&dSim(inp.ta.value,it.en)>=0.85){b._auto=1;b._finish&&b._finish()}});
+  inp.ta.addEventListener("input",()=>{const b=inp.mic;if((!answered||retryMode)&&b&&b._isOn&&b._isOn()&&!b._auto&&dSim(inp.ta.value,it.en)>=0.85){b._auto=1;b._finish&&b._finish()}});
   put(m,h("p",{class:"muted small mono"},(R.i+1)+" / "+R.list.length+(it.retry?" · 다시 나온 문장":"")+(review?" · "+(dPat(it.pid)?.short||""):"")),
     h("div",{class:"card"},h("p",{class:"eyebrow"},it.mine?"내 답변에서 나온 실수 → 맞는 문장으로 고쳐 말하기":"한국어 → 영어로 바로 말하기"),
       it.mine?h("div",{},h("div",{class:"muted small"},"내가 한 말"),h("div",{class:"q",style:"text-decoration:line-through;text-decoration-color:var(--bad);opacity:.85"},it.o||String(it.ko).replace(/^고쳐 말하기 · “|”$/g,"")),
