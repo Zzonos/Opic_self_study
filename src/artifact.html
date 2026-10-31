@@ -2076,7 +2076,7 @@ function dClassify(f){const w=String(f.why||f.w||"");const b=String(f.better||f.
   if(/\bever\b/i.test(b)&&!/\bever\b/i.test(o))out.push("ever");if(/\bhelps? me\b|\bmakes? me feel\b|\bmade me feel\b/i.test(b)&&!/\bhelps? me \w+\b|\bmake me feel\b/i.test(o))out.push("help");
   if(/-ing|동명사|ing를|ing 형태/.test(w))out.push("ing");if(/연결|관계사|접속|after 뒤|when 뒤|because 뒤/.test(w))out.push("link");if(/마무리|클로저|닫/.test(w))out.push("close");const nb=dNorm(b),no=dNorm(o);for(const P of DRILL_PATS)if(P.grp==="up"&&P.id!=="pp"&&P.id!=="ever"&&P.key.test(nb)&&!P.key.test(no))out.push(P.id);return out}
 function dMistakes(pid){const out=[];const seen=new Set();for(const l of S.log||[]){for(const f of (l.fixes||[])){const o=f.original||f.o,b=f.better||f.b;if(!o||!b||seen.has(b))continue;
-    if(dClassify(f).includes(pid)){seen.add(b);out.push({ko:"고쳐 말하기 · “"+o+"”",en:String(b).split(" / ")[0],why:f.why||f.w||"",mine:true,ts:l.ts||Date.parse(l.date)||0})}}}return out}
+    if(dClassify(f).includes(pid)){seen.add(b);out.push({ko:"고쳐 말하기 · “"+o+"”",o,en:String(b).split(" / ")[0],why:f.why||f.w||"",mine:true,ts:l.ts||Date.parse(l.date)||0})}}}return out}
 function dItems(pid){const P=dPat(pid);return [...P.items.map(([ko,en])=>({ko,en})),...dMistakes(pid).slice(-12)]}
 function dDue(){const out=[];for(const P of DRILL_PATS){const p=dP(P.id);if(p.st<4)continue;for(const it of dItems(P.id)){const r=p.i[txtHash(it.en)];if(!r||!r.d||r.d<=todayStr())out.push({...it,pid:P.id})}}return out}
 function dAnswers(){if(dAnswers.n===S.log.length&&dAnswers.v)return dAnswers.v;dAnswers.n=S.log.length;return dAnswers.v=(S.log||[]).flatMap(l=>[l.a,...(l.pq||[]).map(x=>x.a)]).filter(Boolean).map(dNorm)}
@@ -2085,9 +2085,9 @@ function dNewMistakes(pid){const p=dP(pid);if(!p.m)return 0;return dMistakes(pid
 function dRecord(pid,it,ok,fast){const p=dP(pid);const k=txtHash(it.en);const r=p.i[k]=p.i[k]||{b:0,d:"",n:0,ok:0};r.n++;
   if(ok&&fast){r.ok++;r.b=Math.min(DRILL_BOX.length-1,(r.b||0)+1)}else if(ok){r.b=Math.max(1,r.b||0)}else r.b=0;r.d=addDays(ok&&fast?DRILL_BOX[r.b]:ok?1:0);dTouch(p)}
 // time to START speaking, counted from the moment the mic is listening (not from when the card appears)
-function dLimit(pid,it){const r=dP(pid).i[txtHash(it.en)];return (r&&r.b>=2)?3:4}
+function dLimit(pid,it){const r=dP(pid).i[txtHash(it.en)];return ((r&&r.b>=2)?3:4)+(it.mine?2:0)}
 // time to FINISH the sentence (a soft goal, never a fail): 2 s to think + ~2 words a second; 80% once the sentence is familiar
-function dDoneLimit(pid,it){const r=dP(pid).i[txtHash(it.en)];const w=String(it.en||"").trim().split(/\s+/).length;return Math.round((2+w/2)*((r&&r.b>=2)?0.8:1)*10)/10}
+function dDoneLimit(pid,it){const r=dP(pid).i[txtHash(it.en)];const w=String(it.en||"").trim().split(/\s+/).length;return Math.round(((2+w/2)*((r&&r.b>=2)?0.8:1)+(it.mine?2:0))*10)/10}
 function dAdvance(pid,to){const p=dP(pid);const up=p.st<to;if(up){p.st=to;if(to>5)p.m=Date.now()}if(to>5&&!up)p.m=Date.now();dTouch(p);if(up)toast(to>5?"훈련 완료! 이제 복습으로 유지해요":to+"단계가 열렸어요")}
 // speech or typing into one answer box: Web Speech / Azure on the web build, keyboard dictation inside Claude
 function dInput(onSubmit,{rows=2,ph="말하거나 입력하고 Enter",onStart=null}={}){const ta=h("textarea",{id:"ans_drill",rows,style:"min-height:"+(rows>2?150:64)+"px",placeholder:ph,autocapitalize:"sentences"});
@@ -2168,7 +2168,11 @@ function dStage3(m,P,p){const review=!P;let R=drill.round;
   // sentence heard correctly: stop listening and judge at once (the end time is the last word heard)
   inp.ta.addEventListener("input",()=>{const b=inp.mic;if(!answered&&b&&b._isOn&&b._isOn()&&!b._auto&&dSim(inp.ta.value,it.en)>=0.85){b._auto=1;b._finish&&b._finish()}});
   put(m,h("p",{class:"muted small mono"},(R.i+1)+" / "+R.list.length+(it.retry?" · 다시 나온 문장":"")+(review?" · "+(dPat(it.pid)?.short||""):"")),
-    h("div",{class:"card"},h("p",{class:"eyebrow"},it.mine?"내 답변에서 나온 실수":"한국어 → 영어로 바로 말하기"),h("div",{class:"q"},it.ko),
+    h("div",{class:"card"},h("p",{class:"eyebrow"},it.mine?"내 답변에서 나온 실수 → 맞는 문장으로 고쳐 말하기":"한국어 → 영어로 바로 말하기"),
+      it.mine?h("div",{},h("div",{class:"muted small"},"내가 한 말"),h("div",{class:"q",style:"text-decoration:line-through;text-decoration-color:var(--bad);opacity:.85"},it.o||String(it.ko).replace(/^고쳐 말하기 · “|”$/g,"")),
+        h("p",{class:"small",style:"margin:6px 0 0"},h("b",{},"고칠 점: "),it.why||(dPat(it.pid)?.rule||"")),
+        h("details",{style:"margin-top:4px"},h("summary",{class:"muted small"},"정답 문장 보기 (막히면)"),h("div",{class:"row",style:"flex-wrap:nowrap;margin-top:4px"},spkBtn(it.en),h("div",{class:"grow"},it.en))))
+      :h("div",{class:"q"},it.ko),
       h("p",{class:"muted small",style:"margin:2px 0"},"⏱ 마이크가 켜진 뒤 "+lim+"초 안에 말을 시작하면 '빠름'. 끝까지는 "+dlim+"초 목표(느려도 통과)."),
       h("div",{class:"row",style:"flex-wrap:nowrap"},h("div",{class:"grow"},bar),tEl),inp.ta,
       h("div",{class:"row"},inp.mic,h("button",{class:"btn",onclick:()=>finish(inp.ta.value)},"확인"),h("button",{class:"btn ghost",onclick:()=>finish("")},"모르겠어요")),fb));
