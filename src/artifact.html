@@ -2175,7 +2175,7 @@ function dStage3(m,P,p){const review=!P;let R=drill.round;
   inp.ta.addEventListener("input",()=>{const b=inp.mic;if((!answered||retryMode)&&b&&b._isOn&&b._isOn()&&!b._auto&&dSim(inp.ta.value,it.en)>=0.85){b._auto=1;b._finish&&b._finish()}});
   put(m,h("p",{class:"muted small mono"},(R.i+1)+" / "+R.list.length+(it.retry?" · 다시 나온 문장":"")+(review?" · "+(dPat(it.pid)?.short||""):"")),
     h("div",{class:"card"},h("p",{class:"eyebrow"},it.mine?"내 답변에서 나온 실수 → 맞는 문장으로 고쳐 말하기":"한국어 → 영어로 바로 말하기"),
-      it.mine?h("div",{},h("div",{class:"muted small"},"내가 한 말"),h("div",{class:"q",style:"text-decoration:line-through;text-decoration-color:var(--bad);opacity:.85"},it.o||String(it.ko).replace(/^고쳐 말하기 · “|”$/g,"")),
+      it.mine?h("div",{},h("div",{class:"muted small"},"내가 말한 틀린 표현"),h("div",{class:"q"},it.o||String(it.ko).replace(/^고쳐 말하기 · “|”$/g,"")),
         h("p",{class:"small",style:"margin:6px 0 0"},h("b",{},"고칠 점: "),it.why||(dPat(it.pid)?.rule||"")),
         h("details",{style:"margin-top:4px"},h("summary",{class:"muted small"},"정답 문장 보기 (막히면)"),h("div",{class:"row",style:"flex-wrap:nowrap;margin-top:4px"},spkBtn(it.en),h("div",{class:"grow"},it.en))))
       :h("div",{class:"q"},it.ko),
