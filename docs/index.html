@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261031-170049-f970a5">
+<html lang="ko" data-build="20261031-170559-4539ed">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -662,6 +662,8 @@ const MIC_BTNS=new Set();
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState!=="hidden")return;
   for(const b of [...AZ_BTNS,...MIC_BTNS]){if(!b.isConnected&&MIC_BTNS.has(b)){MIC_BTNS.delete(b);continue}try{b._bg&&b._bg()}catch(e){}}
   setTimeout(()=>{MIC.active=0;micRelease()},300)});
+// phone speech recognition left running on a screen that was redrawn: stop it (only one session can listen at a time on a phone)
+function micSweep(){for(const b of [...MIC_BTNS]){if(b.isConnected)continue;MIC_BTNS.delete(b);try{if(b._isOn&&b._isOn()){b._abort();audLog.push("화면 전환: 이전 음성인식 종료")}}catch(e){}}}
 function micRelease(){if(MIC.stream){try{MIC.stream.getTracks().forEach(t=>t.stop())}catch(e){}MIC.stream=null}}
 setInterval(()=>{if(!MIC.stream||MIC.active>0)return;const idle=Date.now()-MIC.last;if(idle>(document.hidden?2:10)*60e3)micRelease()},20000);
 const AZ={tok:null,at:0,region:"",direct:false,sdk:null,live:new Map()};
@@ -753,7 +755,7 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
       // pronunciation scoring only where it is shown (practice / mock); a conversation only needs the words, fast
       if(A){const pa=new sdk.PronunciationAssessmentConfig("",sdk.PronunciationAssessmentGradingSystem.HundredMark,sdk.PronunciationAssessmentGranularity.Word,false);pa.applyTo(r)}
       base=ta.value?ta.value.trim()+" ":"";fin="";pend="";if(!base)segs=[];
-      const zs={n:0,ch:0,nm:0};AZ.lastStat=()=>"Azure 세션 "+Math.round((Date.now()-(t0||Date.now()))/1000)+"초: 결과 "+zs.n+"개 · "+zs.ch+"자"+(zs.nm?" · 못 알아들음 "+zs.nm+"회":"")+(A?" · 발음평가":"");let lagMax=0;t0=0;lastEnd=0;lastProg=Date.now();const lag=e=>{try{if(!t0)return;const end=((e.result.offset||0)+(e.result.duration||0))/1e7;if(end>lastEnd){lastEnd=end;lastProg=Date.now()}const l=(Date.now()-t0)/1000-end;if(l>lagMax)lagMax=l}catch(x){}};
+      const zs={n:0,ch:0,nm:0};AZ.lastStat=()=>"Azure 세션 "+Math.round((Date.now()-(t0||Date.now()))/1000)+"초: 결과 "+zs.n+"개 · "+zs.ch+"자"+(zs.nm?" · 못 알아들음 "+zs.nm+"회":"")+(A?" · 발음평가":"")+(fresh?" · 새 마이크":"")+(()=>{try{const t=cl&&cl.getAudioTracks()[0];return !t?" · 기본 마이크":t.readyState!=="live"?" · 마이크 끊김":t.muted?" · 마이크 음소거":""}catch(x){return ""}})();let lagMax=0;t0=0;lastEnd=0;lastProg=Date.now();const lag=e=>{try{if(!t0)return;const end=((e.result.offset||0)+(e.result.duration||0))/1e7;if(end>lastEnd){lastEnd=end;lastProg=Date.now()}const l=(Date.now()-t0)/1000-end;if(l>lagMax)lagMax=l}catch(x){}};
       r.recognizing=(s,e)=>{if(my!==gen)return;lag(e);lastAct=Date.now();if(skipPhrase)return;pend=e.result.text||"";ta.value=base+fin+pend;ta.dispatchEvent(new Event("input"))};
       r.recognized=(s,e)=>{if(my!==gen)return;lag(e);if(lagMax>1.5){audLog.push("Azure 인식 지연 최대 "+lagMax.toFixed(1)+"초"+(A?" (발음평가 켬)":""));if(audLog.length>30)audLog.shift()}lagMax=0;lastAct=Date.now();MIC.last=Date.now();pend="";if(skipPhrase){skipPhrase=false;return}if(e.result.reason!==sdk.ResultReason.RecognizedSpeech||!e.result.text){zs.nm++;return}zs.n++;zs.ch+=e.result.text.length;fin+=e.result.text+" ";ta.value=base+fin;ta.dispatchEvent(new Event("input"));
         try{const j=JSON.parse(e.result.properties.getProperty(sdk.PropertyId.SpeechServiceResponse_JsonResult));const nb=(j.NBest||[])[0]||{};segs.push({text:e.result.text,dur:(j.Duration||0)/1e7,pa:nb.PronunciationAssessment||{},words:nb.Words||[]})}catch(x){}showDoubt()};
@@ -1134,7 +1136,7 @@ function renderNav(){const n=$("#nav");n.replaceChildren(...VIEWS.map(v=>h("butt
 function go(v,s=null){view=v;sub=s;if(inPrac(v)){LASTPRAC=v;try{localStorage.setItem("oss_lastprac",v)}catch(e){}}if(v==="drill"&&!s)drill=null;timerStop();if(!player.on)ttsStop();render();window.scrollTo({top:0})}
 function render(){renderNav();ensureToday();for(const b of [...AZ_BTNS])try{b._kill()}catch(e){}const m=$("#main");m.replaceChildren();
   if(gated){$("#nav").hidden=true;put(m,h("div",{class:"login"},h("div",{},h("p",{class:"eyebrow"},"Opic Self Study"),h("div",{class:"brand"},"OSS"),h("p",{class:"muted",style:"margin-top:6px"},"이 앱은 Claude 계정으로 로그인한 사람만 쓸 수 있어요.")),h("div",{class:"card"},h("h3",{},"로그인이 필요해요"),h("p",{class:"small"},"Claude에 로그인한 뒤 이 링크를 다시 열어 주세요. 초대받은 계정으로 로그인하면 AI 대화·평가와 기록 저장이 본인 계정으로 동작합니다."),h("p",{class:"muted small"},"Claude 계정이 없다면 claude.ai에서 무료로 만들 수 있어요."))));return}
-  if(cloud.ok&&cloud.ready&&!cloud.user&&!cloud.skip){$("#nav").hidden=true;vLogin(m);return}$("#nav").hidden=false;({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings,drill:vDrill})[view](m);pageLabelTop(m);stampMode(m);if(inPrac(view)&&!sub&&!(view==="chat"&&chat&&chat.summary)){const hd=[...m.children].find(c=>c.matches(".eyebrow")||c.querySelector(".eyebrow"));const tb=pracTabs();
+  if(cloud.ok&&cloud.ready&&!cloud.user&&!cloud.skip){$("#nav").hidden=true;vLogin(m);return}$("#nav").hidden=false;({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings,drill:vDrill})[view](m);micSweep();pageLabelTop(m);stampMode(m);if(inPrac(view)&&!sub&&!(view==="chat"&&chat&&chat.summary)){const hd=[...m.children].find(c=>c.matches(".eyebrow")||c.querySelector(".eyebrow"));const tb=pracTabs();
     // page label on top, then the tabs, then the title (and its buttons)
     if(hd&&hd.matches(".eyebrow"))hd.after(tb);else if(hd){const eb=hd.querySelector(".eyebrow");hd.before(eb);eb.after(tb)}else m.prepend(tb)}}
 // the page label (and the mode next to it) always sits at the very top of a page, above back buttons and options
@@ -2180,7 +2182,7 @@ function dStage3(m,P,p){const review=!P;let R=drill.round;
     // wrong the first time: trying again on the same card is judged too (practice; the record keeps the first try and the sentence comes back at the end of the round)
     if(answered){if(!retryMode||forceOk)return;const s2=dSim(v,it.en);const ok2=s2>=0.85;if(ok2)retryMode=false;
       fb2.replaceChildren(h("div",{class:"fix",style:"border-left-color:"+(ok2?"var(--good)":"var(--bad)")},h("span",{class:"b"},ok2?"✅ 이번엔 맞았어요! (기록은 첫 시도로 남고, 라운드 끝에 한 번 더 나와요)":"아직 달라요 ("+Math.round(s2*100)+"%) — 빨간 단어를 신경 써서 다시"),ok2?null:h("div",{},dDiff(v,it.en))));return}
-    answered=true;clearInterval(iv);if(!t0)t0=Date.now();const start=inp.ta._first||Date.now();const rt=Math.max(0,(start-t0)/1000);const tt=Math.max(rt,((inp.ta._last||Date.now())-t0)/1000);const slow=tt>dlim;
+    answered=true;try{const b=inp.mic;if(b&&b._isOn&&b._isOn()&&!b._auto)b._abort()}catch(e){}clearInterval(iv);if(!t0)t0=Date.now();const start=inp.ta._first||Date.now();const rt=Math.max(0,(start-t0)/1000);const tt=Math.max(rt,((inp.ta._last||Date.now())-t0)/1000);const slow=tt>dlim;
     const s=dSim(v,it.en);const ok=forceOk||s>=0.85;const fast=ok&&rt<=lim;R.res.push({...it,ok,fast});if(ok)R.ok++;if(fast){R.fast++;if(!it.retry)R.fast0++}dRecord(it.pid,it,ok,fast);
     if(!ok){R.list.push({...it,retry:true});retryMode=true}
     fb.replaceChildren(fb2,h("div",{class:"fix",style:"border-left-color:"+(fast?"var(--good)":ok?"var(--warn)":"var(--bad)")},h("span",{class:"b"},fast?"정확 + 빠름 (시작 "+rt.toFixed(1)+"초"+(slow?" · 끝까지 "+tt.toFixed(1)+"초 🐢":"")+")":ok?"정확하지만 시작이 느려요 ("+rt.toFixed(1)+"초 / "+lim+"초) — 입에 붙을 때까지":"다시 — 정답과 비교해 보세요"),
@@ -2202,7 +2204,7 @@ function dStage3(m,P,p){const review=!P;let R=drill.round;
       h("div",{class:"row",style:"flex-wrap:nowrap"},h("div",{class:"grow"},bar),tEl),inp.ta,
       h("div",{class:"row"},inp.mic,h("button",{class:"btn",onclick:()=>finish(inp.ta.value)},"확인"),h("button",{class:"btn ghost",onclick:()=>finish("")},"모르겠어요")),fb));
   // Azure: start listening by itself (the clock starts only once it is really listening)
-  if(inp.mic&&inp.mic._az&&inp.mic._start)setTimeout(()=>{if(inp.mic.isConnected&&!answered)inp.mic._start()},250);
+  if(inp.mic&&inp.mic._az&&inp.mic._start)Promise.resolve().then(()=>{if(inp.mic.isConnected&&!answered)inp.mic._start()});
   else if(!inp.real)setTimeout(()=>{try{inp.ta.focus()}catch(e){}},50)}
 // stage 4: a question that needs the pattern; one-sentence answer judged by Claude (or by the pattern check when AI is off)
 async function dJudge(P,q,a){if(sample){try{const r=await sample.json(`You are an English tutor for a Korean OPIc learner (target ${tgt()}).
