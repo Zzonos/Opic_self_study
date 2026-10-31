@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261030-103917-05617c">
+<html lang="ko" data-build="20261031-135227-9f6f24">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -654,7 +654,8 @@ const HIFI=true;const hfChat=()=>!!(chat&&chat.hf);
 // hands-free needs the API mode (AI on the web) and a microphone: Azure, or the phone's own recognition when Azure is off (e.g. free quota used up)
 const hfOK=()=>!window.claude?.use&&WEB&&API.on&&!!sample&&(azOn()||SR_OK);
 async function micStream(){try{return await micStream1()}catch(e){if(e&&e.name==="NotAllowedError")throw e;await new Promise(r=>setTimeout(r,1000));return await micStream1()}}
-async function micStream1(){if(MIC.stream&&MIC.raw!==RAWMIC&&!MIC.active)micRelease();if(MIC.stream&&MIC.stream.getAudioTracks().some(t=>t.readyState==="live")){MIC.last=Date.now();return MIC.stream}
+async function micStream1(){if(MIC.stream&&MIC.raw!==RAWMIC&&!MIC.active)micRelease();if(MIC.stream&&!MIC.active&&MIC.stream.getAudioTracks().some(t=>t.muted)){audLog.push("마이크 스트림 음소거 상태 → 새로 열기");micRelease()}
+  if(MIC.stream&&MIC.stream.getAudioTracks().some(t=>t.readyState==="live")){MIC.last=Date.now();return MIC.stream}
   MIC.stream=await navigator.mediaDevices.getUserMedia({audio:RAWMIC?{echoCancellation:false,noiseSuppression:false,autoGainControl:false}:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});MIC.hifi=HIFI;MIC.raw=RAWMIC;MIC.last=Date.now();return MIC.stream}
 const MIC_BTNS=new Set();
 // app went to the background: turn every microphone off (recognisers, voice detector, shared stream)
@@ -730,7 +731,7 @@ function vadWatch({onVoice,threshold=0.035,ms=250}){let stop=false,ac=null,timer
 // recognizer itself (chat: paused while the AI thinks/speaks, or after a long silence) — Azure only bills
 // while the recognizer runs; the microphone permission stays because the shared stream is kept.
 const AZ_BTNS=new Set();
-function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,idleStop=0,onState=null,assess=true}={}){const b=h("button",{class:"btn primary"},label);AZ_BTNS.add(b);
+function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,idleStop=0,onState=null,assess=true,fresh=false}={}){const b=h("button",{class:"btn primary"},label);AZ_BTNS.add(b);
   let rec=null,cl=null,t0=0,lastEnd=0,lastProg=0,live=false,want=false,base="",fin="",pend="",segs=[],gen=0,skipPhrase=false,lastAct=0,idleT=null,vadStop=null,starting=false;
   const st=s=>{try{onState&&onState(s)}catch(e){}};
   const paint=()=>{b.disabled=starting;b.textContent=starting?"연결 중…":want?(live?"■ 말하기 끝":"⏸ 대기 · 끝내기"):label;b.classList.toggle("rec",want)};
@@ -746,7 +747,7 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
   const stopRec=()=>new Promise(res=>{clearInterval(idleT);idleT=null;gen++;if(!rec){live=false;dropCl();paint();return res()}const r=rec;rec=null;try{if(AZ.lastStat){audLog.push(AZ.lastStat());if(audLog.length>30)audLog.shift();AZ.lastStat=null}}catch(x){}if(AZ.live.has(b)){azAdd((Date.now()-AZ.live.get(b))/1000);AZ.live.delete(b)}if(live){MIC.active=Math.max(0,MIC.active-1);MIC.last=Date.now()}live=false;paint();
     try{r.stopContinuousRecognitionAsync(()=>{try{r.close()}catch(e){}dropCl();res()},()=>{dropCl();res()})}catch(e){dropCl();res()}});
   const startRec=async()=>{if(rec||starting)return;starting=true;paint();unVad();
-    try{const {sdk,cfg}=await azConfig(2000);let audio;try{const ms=await micStream();dropCl();cl=ms.clone();audio=sdk.AudioConfig.fromStreamInput(cl)}catch(x){if(x&&x.name==="NotAllowedError")throw new Error("마이크 권한이 꺼져 있어요");audio=sdk.AudioConfig.fromDefaultMicrophoneInput()}
+    try{const {sdk,cfg}=await azConfig(2000);let audio;try{if(fresh){try{ttsStop()}catch(x){}if(!MIC.active)micRelease()}const ms=await micStream();dropCl();cl=ms.clone();audio=sdk.AudioConfig.fromStreamInput(cl)}catch(x){if(x&&x.name==="NotAllowedError")throw new Error("마이크 권한이 꺼져 있어요");audio=sdk.AudioConfig.fromDefaultMicrophoneInput()}
       const A=typeof assess==="function"?!!assess():!!assess;if(!A)try{cfg.requestWordLevelTimestamps()}catch(x){}const r=new sdk.SpeechRecognizer(cfg,audio);const my=++gen;rec=r;skipPhrase=false;
       // (no phrase list: my proper nouns are given to the AI instead — see nameHint())
       // pronunciation scoring only where it is shown (practice / mock); a conversation only needs the words, fast
@@ -2108,7 +2109,7 @@ function dAdvance(pid,to){const p=dP(pid);const up=p.st<to;if(up){p.st=to;if(to>
 function dInput(onSubmit,{rows=2,ph="말하거나 입력하고 Enter"}={}){const ta=h("textarea",{id:"ans_drill",rows,style:"min-height:"+(rows>2?150:64)+"px",placeholder:ph,autocapitalize:"sentences"});
   ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&rows<=2){e.preventDefault();onSubmit(ta.value)}});
   ta.addEventListener("input",()=>{if(!ta._first&&ta.value.trim())ta._first=Date.now()});
-  let mic=null;try{mic=(azOn()?azMicBtn:micBtn)(ta,{assess:false,onFinal:v=>{if(rows<=2&&v&&v.trim())onSubmit(v)}})}catch(e){mic=null}
+  let mic=null;try{mic=(azOn()?azMicBtn:micBtn)(ta,{assess:false,fresh:true,onFinal:v=>{if(rows<=2&&v&&v.trim())onSubmit(v)}})}catch(e){mic=null}
   return {ta,mic:mic||micLink()}}
 
 let drill=null;
@@ -2137,6 +2138,8 @@ function dStage2(m,P,p){const list=[...P.ex,...P.items.slice(0,3).map(([ko,en])=
   let i=list.findIndex(([en])=>!p.s2[txtHash(en)]);if(i<0)i=drill.i2||0;const [en,ko]=list[i];const fb=h("div",{});
   const check=v=>{const s=dSim(v,en);if(s>=0.8){p.s2[txtHash(en)]=1;dTouch(p);if(list.every(([e])=>p.s2[txtHash(e)])){dAdvance(P.id,3);drill.stage=3}render()}else fb.replaceChildren(h("div",{class:"fix"},h("span",{class:"w"},"조금 달라요 ("+Math.round(s*100)+"%) — 빨간 단어를 신경 써서 다시"),dDiff(v,en)),h("div",{class:"row"},h("button",{class:"btn sm ghost",onclick:()=>{p.s2[txtHash(en)]=1;dTouch(p);render()}},"맞게 말했는데 인식이 틀렸어요")))};
   const inp=dInput(check);
+  // speaking: once the words heard match the sentence, stop listening and pass by itself (no extra tap)
+  inp.ta.addEventListener("input",()=>{const b=inp.mic;if(b&&b._isOn&&b._isOn()&&!b._auto&&dSim(inp.ta.value,en)>=0.8){b._auto=1;b._finish&&b._finish()}});
   put(m,h("p",{class:"muted small mono"},done+" / "+list.length+" 문장 통과"),
     h("div",{class:"card"},h("div",{class:"row",style:"flex-wrap:nowrap"},spkBtn(en),h("div",{class:"grow"},h("div",{class:"q"},en),h("div",{class:"muted small"},ko))),
       h("p",{class:"muted small"},"듣고 → 똑같은 리듬으로 따라 말하기. I've, That's 같은 줄임말은 한 덩어리로."),inp.ta,h("div",{class:"row"},inp.mic,h("button",{class:"btn",onclick:()=>check(inp.ta.value)},"확인")),fb));
