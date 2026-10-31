@@ -2093,7 +2093,7 @@ function dAdvance(pid,to){const p=dP(pid);const up=p.st<to;if(up){p.st=to;if(to>
 function dInput(onSubmit,{rows=2,ph="말하거나 입력하고 Enter",onStart=null}={}){const ta=h("textarea",{id:"ans_drill",rows,style:"min-height:"+(rows>2?150:64)+"px",placeholder:ph,autocapitalize:"sentences"});
   ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&rows<=2){e.preventDefault();onSubmit(ta.value)}});
   ta.addEventListener("input",()=>{const v=ta.value.trim();if(v){if(!ta._first)ta._first=Date.now();if(v!==ta._lv){ta._lv=v;ta._last=Date.now()}}});
-  let mic=null;try{mic=(azOn()?azMicBtn:micBtn)(ta,{assess:false,fresh:true,onStart,onFinal:v=>{if(rows<=2&&v&&v.trim())onSubmit(v)}})}catch(e){mic=null}
+  let mic=null;try{mic=(azOn()&&!(DRILL_SR&&SR_OK)?azMicBtn:micBtn)(ta,{assess:false,fresh:true,onStart,onFinal:v=>{if(rows<=2&&v&&v.trim())onSubmit(v)}})}catch(e){mic=null}
   // speaking again: start from an empty box (a new try, not more words added to the last one)
   if(mic)mic.addEventListener("click",()=>{if((mic._isOn&&mic._isOn())||(mic._live&&mic._live()))return;ta.value="";ta._lv="";mic._auto=0;try{mic._reset&&mic._reset()}catch(e){}},{capture:true});
   // the phone's own recognition has no "listening now" event: count from the tap
@@ -2114,7 +2114,11 @@ function vDrill(m){if(drill&&drill.pid)return vDrillPat(m);
           h("div",{class:"muted small"},(p.st>5?"완료 · 복습 중":(p.st)+"단계 "+DRILL_STAGES[p.st-1])+(used!=null?" · 내 답변에서 사용 "+used+"회":"")+(mine?" · 내 실수 "+mine+"개 포함":""))),dots(p.st))}))]}),
     h("p",{class:"muted small"},"기록은 계정에 저장돼 휴대폰·PC 어디서 열어도 이어서 할 수 있어요."));
 }
-function dHeader(P,p){return h("div",{},h("button",{class:"btn sm ghost",onclick:()=>{drill=null;render()}},"← 약점 훈련"),h("p",{class:"eyebrow",style:"margin-top:10px"},P?P.name:"복습"),
+// drill only: use the phone's own speech recognition instead of Azure (saves the monthly Azure time; no connect wait)
+let DRILL_SR=false;try{DRILL_SR=localStorage.getItem("oss_drill_sr")==="1"}catch(e){}
+function dSrToggle(){if(!azOn()||!SR_OK)return null;const cb=h("input",{type:"checkbox"});cb.checked=DRILL_SR;cb.onchange=()=>{DRILL_SR=cb.checked;try{localStorage.setItem("oss_drill_sr",DRILL_SR?"1":"0")}catch(e){}render()};
+  return h("label",{class:"muted small",style:"display:inline-flex;align-items:center;gap:6px;cursor:pointer"},cb,"휴대폰 음성인식 사용 (Azure 안 씀)")}
+function dHeader(P,p){return h("div",{},h("div",{class:"row",style:"justify-content:space-between;align-items:center"},h("button",{class:"btn sm ghost",onclick:()=>{drill=null;render()}},"← 약점 훈련"),dSrToggle()),h("p",{class:"eyebrow",style:"margin-top:10px"},P?P.name:"복습"),
   P?h("div",{class:"segs",style:"margin-top:8px"},...DRILL_STAGES.map((s,k)=>h("button",{class:"seg"+(drill.stage===k+1?" on":""),disabled:k+1>p.st,style:k+1>p.st?"opacity:.4":"",onclick:()=>{drill={pid:P.id,stage:k+1};render()}},(k+1)+" "+(window.innerWidth<520?"":s)))):null)}
 function vDrillPat(m){if(drill.pid==="_review")return dStage3(m,null,null);const P=dPat(drill.pid);const p=dP(P.id);
   put(m,dHeader(P,p),h("h1",{},DRILL_STAGES[drill.stage-1]));
@@ -2170,7 +2174,7 @@ function dStage3(m,P,p){const review=!P;let R=drill.round;
       h("div",{class:"row"},inp.mic,h("button",{class:"btn",onclick:()=>finish(inp.ta.value)},"확인"),h("button",{class:"btn ghost",onclick:()=>finish("")},"모르겠어요")),fb));
   // Azure: start listening by itself (the clock starts only once it is really listening)
   if(inp.mic&&inp.mic._az&&inp.mic._start)setTimeout(()=>{if(inp.mic.isConnected&&!answered)inp.mic._start()},250);
-  else setTimeout(()=>{try{inp.ta.focus()}catch(e){}},50)}
+  else if(!inp.real)setTimeout(()=>{try{inp.ta.focus()}catch(e){}},50)}
 // stage 4: a question that needs the pattern; one-sentence answer judged by Claude (or by the pattern check when AI is off)
 async function dJudge(P,q,a){if(sample){try{const r=await sample.json(`You are an English tutor for a Korean OPIc learner (target ${tgt()}).
 Target pattern: ${P.ruleEn}.
