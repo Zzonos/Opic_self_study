@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261031-180515-5c7f7e">
+<html lang="ko" data-build="20261031-181715-5b453a">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -2381,7 +2381,8 @@ function aiGate(){const box=h("span",{class:"row",style:"gap:6px"});const note=h
   box.append(btn,note);return box}
 // every phone recogniser ever started: a phone can listen with one at a time, and one left half-open
 // (e.g. stopped while the app was in the background) blocks the next — so a new start aborts them all first
-const SR_ALL=new Set();
+const SR_ALL=new Set();let SR_BG=false;const srLog=t=>{audLog.push("휴대폰 음성인식 "+t);if(audLog.length>30)audLog.shift()};
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")SR_BG=true});
 function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false,gate=null,onHeard=null}={}){if(!SR_OK)return null;const b=h("button",{class:"btn primary"},label);MIC_BTNS.add(b);let on=false;let waitEnd=null;let t0s=0,retried=false;
   b._isOn=()=>on;b._finish=()=>new Promise(res=>{if(!on){res();return}waitEnd=res;try{rec?.stop()}catch(e){}setTimeout(()=>{if(waitEnd===res){waitEnd=null;if(on)stop();res()}},2500)});
   const stop=()=>{on=false;b.textContent=label;b.classList.remove("rec");try{rec?.stop()}catch(e){}rec=null};
@@ -2396,7 +2397,10 @@ function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false,gate=nul
   // make the words still being recognised final before the text is sent: ask the browser to close the
   // session (it then finalises them); keepAlive starts listening again right after
   b._flush=()=>new Promise(res=>{if(!on||!rec||!pend.trim())return res();settled=res;try{rec.stop()}catch(e){}setTimeout(()=>{if(settled===res){settled=null;res()}},1800)});
-  b.onclick=()=>{ttsStop();if(on){want=false;stop();return}const R=window.SpeechRecognition||window.webkitSpeechRecognition;rec=new R();for(const r of SR_ALL){try{r.abort()}catch(e){}}SR_ALL.clear();SR_ALL.add(rec);t0s=Date.now();rec.lang="en-US";rec.continuous=true;rec.interimResults=true;base=ta.value?ta.value.trim()+" ":"";fin="";from=0;seen=0;
+  b.onclick=()=>{ttsStop();if(on){want=false;stop();return}const R=window.SpeechRecognition||window.webkitSpeechRecognition;rec=new R();const prev=SR_ALL.size;for(const r of SR_ALL){try{r.abort()}catch(e){}}SR_ALL.clear();SR_ALL.add(rec);t0s=Date.now();
+    {const me=rec,st={a:0,r:0,ch:0};srLog("시작"+(prev?" (이전 "+prev+"개 끊음)":"")+(SR_BG?" · 백그라운드 복귀 후":""));SR_BG=false;
+     me.onstart=()=>{st.s=1};me.onaudiostart=()=>{st.a=1};if(me.addEventListener){me.addEventListener("result",e=>{st.r++;try{st.ch=Array.from(e.results).map(x=>x[0].transcript).join(" ").length}catch(x){}});
+     me.addEventListener("end",()=>srLog("종료 "+((Date.now()-t0s)/1000).toFixed(0)+"초: 시작신호 "+(st.s?"O":"X")+" · 소리 "+(st.a?"O":"X")+" · 결과 "+st.r+"회 "+st.ch+"자"))}}rec.lang="en-US";rec.continuous=true;rec.interimResults=true;base=ta.value?ta.value.trim()+" ":"";fin="";from=0;seen=0;
     rec.onresult=e=>{if(!on||(e.target&&e.target!==rec))return;retried=false;let interim="";fin="";seen=e.results.length;for(let i=from;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t+" ";else interim+=t}pend=interim;
       // muted (the app is speaking): do not write what is heard, just report it so the app can tell echo from the user
       if(gate&&gate()){onHeard&&onHeard((fin+interim).trim());return}
