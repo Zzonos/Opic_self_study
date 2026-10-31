@@ -2094,6 +2094,8 @@ function dInput(onSubmit,{rows=2,ph="말하거나 입력하고 Enter",onStart=nu
   ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&rows<=2){e.preventDefault();onSubmit(ta.value)}});
   ta.addEventListener("input",()=>{const v=ta.value.trim();if(v){if(!ta._first)ta._first=Date.now();if(v!==ta._lv){ta._lv=v;ta._last=Date.now()}}});
   let mic=null;try{mic=(azOn()?azMicBtn:micBtn)(ta,{assess:false,fresh:true,onStart,onFinal:v=>{if(rows<=2&&v&&v.trim())onSubmit(v)}})}catch(e){mic=null}
+  // speaking again: start from an empty box (a new try, not more words added to the last one)
+  if(mic)mic.addEventListener("click",()=>{if((mic._isOn&&mic._isOn())||(mic._live&&mic._live()))return;ta.value="";ta._lv="";mic._auto=0;try{mic._reset&&mic._reset()}catch(e){}},{capture:true});
   // the phone's own recognition has no "listening now" event: count from the tap
   if(mic&&!mic._az&&onStart)mic.addEventListener("click",()=>{if(mic._isOn&&mic._isOn())onStart()});
   return {ta,mic:mic||micLink(),real:!!mic}}
