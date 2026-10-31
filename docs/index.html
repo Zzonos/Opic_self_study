@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261031-174500-3e5bc9">
+<html lang="ko" data-build="20261031-175215-af8c48">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -2087,12 +2087,19 @@ const DR_CONTR=[[/\bi'm\b/g,"i am"],[/\b(\w+)'ve\b/g,"$1 have"],[/\b(\w+)'ll\b/g
 function dNorm(t){let x=String(t||"").toLowerCase().replace(/[’‘`]/g,"'");for(const [a,b] of DR_CONTR)x=x.replace(a,b);
   x=x.replace(/\b(\d+)\s*(km|kilometers?)\b/g,"$1 kilometers").replace(/\bten\b/g,"10").replace(/\bnine\b/g,"9").replace(/\bfive\b/g,"5").replace(/\bone\b/g,"1").replace(/\btwo\b/g,"2").replace(/\bthree\b/g,"3");
   return x.replace(/[^a-z0-9' ]+/g," ").replace(/'/g,"").replace(/\s+/g," ").trim()}
-function dSim(a,b){const x=dNorm(a).split(" ").filter(Boolean),y=dNorm(b).split(" ").filter(Boolean);if(!x.length||!y.length)return 0;
-  const L=Array.from({length:x.length+1},()=>new Array(y.length+1).fill(0));for(let i=1;i<=x.length;i++)for(let j=1;j<=y.length;j++)L[i][j]=x[i-1]===y[j-1]?L[i-1][j-1]+1:Math.max(L[i-1][j],L[i][j-1]);
+// proper nouns of the target sentence (Chuseok, Daegu, Suji…): speech recognition often cannot spell them,
+// so any one word said in their place counts — the learner is judged on the English around them
+function dProper(t){t=String(t||"");const C=dProper.c=dProper.c||new Map();if(C.has(t))return C.get(t);if(C.size>300)C.clear();const tk=t.split(/\s+/);
+  if(!dProper.m||Date.now()-dProper.mt>60e3){dProper.mt=Date.now();dProper.m=new Set();try{for(const p of asrPhrases())for(const w of String(p).split(/\s+/))if(w)dProper.m.add(dNorm(w))}catch(e){}}const mine=dProper.m;
+  const out=new Set();tk.forEach((w,i)=>{const c=w.replace(/[^A-Za-z'-]/g,"");if(!c||/^I('|$)/.test(c))return;const n=dNorm(c);if(!n)return;
+    const mid=i>0&&!/[.!?]["”']?$/.test(tk[i-1]);if((/^[A-Z]/.test(c)&&mid)||mine.has(n))n.split(" ").forEach(x=>out.add(x))});C.set(t,out);return out}
+function dSim(a,b){const x=dNorm(a).split(" ").filter(Boolean),y=dNorm(b).split(" ").filter(Boolean);if(!x.length||!y.length)return 0;const pn=dProper(b);
+  const L=Array.from({length:x.length+1},()=>new Array(y.length+1).fill(0));for(let i=1;i<=x.length;i++)for(let j=1;j<=y.length;j++)L[i][j]=(x[i-1]===y[j-1]||pn.has(y[j-1]))?L[i-1][j-1]+1:Math.max(L[i-1][j],L[i][j-1]);
   return 2*L[x.length][y.length]/(x.length+y.length)}
 // word diff for feedback: target words the learner missed are marked
-function dDiff(said,target){const x=dNorm(said).split(" ").filter(Boolean);const tw=String(target).split(/\s+/);const have=new Map();for(const w of x)have.set(w,(have.get(w)||0)+1);
-  return h("span",{},...tw.map((w,i)=>{const n=dNorm(w).split(" ")[0]||"";const ok=n&&have.get(n)>0;if(ok)have.set(n,have.get(n)-1);return h("span",{style:ok?"":"color:var(--bad);font-weight:600;text-decoration:underline"},(i?" ":"")+w)}))}
+function dDiff(said,target){const x=dNorm(said).split(" ").filter(Boolean);const tw=String(target).split(/\s+/);const have=new Map();for(const w of x)have.set(w,(have.get(w)||0)+1);const pn=dProper(target);
+  return h("span",{},...tw.map((w,i)=>{const n=dNorm(w).split(" ")[0]||"";const ok=n&&have.get(n)>0;if(ok)have.set(n,have.get(n)-1);const pr=!ok&&n&&pn.has(n);
+    return h("span",{style:ok?"":pr?"text-decoration:underline dotted;color:var(--muted)":"color:var(--bad);font-weight:600;text-decoration:underline",title:pr?"고유명사 — 인식이 달라도 괜찮아요":""},(i?" ":"")+w)}))}
 // the learner's own mistakes from AI feedback, sorted into patterns
 function dClassify(f){const w=String(f.why||f.w||"");const b=String(f.better||f.b||"");const o=String(f.original||f.o||"");const out=[];
   if(/과거/.test(w))out.push("past");if(/현재완료|have p\.?p|have \+ ?p/i.test(w)||/\b(i|we)('ve| have) (been|gained|lived|worked|gotten)\b/i.test(b))out.push("pp");
