@@ -2084,21 +2084,26 @@ function dUsed(P){return dAnswers().filter(a=>P.key.test(a)).length}
 function dNewMistakes(pid){const p=dP(pid);if(!p.m)return 0;return dMistakes(pid).filter(x=>x.ts>p.m).length}
 function dRecord(pid,it,ok,fast){const p=dP(pid);const k=txtHash(it.en);const r=p.i[k]=p.i[k]||{b:0,d:"",n:0,ok:0};r.n++;
   if(ok&&fast){r.ok++;r.b=Math.min(DRILL_BOX.length-1,(r.b||0)+1)}else if(ok){r.b=Math.max(1,r.b||0)}else r.b=0;r.d=addDays(ok&&fast?DRILL_BOX[r.b]:ok?1:0);dTouch(p)}
-function dLimit(pid,it){const r=dP(pid).i[txtHash(it.en)];return (r&&r.b>=2)?3:5}
+// time to START speaking, counted from the moment the mic is listening (not from when the card appears)
+function dLimit(pid,it){const r=dP(pid).i[txtHash(it.en)];return (r&&r.b>=2)?3:4}
+// time to FINISH the sentence (a soft goal, never a fail): 2 s to think + ~2 words a second; 80% once the sentence is familiar
+function dDoneLimit(pid,it){const r=dP(pid).i[txtHash(it.en)];const w=String(it.en||"").trim().split(/\s+/).length;return Math.round((2+w/2)*((r&&r.b>=2)?0.8:1)*10)/10}
 function dAdvance(pid,to){const p=dP(pid);const up=p.st<to;if(up){p.st=to;if(to>5)p.m=Date.now()}if(to>5&&!up)p.m=Date.now();dTouch(p);if(up)toast(to>5?"훈련 완료! 이제 복습으로 유지해요":to+"단계가 열렸어요")}
 // speech or typing into one answer box: Web Speech / Azure on the web build, keyboard dictation inside Claude
-function dInput(onSubmit,{rows=2,ph="말하거나 입력하고 Enter"}={}){const ta=h("textarea",{id:"ans_drill",rows,style:"min-height:"+(rows>2?150:64)+"px",placeholder:ph,autocapitalize:"sentences"});
+function dInput(onSubmit,{rows=2,ph="말하거나 입력하고 Enter",onStart=null}={}){const ta=h("textarea",{id:"ans_drill",rows,style:"min-height:"+(rows>2?150:64)+"px",placeholder:ph,autocapitalize:"sentences"});
   ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&rows<=2){e.preventDefault();onSubmit(ta.value)}});
-  ta.addEventListener("input",()=>{if(!ta._first&&ta.value.trim())ta._first=Date.now()});
-  let mic=null;try{mic=(azOn()?azMicBtn:micBtn)(ta,{assess:false,fresh:true,onFinal:v=>{if(rows<=2&&v&&v.trim())onSubmit(v)}})}catch(e){mic=null}
-  return {ta,mic:mic||micLink()}}
+  ta.addEventListener("input",()=>{const v=ta.value.trim();if(v){if(!ta._first)ta._first=Date.now();if(v!==ta._lv){ta._lv=v;ta._last=Date.now()}}});
+  let mic=null;try{mic=(azOn()?azMicBtn:micBtn)(ta,{assess:false,fresh:true,onStart,onFinal:v=>{if(rows<=2&&v&&v.trim())onSubmit(v)}})}catch(e){mic=null}
+  // the phone's own recognition has no "listening now" event: count from the tap
+  if(mic&&!mic._az&&onStart)mic.addEventListener("click",()=>{if(mic._isOn&&mic._isOn())onStart()});
+  return {ta,mic:mic||micLink(),real:!!mic}}
 
 let drill=null;
 function vDrill(m){if(drill&&drill.pid)return vDrillPat(m);
   const due=dDue();
   const dots=st=>h("span",{class:"row",style:"gap:3px"},...[1,2,3,4,5].map(k=>h("i",{style:`display:inline-block;width:14px;height:6px;border-radius:3px;background:${st>k?"var(--accent)":st===k?"var(--warn)":"var(--line)"}`})));
   put(m,h("div",{},h("p",{class:"eyebrow"},"Weak-point drill · 오늘 "+(S.today.drill||0)+"회"),h("h1",{},"약점 훈련")),
-    h("div",{class:"note"},h("span",{},"내 답변 기록에서 자주 틀린 패턴과, 거의 안 쓰지만 쓰면 점수가 오르는 표현을 모았어요. 패턴마다 5단계를 올라가고, 3단계부터는 ",h("b",{},"정확하게 + 빠르게(5초→3초)")," 말해야 통과해요.")),
+    h("div",{class:"note"},h("span",{},"내 답변 기록에서 자주 틀린 패턴과, 거의 안 쓰지만 쓰면 점수가 오르는 표현을 모았어요. 패턴마다 5단계를 올라가고, 3단계부터는 ",h("b",{},"정확하게 + 빠르게(마이크가 켜진 뒤 4초→3초 안에 말 시작)")," 말해야 통과해요.")),
     due.length?h("div",{class:"card",style:"border-color:var(--accent)"},h("div",{class:"hdr"},h("div",{},h("h3",{},"오늘 복습 "+due.length+"문장"),h("p",{class:"muted small"},"완료한 패턴의 문장이 1·3·7·14일 간격으로 돌아와요.")),h("button",{class:"btn primary",onclick:()=>{drill={pid:"_review",stage:3,round:null};render()}},"복습 시작"))):null,
     ...[["fix","자주 틀리는 것 — 실수 고치기"],["up","안 쓰지만 쓰면 점수 오르는 것 — 새 무기"]].flatMap(([g,label])=>{const recG=DRILL_PATS.find(P=>P.grp===g&&dP(P.id).st<=5);return [h("p",{class:"eyebrow",style:"margin-top:6px"},label),
     h("div",{class:"list"},...DRILL_PATS.filter(P=>P.grp===g).map(P=>{const rec=recG;const p=dP(P.id);const nm=dNewMistakes(P.id);const mine=dMistakes(P.id).length;const used=g==="up"?dUsed(P):null;
@@ -2136,23 +2141,34 @@ function dStage3(m,P,p){const review=!P;let R=drill.round;
       !review&&!pass?h("p",{class:"muted small"},"제한 시간 안에 80% 이상 맞히면 4단계가 열려요. 틀린 문장은 바로 다시 나와요."):null,
       h("div",{class:"list"},...R.res.map(r=>h("div",{class:"li"},h("span",{},r.fast?"✅":r.ok?"🐢":"❌"),h("div",{class:"grow"},h("div",{},r.en),h("div",{class:"muted small"},r.ko))))),
       h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{drill.round=null;if(pass){drill.stage=4}render()}},pass?"4단계로":"다시 하기"),h("button",{class:"btn",onclick:()=>{drill=null;render()}},"목록으로"))));return}
-  const it=R.list[R.i];const lim=dLimit(it.pid,it);const t0=Date.now();const fb=h("div",{});let answered=false;
-  const bar=h("div",{class:"bar"},h("i",{style:"transition:none;width:100%"}));const tEl=h("span",{class:"mono small muted"},lim+"초");
-  const iv=setInterval(()=>{if(!bar.isConnected){clearInterval(iv);return}const el=(Date.now()-t0)/1000;const left=Math.max(0,lim-el);bar.firstChild.style.width=(left/lim*100)+"%";bar.firstChild.style.background=left<=1?"var(--bad)":"var(--accent)";tEl.textContent=left>0?left.toFixed(1)+"초":"시간 초과 — 그래도 말해 보세요"},100);
+  const it=R.list[R.i];const lim=dLimit(it.pid,it);const dlim=dDoneLimit(it.pid,it);let t0=0;const fb=h("div",{});let answered=false;
+  const bar=h("div",{class:"bar"},h("i",{style:"transition:none;width:100%"}));const tEl=h("span",{class:"mono small muted",style:"white-space:nowrap"},"마이크 준비 중…");
+  // two clocks: "start speaking" (the real test) and, once speaking, "finish the sentence" (soft goal)
+  const iv=setInterval(()=>{if(!bar.isConnected){clearInterval(iv);return}if(!t0){tEl.textContent=inp.real?"🎙 마이크를 켜면 시작":"입력하면 시작";return}const el=(Date.now()-t0)/1000;const f=inp.ta._first;
+    if(!f){const left=Math.max(0,lim-el);bar.firstChild.style.width=(left/lim*100)+"%";bar.firstChild.style.background=left<=1?"var(--bad)":"var(--accent)";tEl.textContent=left>0?"말 시작까지 "+left.toFixed(1)+"초":"시작 시간 초과 — 그래도 말해 보세요"}
+    else{const left=Math.max(0,dlim-el);bar.firstChild.style.width=(left/dlim*100)+"%";bar.firstChild.style.background=left>0?"var(--good)":"var(--warn)";tEl.textContent=left>0?"말 끝내기 "+left.toFixed(1)+"초":"🐢 천천히 끝까지 (실패 아님)"}},100);
+  const go0=()=>{if(!t0){t0=Date.now();try{readyTone()}catch(e){}}};
   const next=()=>{R.i++;render()};
-  const finish=(v,forceOk)=>{if(answered)return;answered=true;clearInterval(iv);const start=inp.ta._first||Date.now();const rt=(start-t0)/1000;
+  const finish=(v,forceOk)=>{if(answered)return;answered=true;clearInterval(iv);if(!t0)t0=Date.now();const start=inp.ta._first||Date.now();const rt=Math.max(0,(start-t0)/1000);const tt=Math.max(rt,((inp.ta._last||Date.now())-t0)/1000);const slow=tt>dlim;
     const s=dSim(v,it.en);const ok=forceOk||s>=0.85;const fast=ok&&rt<=lim;R.res.push({...it,ok,fast});if(ok)R.ok++;if(fast){R.fast++;if(!it.retry)R.fast0++}dRecord(it.pid,it,ok,fast);
     if(!ok){R.list.push({...it,retry:true})}
-    fb.replaceChildren(h("div",{class:"fix",style:"border-left-color:"+(fast?"var(--good)":ok?"var(--warn)":"var(--bad)")},h("span",{class:"b"},fast?"정확 + 빠름 ("+rt.toFixed(1)+"초)":ok?"정확하지만 느려요 ("+rt.toFixed(1)+"초) — 입에 붙을 때까지":"다시 — 정답과 비교해 보세요"),
+    fb.replaceChildren(h("div",{class:"fix",style:"border-left-color:"+(fast?"var(--good)":ok?"var(--warn)":"var(--bad)")},h("span",{class:"b"},fast?"정확 + 빠름 (시작 "+rt.toFixed(1)+"초"+(slow?" · 끝까지 "+tt.toFixed(1)+"초 🐢":"")+")":ok?"정확하지만 시작이 느려요 ("+rt.toFixed(1)+"초 / "+lim+"초) — 입에 붙을 때까지":"다시 — 정답과 비교해 보세요"),
+      fast&&slow?h("span",{class:"muted small"},"시작은 빨랐어요. 끝까지 목표 "+dlim+"초 — 통과에는 영향 없어요."):null,
       h("div",{},dDiff(v,it.en)),it.why?h("span",{class:"w"},it.why):null),
       h("div",{class:"row"},spkBtn(it.en),!ok?h("button",{class:"btn sm ghost",onclick:()=>{R.res.pop();R.list.pop();answered=false;finish(it.en,true)}},"맞게 말했는데 인식이 틀렸어요"):null,h("button",{class:"btn primary",onclick:next},"다음 →")));
     if(!ok)speak(it.en)};
-  const inp=dInput(v=>finish(v));
+  const inp=dInput(v=>finish(v),{onStart:go0});
+  if(!inp.real)inp.ta.addEventListener("keydown",go0,{once:true});
+  // sentence heard correctly: stop listening and judge at once (the end time is the last word heard)
+  inp.ta.addEventListener("input",()=>{const b=inp.mic;if(!answered&&b&&b._isOn&&b._isOn()&&!b._auto&&dSim(inp.ta.value,it.en)>=0.85){b._auto=1;b._finish&&b._finish()}});
   put(m,h("p",{class:"muted small mono"},(R.i+1)+" / "+R.list.length+(it.retry?" · 다시 나온 문장":"")+(review?" · "+(dPat(it.pid)?.short||""):"")),
     h("div",{class:"card"},h("p",{class:"eyebrow"},it.mine?"내 답변에서 나온 실수":"한국어 → 영어로 바로 말하기"),h("div",{class:"q"},it.ko),
+      h("p",{class:"muted small",style:"margin:2px 0"},"⏱ 마이크가 켜진 뒤 "+lim+"초 안에 말을 시작하면 '빠름'. 끝까지는 "+dlim+"초 목표(느려도 통과)."),
       h("div",{class:"row",style:"flex-wrap:nowrap"},h("div",{class:"grow"},bar),tEl),inp.ta,
       h("div",{class:"row"},inp.mic,h("button",{class:"btn",onclick:()=>finish(inp.ta.value)},"확인"),h("button",{class:"btn ghost",onclick:()=>finish("")},"모르겠어요")),fb));
-  setTimeout(()=>{try{inp.ta.focus()}catch(e){}},50)}
+  // Azure: start listening by itself (the clock starts only once it is really listening)
+  if(inp.mic&&inp.mic._az&&inp.mic._start)setTimeout(()=>{if(inp.mic.isConnected&&!answered)inp.mic._start()},250);
+  else setTimeout(()=>{try{inp.ta.focus()}catch(e){}},50)}
 // stage 4: a question that needs the pattern; one-sentence answer judged by Claude (or by the pattern check when AI is off)
 async function dJudge(P,q,a){if(sample){try{const r=await sample.json(`You are an English tutor for a Korean OPIc learner (target ${tgt()}).
 Target pattern: ${P.ruleEn}.
