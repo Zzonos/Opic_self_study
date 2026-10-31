@@ -2177,7 +2177,7 @@ function dStage3(m,P,p){const review=!P;let R=drill.round;
     if(!ok)speak(it.en)};
   const inp=dInput(v=>finish(v),{onStart:go0});
   // the Korean to say (my mistakes: Korean of the corrected sentence; may still be on its way)
-  const ko0=it.mine?dKo(it):"";const koEl=it.mine?h("div",{class:"q"},ko0||(sample?"한국어 뜻 만드는 중…":"(한국어 뜻은 API 모드에서 만들어져요 — 아래 틀린 표현을 고쳐 말해 보세요)")):null;
+  const ko0=it.mine?dKo(it):"";const koEl=it.mine?h("div",{class:"q"},ko0||(sample?"한국어 뜻 만드는 중…":"(한국어 뜻은 클로드 모드나 API 모드에서 만들어져요 — 아래 틀린 표현을 고쳐 말해 보세요)")):null;
   const koReady=it.mine&&!ko0&&sample?dKoFill([it]).then(()=>{if(koEl.isConnected)koEl.textContent=dKo(it)||"(한국어 뜻을 못 만들었어요 — 아래 틀린 표현을 고쳐 말해 보세요)"}):Promise.resolve();
   if(!inp.real)inp.ta.addEventListener("keydown",go0,{once:true});
   // sentence heard correctly: stop listening and judge at once (the end time is the last word heard)
