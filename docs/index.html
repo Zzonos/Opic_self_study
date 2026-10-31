@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261031-181715-5b453a">
+<html lang="ko" data-build="20261031-204037-e36ce4">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -2258,10 +2258,13 @@ function dStage3(m,P,p){const review=!P;let R=drill.round;
   if(inp.mic&&inp.mic._az&&inp.mic._start)koReady.then(()=>{if(inp.mic.isConnected&&!answered)inp.mic._start()});
   else if(!inp.real)setTimeout(()=>{try{inp.ta.focus()}catch(e){}},50)}
 // stage 4: a question that needs the pattern; one-sentence answer judged by Claude (or by the pattern check when AI is off)
+// stage 4/5 AI checks: a misheard proper noun is not the learner's mistake
+const D_ASR=`Speech recognition often mishears proper nouns (place, shop, brand and people names) and writes them as odd or unrelated words (e.g. "sushi sports Park" for "Suji Sports Park"). Treat any such odd word that stands where a name would be as a correct name: never mark the answer wrong, correct it, or mention it because of that. Keep the name as the learner said it in your corrected sentence.`;
 async function dJudge(P,q,a){if(sample){try{const r=await sample.json(`You are an English tutor for a Korean OPIc learner (target ${tgt()}).
 Target pattern: ${P.ruleEn}.
 Question: "${q}"
 Learner's short answer (voice-dictated; ignore capitals and punctuation): "${a}"
+${D_ASR}${nameHint()}
 Judge only two things: did the learner use the target pattern, and is the sentence correct enough to say in the exam (small slips that a listener would not notice are fine)?
 Reply with ONLY JSON: {"ok":true,"used":true,"better":"a natural corrected answer that keeps the learner's meaning and uses the pattern","why":"한국어 한 줄 설명"}`,{cache:false,modelTier:"quick"});if(r&&typeof r.ok==="boolean")return r}catch(e){}}
   const used=P.key.test(dNorm(a));return {ok:null,used,better:null,why:used?"패턴은 들어갔어요. 아래 예시와 비교해 스스로 채점해 주세요.":"이 질문에 필요한 패턴이 안 보여요."}}
@@ -2273,7 +2276,7 @@ function dStage4(m,P,p){const Q=P.qs;drill.q4=drill.q4||{i:0,ok:0,res:[]};const 
   const nextBtn=()=>h("button",{class:"btn primary",onclick:()=>{st.i++;render()}},"다음 →");
   const grade=ok=>{if(done)return;done=true;st.res.push(ok);if(ok)st.ok++;dTouch(p);dSave()};
   const check=async v=>{v=(v||"").trim();if(v.length<3){toast("한 문장으로 답해 주세요");return}fb.replaceChildren(h("div",{class:"thinking"},h("i"),h("i"),h("i")));
-    const r=await dJudge(P,q,v);if(!fb.isConnected)return;
+    const r=await dJudge(P,q,v);if(!fb.isConnected)return;{const nf=fixNames(v,r.name_fixes);if(nf.applied.length)inp.ta.value=nf.text}
     if(r.ok===null){fb.replaceChildren(h("div",{class:"fix",style:"border-left-color:var(--warn)"},h("span",{class:"w"},r.why),h("span",{class:"b"},"예시: "+model)),
         h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{grade(false);st.i++;render()}},"틀렸어요"),h("button",{class:"btn primary",onclick:()=>{grade(true);st.i++;render()}},"맞게 썼어요")));return}
     grade(r.ok&&r.used!==false);
@@ -2295,6 +2298,7 @@ function dStage5(m,P,p){const pool=P.q5?P.q5().map(x=>({t:{ko:x.ko,en:x.ko,id:"x
 Target pattern: ${P.ruleEn}.
 Question: "${q.q}"
 Answer (voice-dictated): """${a}"""
+${D_ASR}${nameHint()}
 Find every place the learner used (or should have used) the pattern. Reply with ONLY JSON:
 {"used":2,"correct":true,"quotes":["learner's phrase that used it correctly"],"fixes":[{"original":"learner's phrase","better":"corrected phrase using the pattern","why":"한국어 한 줄"}],"summary":"한국어 1-2문장: 패턴을 잘 썼는지, 다음에 어디에 넣으면 좋을지"}
 "correct" is true when the pattern appears at least once and is used correctly every time (or the misuses are minor). Give at most 3 fixes.`,{cache:false})}catch(e){r=null}}
