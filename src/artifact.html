@@ -2082,10 +2082,20 @@ function dNear(x,y){if(x.length<4||y.length<4||x.startsWith(y)||y.startsWith(x)|
 function dSim(a,b){const x=dNorm(a).split(" ").filter(Boolean),y=dNorm(b).split(" ").filter(Boolean);if(!x.length||!y.length)return 0;const pn=dProper(b);
   const L=Array.from({length:x.length+1},()=>new Array(y.length+1).fill(0));for(let i=1;i<=x.length;i++)for(let j=1;j<=y.length;j++){const s=(x[i-1]===y[j-1]||pn.has(y[j-1]))?1:dNear(x[i-1],y[j-1]);L[i][j]=Math.max(L[i-1][j],L[i][j-1],s?L[i-1][j-1]+s:0)}
   return 2*L[x.length][y.length]/(x.length+y.length)}
+// the words a sentence is judged on: what the pattern is about (past verbs for 과거시제, have + p.p., ever, so … that …)
+// and, for my own mistakes, the words that were corrected. These must be said exactly; the rest only needs to be close,
+// because speech recognition often mishears small words.
+function dCore(target,P,orig){const y=dNorm(target).split(" ").filter(Boolean);const pn=dProper(target);const need=new Map();const add=w=>{if(w&&!pn.has(w))need.set(w,(need.get(w)||0)+1)};
+  if(P&&P.key){try{const re=new RegExp(P.key.source,"g");for(const m of dNorm(target).matchAll(re))m[0].split(" ").filter(Boolean).forEach(add)}catch(e){}}
+  if(orig){const o=new Map();for(const w of dNorm(orig).split(" ").filter(Boolean))o.set(w,(o.get(w)||0)+1);for(const w of y){if((o.get(w)||0)>0)o.set(w,o.get(w)-1);else if(!need.has(w))add(w)}}
+  return need}
+function dCheck(said,target,P,orig,thr=0.75){const s=dSim(said,target);const have=new Map();for(const w of dNorm(said).split(" ").filter(Boolean))have.set(w,(have.get(w)||0)+1);
+  const miss=[];for(const [w,n] of dCore(target,P,orig))if((have.get(w)||0)<n)miss.push(w);return {ok:s>=thr&&!miss.length,s,miss}}
+const dMissMsg=J=>J.miss.length?"핵심 표현이 빠졌거나 틀렸어요: "+J.miss.join(", "):"조금 달라요 ("+Math.round(J.s*100)+"%)";
 // word diff for feedback: target words the learner missed are marked
-function dDiff(said,target){const x=dNorm(said).split(" ").filter(Boolean);const tw=String(target).split(/\s+/);const have=new Map();for(const w of x)have.set(w,(have.get(w)||0)+1);const pn=dProper(target);
+function dDiff(said,target,core=null){const x=dNorm(said).split(" ").filter(Boolean);const tw=String(target).split(/\s+/);const have=new Map();for(const w of x)have.set(w,(have.get(w)||0)+1);const pn=dProper(target);
   return h("span",{},...tw.map((w,i)=>{const n=dNorm(w).split(" ")[0]||"";const ok=n&&have.get(n)>0;if(ok)have.set(n,have.get(n)-1);const pr=!ok&&n&&(pn.has(n)||x.some(w=>dNear(w,n)));
-    return h("span",{style:ok?"":pr?"text-decoration:underline dotted;color:var(--muted)":"color:var(--bad);font-weight:600;text-decoration:underline",title:pr?"비슷하게 인식됨 / 고유명사 — 괜찮아요":""},(i?" ":"")+w)}))}
+    const minor=!ok&&!pr&&core&&!core.has(n);return h("span",{style:ok?"":pr?"text-decoration:underline dotted;color:var(--muted)":minor?"color:var(--warn);text-decoration:underline":"color:var(--bad);font-weight:600;text-decoration:underline",title:pr?"비슷하게 인식됨 / 고유명사 — 괜찮아요":""},(i?" ":"")+w)}))}
 // the learner's own mistakes from AI feedback, sorted into patterns
 function dClassify(f){const w=String(f.why||f.w||"");const b=String(f.better||f.b||"");const o=String(f.original||f.o||"");const out=[];
   if(/과거/.test(w))out.push("past");if(/현재완료|have p\.?p|have \+ ?p/i.test(w)||/\b(i|we)('ve| have) (been|gained|lived|worked|gotten)\b/i.test(b))out.push("pp");
@@ -2159,18 +2169,18 @@ function dStage1(m,P,p){put(m,h("div",{class:"card"},h("h3",{},"언제 쓰나"),
   h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{dAdvance(P.id,2);drill.stage=2;render()}},"이해했어요 → 따라 말하기")))}
 function dStage2(m,P,p){const list=[...P.ex,...P.items.slice(0,3).map(([ko,en])=>[en,ko])];const done=list.filter(([en])=>p.s2[txtHash(en)]).length;
   let i=list.findIndex(([en])=>!p.s2[txtHash(en)]);if(i<0)i=drill.i2||0;const [en,ko]=list[i];const fb=h("div",{});
-  const check=v=>{const s=dSim(v,en);if(s>=0.8){p.s2[txtHash(en)]=1;dTouch(p);if(list.every(([e])=>p.s2[txtHash(e)])){dAdvance(P.id,3);drill.stage=3}render()}else fb.replaceChildren(h("div",{class:"fix"},h("span",{class:"w"},"조금 달라요 ("+Math.round(s*100)+"%) — 빨간 단어를 신경 써서 다시"),dDiff(v,en)),h("div",{class:"row"},h("button",{class:"btn sm ghost",onclick:()=>{p.s2[txtHash(en)]=1;dTouch(p);render()}},"맞게 말했는데 인식이 틀렸어요")))};
+  const check=v=>{const J=dCheck(v,en,P);if(J.ok){p.s2[txtHash(en)]=1;dTouch(p);if(list.every(([e])=>p.s2[txtHash(e)])){dAdvance(P.id,3);drill.stage=3}render()}else fb.replaceChildren(h("div",{class:"fix"},h("span",{class:"w"},dMissMsg(J)+" — 빨간 단어를 신경 써서 다시"),dDiff(v,en,dCore(en,P))),h("div",{class:"row"},h("button",{class:"btn sm ghost",onclick:()=>{p.s2[txtHash(en)]=1;dTouch(p);render()}},"맞게 말했는데 인식이 틀렸어요")))};
   const inp=dInput(check);
   // speaking: once the words heard match the sentence, stop listening and pass by itself (no extra tap)
-  dAutoJudge(inp,en,0.8);
+  dAutoJudge(inp,en,v=>dCheck(v,en,P).ok);
   put(m,h("p",{class:"muted small mono"},done+" / "+list.length+" 문장 통과"),
     h("div",{class:"card"},h("div",{class:"row",style:"flex-wrap:nowrap"},spkBtn(en),h("div",{class:"grow"},h("div",{class:"q"},en),h("div",{class:"muted small"},ko))),
       h("p",{class:"muted small"},"듣고 → 똑같은 리듬으로 따라 말하기. I've, That's 같은 줄임말은 한 덩어리로."),inp.ta,h("div",{class:"row"},inp.mic,h("button",{class:"btn",onclick:()=>check(inp.ta.value)},"확인")),fb));
   setTimeout(()=>speak(en),300)}
 // auto-judge while speaking: only once the sentence is really finished — its last word heard (short settle),
 // or a close match and then a pause — never just because 85% of the words are already there
-function dAutoJudge(inp,target,thr,ok=()=>true){let t=null;const lastW=(dNorm(target).split(" ").filter(Boolean).pop())||"";
-  inp.ta.addEventListener("input",()=>{clearTimeout(t);const b=inp.mic;if(!ok()||!b||!b._isOn||!b._isOn()||b._auto)return;const v=inp.ta.value;if(dSim(v,target)<thr)return;
+function dAutoJudge(inp,target,pass,ok=()=>true){let t=null;const lastW=(dNorm(target).split(" ").filter(Boolean).pop())||"";
+  inp.ta.addEventListener("input",()=>{clearTimeout(t);const b=inp.mic;if(!ok()||!b||!b._isOn||!b._isOn()||b._auto)return;const v=inp.ta.value;if(!pass(v))return;
     const tail=dNorm(v).split(" ").filter(Boolean).slice(-2);const done=lastW&&tail.includes(lastW);
     t=setTimeout(()=>{if(!ok()||!b._isOn()||b._auto||inp.ta.value!==v)return;b._auto=1;inp.submitNow()},done?400:1500)})}
 // my own mistakes have no Korean cue: use the Korean of the corrected sentence (shared translation cache, made on demand in API mode)
@@ -2198,14 +2208,14 @@ function dStage3(m,P,p){const review=!P;let R=drill.round;
   const next=()=>{R.i++;render()};
   const finish=(v,forceOk)=>{
     // wrong the first time: trying again on the same card is judged too (practice; the record keeps the first try and the sentence comes back at the end of the round)
-    if(answered){if(!retryMode||forceOk)return;const s2=dSim(v,it.en);const ok2=s2>=0.85;if(ok2)retryMode=false;
-      fb2.replaceChildren(h("div",{class:"fix",style:"border-left-color:"+(ok2?"var(--good)":"var(--bad)")},h("span",{class:"b"},ok2?"✅ 이번엔 맞았어요! (기록은 첫 시도로 남고, 라운드 끝에 한 번 더 나와요)":"아직 달라요 ("+Math.round(s2*100)+"%) — 빨간 단어를 신경 써서 다시"),ok2?null:h("div",{},dDiff(v,it.en))));return}
+    if(answered){if(!retryMode||forceOk)return;const J2=dCheck(v,it.en,dPat(it.pid),it.o);const ok2=J2.ok;if(ok2)retryMode=false;
+      fb2.replaceChildren(h("div",{class:"fix",style:"border-left-color:"+(ok2?"var(--good)":"var(--bad)")},h("span",{class:"b"},ok2?"✅ 이번엔 맞았어요! (기록은 첫 시도로 남고, 라운드 끝에 한 번 더 나와요)":"아직 달라요 — "+dMissMsg(J2)),ok2?null:h("div",{},dDiff(v,it.en,dCore(it.en,dPat(it.pid),it.o)))));return}
     answered=true;try{const b=inp.mic;if(b&&b._isOn&&b._isOn()&&!b._auto)b._abort()}catch(e){}clearInterval(iv);if(!t0)t0=Date.now();const start=inp.ta._first||Date.now();const rt=Math.max(0,(start-t0)/1000);const tt=Math.max(rt,((inp.ta._last||Date.now())-t0)/1000);const slow=tt>dlim;
-    const s=dSim(v,it.en);const ok=forceOk||s>=0.85;const fast=ok&&rt<=lim;R.res.push({...it,ok,fast});if(ok)R.ok++;if(fast){R.fast++;if(!it.retry)R.fast0++}dRecord(it.pid,it,ok,fast);dSave();
+    const J=dCheck(v,it.en,dPat(it.pid),it.o);const ok=forceOk||J.ok;const fast=ok&&rt<=lim;R.res.push({...it,ok,fast});if(ok)R.ok++;if(fast){R.fast++;if(!it.retry)R.fast0++}dRecord(it.pid,it,ok,fast);dSave();
     if(!ok){R.list.push({...it,retry:true});retryMode=true}
-    fb.replaceChildren(fb2,h("div",{class:"fix",style:"border-left-color:"+(fast?"var(--good)":ok?"var(--warn)":"var(--bad)")},h("span",{class:"b"},fast?"정확 + 빠름 (시작 "+rt.toFixed(1)+"초"+(slow?" · 끝까지 "+tt.toFixed(1)+"초 🐢":"")+")":ok?"정확하지만 시작이 느려요 ("+rt.toFixed(1)+"초 / "+lim+"초) — 입에 붙을 때까지":"다시 — 정답과 비교해 보세요"),
+    fb.replaceChildren(fb2,h("div",{class:"fix",style:"border-left-color:"+(fast?"var(--good)":ok?"var(--warn)":"var(--bad)")},h("span",{class:"b"},fast?"정확 + 빠름 (시작 "+rt.toFixed(1)+"초"+(slow?" · 끝까지 "+tt.toFixed(1)+"초 🐢":"")+")":ok?"정확하지만 시작이 느려요 ("+rt.toFixed(1)+"초 / "+lim+"초) — 입에 붙을 때까지":"다시 — "+dMissMsg(J)),
       fast&&slow?h("span",{class:"muted small"},"시작은 빨랐어요. 끝까지 목표 "+dlim+"초 — 통과에는 영향 없어요."):null,
-      h("div",{},dDiff(v,it.en)),it.why?h("span",{class:"w"},it.why):null),
+      h("div",{},dDiff(v,it.en,dCore(it.en,dPat(it.pid),it.o))),it.why?h("span",{class:"w"},it.why):null),
       h("div",{class:"row"},spkBtn(it.en),!ok?h("button",{class:"btn sm ghost",onclick:()=>{R.res.pop();R.list.pop();answered=false;retryMode=false;fb2.replaceChildren();finish(it.en,true)}},"맞게 말했는데 인식이 틀렸어요"):null,h("button",{class:"btn primary",onclick:next},"다음 →")));
     if(!ok)speak(it.en)};
   const inp=dInput(v=>finish(v),{onStart:go0});
@@ -2214,7 +2224,7 @@ function dStage3(m,P,p){const review=!P;let R=drill.round;
   const koReady=it.mine&&!ko0&&sample?dKoFill([it]).then(()=>{if(koEl.isConnected)koEl.textContent=dKo(it)||"(한국어 뜻을 못 만들었어요 — 아래 틀린 표현을 고쳐 말해 보세요)"}):Promise.resolve();
   if(!inp.real)inp.ta.addEventListener("keydown",go0,{once:true});
   // sentence heard correctly: stop listening and judge at once (the end time is the last word heard)
-  dAutoJudge(inp,it.en,0.85,()=>!answered||retryMode);
+  dAutoJudge(inp,it.en,v=>dCheck(v,it.en,dPat(it.pid),it.o).ok,()=>!answered||retryMode);
   put(m,h("p",{class:"muted small mono"},(R.i+1)+" / "+R.list.length+(it.retry?" · 다시 나온 문장":"")+(review?" · "+(dPat(it.pid)?.short||""):"")),
     h("div",{class:"card"},h("p",{class:"eyebrow"},it.mine?"내 답변에서 나온 실수 → 맞는 문장으로 고쳐 말하기":"한국어 → 영어로 바로 말하기"),
       it.mine?h("div",{},koEl,
