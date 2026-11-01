@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261031-205055-d7c68a">
+<html lang="ko" data-build="20261101-151434-9db23e">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -131,7 +131,7 @@ label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--mu
 .note.ai{background:var(--warn-soft);color:var(--warn)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:9}
 .toast.show{opacity:1}
-.segs{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px}
+.segs{position:sticky;top:calc(env(safe-area-inset-top,0px) + 6px);z-index:4;display:flex;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px}
 .segs .seg{flex:1;border:0;background:none;border-radius:9px;padding:9px 6px;font-size:14px;font-weight:600;color:var(--mute);cursor:pointer}
 .segs .seg.on{background:var(--panel);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .cks{display:flex;flex-wrap:wrap;gap:6px}
@@ -177,6 +177,9 @@ svg.chart{width:100%;height:auto;display:block}
 .login{max-width:420px;margin:24px auto;display:flex;flex-direction:column;gap:14px}
 .login .brand{font-family:var(--display);font-size:34px;font-weight:700;line-height:1}
 .login input[type=password],.login input[type=email]{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:var(--bg)}
+.stick{position:sticky;top:env(safe-area-inset-top,0px);z-index:4;background:var(--bg);padding-block:8px;margin-block:-8px}
+.stick .segs{position:static}
+.main > .segs{box-shadow:0 -8px 0 var(--bg)}
 .hdr{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .hdrR{display:flex;align-items:center;gap:6px;flex-shrink:0}
 @media (max-width:900px){.hdrR{flex-direction:column;align-items:flex-end;gap:4px}}
@@ -1140,6 +1143,9 @@ function render(){renderNav();ensureToday();for(const b of [...AZ_BTNS])try{b._k
     // page label on top, then the tabs, then the title (and its buttons)
     if(hd&&hd.matches(".eyebrow"))hd.after(tb);else if(hd){const eb=hd.querySelector(".eyebrow");hd.before(eb);eb.after(tb)}else m.prepend(tb)}}
 // the page label (and the mode next to it) always sits at the very top of a page, above back buttons and options
+// page tabs and a sticky header (chat: 대화 끝내기) both pinned: stack the header under the tabs
+function stickStack(){try{const m=$("#main");if(!m)return;const k=m.querySelector(":scope > .stick");if(!k)return;const sg=m.querySelector(":scope > .segs");const t=sg&&(sg.compareDocumentPosition(k)&4)?sg.offsetHeight+6:0;const v=t?"calc(env(safe-area-inset-top,0px) + "+t+"px)":"";if(k.style.top!==v)k.style.top=v}catch(e){}}
+window.addEventListener("scroll",stickStack,{passive:true});
 function pageLabelTop(m){try{const eb=[...m.querySelectorAll(".eyebrow")].find(e=>!e.closest(".card,.note,details"));if(!eb)return;const f=m.firstElementChild;if(f===eb||(f&&f.firstElementChild===eb&&eb.parentElement===f))return;eb.style.marginTop="";m.prepend(eb)}catch(e){}}
 // current mode next to the page's top label on every screen (웹 모드 / API 모드 / 클로드 모드)
 function stampMode(m){try{const eb=m.querySelector(".eyebrow");if(!eb||/모드/.test(eb.textContent))return;eb.append(h("span",{class:"modetag",style:"color:var(--accent)"}," · "+modeLabel()))}catch(e){}}
@@ -1511,7 +1517,7 @@ Reply with ONLY JSON: {"done":true} or {"done":false}`,{cache:false,modelTier:"q
 
   const waitSel=h("select",{title:"말을 멈춘 뒤 얼마나 기다렸다 보낼지",onchange:e=>{chatWait=+e.target.value;try{localStorage.setItem("opic30_cwait",chatWait)}catch(x){}armAuto()}},...[[2,"2초 후 전송"],[4,"4초 후 전송"],[6,"6초 후 전송"],[10,"10초 후 전송"],[0,"직접 보내기"]].map(([v,l])=>h("option",{value:v,selected:chatWait===v},l)));waitSel.style.width="auto";
   const inputRow=chatMode==="voice"?h("div",{class:"row"},micBtn_,h("button",{class:"btn",onclick:async()=>{clearTimeout(vt);try{if(micBtn_&&micBtn_._flush)await micBtn_._flush()}catch(e){}send()}},"지금 보내기"),waitSel,status):h("div",{class:"row"},h("button",{class:"btn primary",onclick:send},"보내기"),h("span",{class:"muted small"},"Enter로 줄바꿈, 보내기 버튼으로 전송"));
-  put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow",id:"chat_cnt"},chatEyebrow(sc)),h("h2",{},sc.ko)),h("div",{class:"row"},h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_auto",checked:chat.auto,onchange:e=>chat.auto=e.target.checked}),"자동 읽기"),chatMode==="voice"?h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_hide",checked:chat.hide,onchange:e=>{chat.hide=e.target.checked;bub.classList.toggle("hidetext",chat.hide)}}),"상대 말 숨기기"):null,h("button",{class:"btn sm",onclick:()=>endChat()},"대화 끝내기"))),
+  put(m,h("div",{class:"hdr stick"},h("div",{},h("p",{class:"eyebrow",id:"chat_cnt"},chatEyebrow(sc)),h("h2",{},sc.ko)),h("div",{class:"row"},h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_auto",checked:chat.auto,onchange:e=>chat.auto=e.target.checked}),"자동 읽기"),chatMode==="voice"?h("label",{class:"row small",style:"gap:5px;cursor:pointer"},h("input",{type:"checkbox",id:"chat_hide",checked:chat.hide,onchange:e=>{chat.hide=e.target.checked;bub.classList.toggle("hidetext",chat.hide)}}),"상대 말 숨기기"):null,h("button",{class:"btn sm",onclick:()=>endChat()},"대화 끝내기"))),
     bub,
     h("div",{class:"chatin"},h("div",{class:"card",style:"gap:8px"},ta,inputRow,h("div",{class:"row"},h("div",{class:"grow"},prompt_ko),hintBtn),hintOut)));
   if(chat.hide)bub.classList.add("hidetext");
@@ -2178,7 +2184,7 @@ function vDrill(m){if(drill&&drill.pid)return vDrillPat(m);
 let DRILL_SR=false;try{DRILL_SR=localStorage.getItem("oss_drill_sr")==="1"}catch(e){}
 function dSrToggle(){if(!azOn()||!SR_OK)return null;const cb=h("input",{type:"checkbox"});cb.checked=DRILL_SR;cb.onchange=()=>{DRILL_SR=cb.checked;try{localStorage.setItem("oss_drill_sr",DRILL_SR?"1":"0")}catch(e){}render()};
   return h("label",{class:"muted small",style:"display:inline-flex;align-items:center;gap:6px;cursor:pointer"},cb,"휴대폰 음성인식 사용 (Azure 안 씀)")}
-function dHeader(P,p){return h("div",{},h("div",{class:"row",style:"justify-content:space-between;align-items:center"},h("button",{class:"btn sm ghost",onclick:()=>{drill=null;render()}},"← 약점 훈련"),dSrToggle()),h("p",{class:"eyebrow",style:"margin-top:10px"},P?P.name:"복습"),
+function dHeader(P,p){return h("div",{class:"stick"},h("div",{class:"row",style:"justify-content:space-between;align-items:center"},h("button",{class:"btn sm ghost",onclick:()=>{drill=null;render()}},"← 약점 훈련"),dSrToggle()),h("p",{class:"eyebrow",style:"margin-top:10px"},P?P.name:"복습"),
   P?h("div",{class:"segs",style:"margin-top:8px"},...DRILL_STAGES.map((s,k)=>h("button",{class:"seg"+(drill.stage===k+1?" on":""),disabled:k+1>p.st,style:k+1>p.st?"opacity:.4":"",onclick:()=>{drill={pid:P.id,stage:k+1};render()}},(k+1)+" "+(window.innerWidth<520?"":s)))):null)}
 function vDrillPat(m){dResume();if(drill.pid==="_review"){dStage3(m,null,null);dSave();return}const P=dPat(drill.pid);const p=dP(P.id);
   put(m,dHeader(P,p),h("h1",{},DRILL_STAGES[drill.stage-1]));
