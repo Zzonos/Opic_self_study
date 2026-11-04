@@ -731,8 +731,13 @@ function vadWatch({onVoice,threshold=0.035,ms=250}){let stop=false,ac=null,timer
 // recognizer itself (chat: paused while the AI thinks/speaks, or after a long silence) — Azure only bills
 // while the recognizer runs; the microphone permission stays because the shared stream is kept.
 const AZ_BTNS=new Set();
-function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,idleStop=0,onState=null,assess=true,fresh=false}={}){const b=h("button",{class:"btn primary"},label);AZ_BTNS.add(b);
-  let rec=null,cl=null,t0=0,lastEnd=0,lastProg=0,live=false,want=false,base="",fin="",pend="",segs=[],gen=0,skipPhrase=false,lastAct=0,idleT=null,vadStop=null,starting=false;
+function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,idleStop=0,onState=null,assess=true,fresh=false,gate=null,echo=null}={}){const b=h("button",{class:"btn primary"},label);AZ_BTNS.add(b);
+  let rec=null,cl=null,t0=0,lastEnd=0,lastProg=0,live=false,want=false,base="",fin="",pend="",segs=[],gen=0,skipPhrase=false,lastAct=0,idleT=null,vadStop=null,starting=false,gp=false;
+  // gate (hands-free call): the recogniser keeps running while the AI talks; what it hears then is dropped, and a phrase
+  // that began during the AI's voice loses its leading words that are the AI's own (echo), keeping what the user said after
+  const gated=()=>{try{return !!(gate&&gate())}catch(e){return false}};
+  const unEcho=t=>{const ew=new Set(String((echo&&echo())||"").toLowerCase().replace(/[^a-z' ]/g," ").split(/\s+/).filter(Boolean));if(!ew.size)return t;
+    const ws=String(t||"").split(/\s+/);let i=0;while(i<ws.length&&ew.has(ws[i].toLowerCase().replace(/[^a-z']/g,"")))i++;return ws.slice(i).join(" ")};
   const st=s=>{try{onState&&onState(s)}catch(e){}};
   const paint=()=>{b.disabled=starting;b.textContent=starting?"연결 중…":want?(live?"■ 말하기 끝":"⏸ 대기 · 끝내기"):label;b.classList.toggle("rec",want)};
   b._isOn=()=>want;b._live=()=>live;b._wanted=()=>want;b._az=true;b._pron=()=>azSummary(segs);b._reset=()=>{segs=[];segCut=0;if(ta._doubtEl)ta._doubtEl.hidden=true};
@@ -746,7 +751,7 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
   const dropCl=()=>{if(cl){try{cl.getTracks().forEach(t=>t.stop())}catch(e){}cl=null}};
   const stopRec=()=>new Promise(res=>{clearInterval(idleT);idleT=null;gen++;if(!rec){live=false;dropCl();paint();return res()}const r=rec;rec=null;try{if(AZ.lastStat){audLog.push(AZ.lastStat());if(audLog.length>30)audLog.shift();AZ.lastStat=null}}catch(x){}if(AZ.live.has(b)){azAdd((Date.now()-AZ.live.get(b))/1000);AZ.live.delete(b)}if(live){MIC.active=Math.max(0,MIC.active-1);MIC.last=Date.now()}live=false;paint();
     try{r.stopContinuousRecognitionAsync(()=>{try{r.close()}catch(e){}dropCl();res()},()=>{dropCl();res()})}catch(e){dropCl();res()}});
-  const startRec=async()=>{if(rec||starting)return;starting=true;paint();unVad();
+  const startRec=async()=>{if(rec||starting)return;starting=true;paint();unVad();const c0=Date.now();
     try{const {sdk,cfg}=await azConfig(2000);let audio;try{if(fresh){try{ttsStop()}catch(x){}if(!MIC.active)micRelease()}const ms=await micStream();dropCl();cl=ms.clone();audio=sdk.AudioConfig.fromStreamInput(cl)}catch(x){if(x&&x.name==="NotAllowedError")throw new Error("마이크 권한이 꺼져 있어요");audio=sdk.AudioConfig.fromDefaultMicrophoneInput()}
       const A=typeof assess==="function"?!!assess():!!assess;if(!A)try{cfg.requestWordLevelTimestamps()}catch(x){}const r=new sdk.SpeechRecognizer(cfg,audio);const my=++gen;rec=r;skipPhrase=false;
       // (no phrase list: my proper nouns are given to the AI instead — see nameHint())
@@ -754,15 +759,15 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
       if(A){const pa=new sdk.PronunciationAssessmentConfig("",sdk.PronunciationAssessmentGradingSystem.HundredMark,sdk.PronunciationAssessmentGranularity.Word,false);pa.applyTo(r)}
       base=ta.value?ta.value.trim()+" ":"";fin="";pend="";if(!base)segs=[];
       const zs={n:0,ch:0,nm:0};AZ.lastStat=()=>"Azure 세션 "+Math.round((Date.now()-(t0||Date.now()))/1000)+"초: 결과 "+zs.n+"개 · "+zs.ch+"자"+(zs.nm?" · 못 알아들음 "+zs.nm+"회":"")+(A?" · 발음평가":"")+(fresh?" · 새 마이크":"")+(()=>{try{const t=cl&&cl.getAudioTracks()[0];return !t?" · 기본 마이크":t.readyState!=="live"?" · 마이크 끊김":t.muted?" · 마이크 음소거":""}catch(x){return ""}})();let lagMax=0;t0=0;lastEnd=0;lastProg=Date.now();const lag=e=>{try{if(!t0)return;const end=((e.result.offset||0)+(e.result.duration||0))/1e7;if(end>lastEnd){lastEnd=end;lastProg=Date.now()}const l=(Date.now()-t0)/1000-end;if(l>lagMax)lagMax=l}catch(x){}};
-      r.recognizing=(s,e)=>{if(my!==gen)return;lag(e);lastAct=Date.now();if(skipPhrase)return;pend=e.result.text||"";ta.value=base+fin+pend;ta.dispatchEvent(new Event("input"))};
-      r.recognized=(s,e)=>{if(my!==gen)return;lag(e);if(lagMax>1.5){audLog.push("Azure 인식 지연 최대 "+lagMax.toFixed(1)+"초"+(A?" (발음평가 켬)":""));if(audLog.length>30)audLog.shift()}lagMax=0;lastAct=Date.now();MIC.last=Date.now();pend="";if(skipPhrase){skipPhrase=false;return}if(e.result.reason!==sdk.ResultReason.RecognizedSpeech||!e.result.text){zs.nm++;return}zs.n++;zs.ch+=e.result.text.length;fin+=e.result.text+" ";ta.value=base+fin;ta.dispatchEvent(new Event("input"));
+      r.recognizing=(s,e)=>{if(my!==gen)return;lag(e);lastAct=Date.now();if(skipPhrase)return;if(gated()){gp=true;pend="";return}pend=gp?unEcho(e.result.text||""):(e.result.text||"");ta.value=base+fin+pend;ta.dispatchEvent(new Event("input"))};
+      r.recognized=(s,e)=>{if(my!==gen)return;lag(e);if(lagMax>1.5){audLog.push("Azure 인식 지연 최대 "+lagMax.toFixed(1)+"초"+(A?" (발음평가 켬)":""));if(audLog.length>30)audLog.shift()}lagMax=0;lastAct=Date.now();MIC.last=Date.now();pend="";if(skipPhrase){skipPhrase=false;return}if(gated()){gp=false;return}if(e.result.reason!==sdk.ResultReason.RecognizedSpeech||!e.result.text){gp=false;zs.nm++;return}const said=gp?unEcho(e.result.text):e.result.text;if(gp&&said!==e.result.text)audLog.push("AI 목소리 겹침 제거: "+(e.result.text.split(/\s+/).length-(said?said.split(/\s+/).length:0))+"단어");gp=false;if(!said){ta.value=base+fin;ta.dispatchEvent(new Event("input"));return}zs.n++;zs.ch+=said.length;fin+=said+" ";ta.value=base+fin;ta.dispatchEvent(new Event("input"));
         try{const j=JSON.parse(e.result.properties.getProperty(sdk.PropertyId.SpeechServiceResponse_JsonResult));const nb=(j.NBest||[])[0]||{};segs.push({text:e.result.text,dur:(j.Duration||0)/1e7,pa:nb.PronunciationAssessment||{},words:nb.Words||[]})}catch(x){}showDoubt()};
       r.canceled=(s,e)=>{if(my!==gen||e.reason!==sdk.CancellationReason.Error)return;const d=String(e.errorDetails||"");audLog.push("azure canceled "+e.errorCode+" "+d.slice(0,80));
         if(document.hidden){stopRec();return}
         if(/quota|429|1007|exceed/i.test(d)||e.errorCode===sdk.CancellationErrorCode.TooManyRequests){want=false;azDisable("무료 한도 소진")}else if(/401|403|auth/i.test(d)||e.errorCode===sdk.CancellationErrorCode.AuthenticationFailure){AZ.tok=null;toast("Azure 인증 오류 — 다시 눌러 주세요");want=false}else{toast("Azure 연결이 끊겼어요: "+d.slice(0,60));want=false}stopRec()};
       await new Promise((ok,bad)=>r.startContinuousRecognitionAsync(ok,bad));t0=Date.now();lastProg=Date.now();
       if(my!==gen){try{r.close()}catch(e){}starting=false;paint();return}
-      live=true;want=true;MIC.active++;AZ.live.set(b,Date.now());lastAct=Date.now();starting=false;paint();st("listen");try{onStart&&onStart()}catch(x){}
+      live=true;want=true;MIC.active++;AZ.live.set(b,Date.now());lastAct=Date.now();starting=false;paint();{const cs=(Date.now()-c0)/1000;if(cs>0.8){audLog.push("Azure 연결 "+cs.toFixed(1)+"초");if(audLog.length>30)audLog.shift()}}st("listen");try{onStart&&onStart()}catch(x){}
       // long silence in a conversation: stop paying Azure, wake up again by the local voice detector
       if(idleStop)idleT=setInterval(()=>{if(live&&!pend&&Date.now()-lastAct>idleStop)b._pause(true)},1000)}
     catch(e){starting=false;rec=null;live=false;want=false;paint();const m=String(e.message||e);if(e.status===500&&/AZURE_SPEECH_KEY/.test(m))toast("Worker에 Azure 키가 아직 없어요");else if(/azure 401/.test(m))azDisable("키 오류");else toast("Azure 연결 실패: "+m.slice(0,80))}
@@ -1078,8 +1083,8 @@ function natSpeak(text,{btn,rate,onend,fallback,whole=false,chunks=null}){let ss
   const urls=ss.map(()=>null);
   // a request that hangs (weak signal while driving) gives up after 15s instead of stalling the voice
   const get=i=>urls[i]||(urls[i]=Promise.race([natUrl(ss[i]).catch(()=>null),new Promise(r=>setTimeout(()=>r(null),15000))]));
-  const step=i=>{if(tts.cur!==cur)return;if(i>=ss.length){done();return}for(let k=i;k<Math.min(ss.length,i+(chunks?6:3));k++)get(k);
-    urls[i].then(u=>{if(tts.cur!==cur)return;if(!u){const parts=splitSent(ss[i]);if(parts.length>1){ss.splice(i,1,...parts);urls.splice(i,1,...parts.map(()=>null));step(i);return}if(i===0){tts.cur=null;fallback();return}step(i+1);return}
+  const step=i=>{if(tts.cur!==cur)return;if(i>=ss.length){done();return}for(let k=i;k<Math.min(ss.length,i+(chunks?8:3));k++)get(k);const tw=Date.now();
+    urls[i].then(u=>{if(tts.cur!==cur)return;{const wt=(Date.now()-tw)/1000;if(wt>0.8){audLog.push("음성 준비 대기 "+wt.toFixed(1)+"초 ("+(i+1)+"/"+ss.length+"번째)");if(audLog.length>30)audLog.shift()}}if(!u){const parts=splitSent(ss[i]);if(parts.length>1){ss.splice(i,1,...parts);urls.splice(i,1,...parts.map(()=>null));step(i);return}if(i===0){tts.cur=null;fallback();return}step(i+1);return}
       audPlay(u,{rate:rate??tts.rate,onend:()=>step(i+1),onerror:()=>step(i+1)})})};
   step(0)}
 function speak(text,{btn=null,rate=null,onend=null,key=null,whole=false,chunks=null}={}){
@@ -1448,13 +1453,13 @@ function vChat(m){
   const ta=h("textarea",{id:"chat_in",style:"min-height:64px",placeholder:"입력하거나 받아쓰기로 말하세요 — "+DICT_HINT});
   // Enter sends, Shift+Enter makes a new line (ignored while a Korean/IME word is still being composed)
   ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){e.preventDefault();send()}});
-  const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ttsStop();ta.value="";let dz=[];try{dz=micBtn_&&micBtn_._doubt?micBtn_._doubt():[]}catch(e){}try{micBtn_&&micBtn_._cut&&micBtn_._cut();if(micBtn_&&micBtn_._pause)Promise.resolve(micBtn_._pause()).then(()=>{if(!hfChat()&&micBtn_._az&&!MIC.active){micRelease();audLog.push("AI 차례: 마이크 닫음 (일반 음질)")}})}catch(e){}chat.busy=true;
+  const send=async()=>{const t=ta.value.trim();if(!t||chat.busy)return;ttsStop();ta.value="";let dz=[];try{dz=micBtn_&&micBtn_._doubt?micBtn_._doubt():[]}catch(e){}try{micBtn_&&micBtn_._cut&&micBtn_._cut();if(micBtn_&&micBtn_._pause&&!(hfChat()&&micBtn_._az))Promise.resolve(micBtn_._pause()).then(()=>{if(!hfChat()&&micBtn_._az&&!MIC.active){micRelease();audLog.push("AI 차례: 마이크 닫음 (일반 음질)")}})}catch(e){}chat.busy=true;
     const meU={who:"me",text:t,dz};chat.ui.push(meU);chat.turns.push({role:"user",content:t});const meTurn=chat.turns[chat.turns.length-1];let meEl=render1(meU);bub.append(meEl);const w=render1({who:"wait"});bub.append(w);toEnd();
     const pre=new Set();const warm=t=>{if(!t||pre.has(t)||!chat.auto||!(WEB&&TTS_URL))return;pre.add(t);try{if(natOK(t))natUrl(t).catch(()=>{})}catch(e){}};
     const str=(src,k)=>{const m=new RegExp('"'+k+'"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"').exec(src);if(!m)return null;try{return JSON.parse('"'+m[1]+'"')}catch(e){return null}};
     const onText=({text})=>{try{const b=str(text,"better");if(b){warm(TIP_OPEN);warm(tipBetter(b))}
       const wm=/"words"\s*:\s*(\[[^\]]*\])/.exec(text);if(wm&&b){try{const w=tipWords(JSON.parse(wm[1]));if(w)warm(w)}catch(e){}}
-      const rp=str(text,"reply");if(rp)warm(rp.trim()||null)}catch(e){}};
+      const rm=/"reply"\s*:\s*"((?:[^"\\]|\\.)*)("?)/.exec(text);if(rm){let rp="";try{rp=JSON.parse('"'+rm[1].replace(/\\$/,"")+'"')}catch(x){}const ss=splitSent(rp);(rm[2]?ss:ss.slice(0,-1)).forEach(warm)}}catch(e){}};
     try{const ask=()=>sample.json([{role:"user",content:chatRules(sc)},...chat.turns],{cache:false,modelTier:"quick",onText});
       let r;try{r=await ask()}catch(e1){if(e1&&e1.code==="invalid_json"){try{r=await ask()}catch(e2){const raw=String((e2&&e2.text)||"").replace(/```[a-z]*|```/g,"").trim();const m=/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(raw);
           if(m)r={reply:JSON.parse('"'+m[1]+'"'),fix:null};else if(raw&&!/^[\[{]/.test(raw))r={reply:raw.slice(0,600),fix:null};else throw e2}}else throw e1}
@@ -1464,12 +1469,12 @@ function vChat(m){
       // spoken feedback first (when there was something to fix), then the reply
       // spoken tip: always the learner's full sentence, said the better way
       const bt=tipBetter(r?.fix?.better);const ww=tipWords(r?.fix?.words);
-      const parts=bt?[TIP_OPEN,bt,...(ww?[ww]:[]),reply]:[reply];
+      const rs=splitSent(reply);const rparts=rs.length?rs:[reply];const parts=bt?[TIP_OPEN,bt,...(ww?[ww]:[]),...rparts]:rparts;
       const spoken=parts?parts.join(" "):reply;
       if(chat.auto){const micOn=()=>micBtn_&&micBtn_._isOn&&micBtn_._isOn();chat.speaking=true;chat.speakingText=spoken;chat.barged=false;let done=false;
         // Azure: the recognizer is paused while the AI talks; a local voice detector lets the user cut in
         let unv=null;if(false)unv=vadWatch({threshold:0.08,ms:400,onVoice:()=>{if(!chat.speaking)return;chat.barged=true;chat.speaking=false;if(unv){unv();unv=null}ttsStop();micBtn_._resume();status.textContent="듣는 중…"}});
-        const fin=()=>{if(unv){unv();unv=null}if(done)return;done=true;if(chat.barged)return;chat.speaking=false;if(micOn()){try{micBtn_._cut&&micBtn_._cut()}catch(x){}ta.value="";status.textContent="듣는 중…";if(micBtn_._fresh)micBtn_._fresh();if(micBtn_._resume)micBtn_._resume()}};
+        const fin=()=>{if(unv){unv();unv=null}if(done)return;done=true;if(chat.barged)return;chat.speaking=false;if(micOn()){try{micBtn_._cut&&micBtn_._cut()}catch(x){}ta.value="";status.textContent="듣는 중…";if(micBtn_._fresh)micBtn_._fresh();if(micBtn_._resume)micBtn_._resume();if(hfAz&&micBtn_._live&&micBtn_._live())readyTone()}};
         speak(spoken,{onend:fin,whole:true,chunks:parts});const t0=Date.now(),cap=Math.max(45000,spoken.length*200);
         const sg=setInterval(()=>{if(done){clearInterval(sg);return}const busy=!!tts.cur||(tts.ok&&(speechSynthesis.speaking||speechSynthesis.pending))||(AUD.el&&!AUD.el.paused&&!AUD.el.ended);
           if((!busy&&Date.now()-t0>3000)||Date.now()-t0>cap){clearInterval(sg);fin()}},1000)}
@@ -1481,7 +1486,7 @@ function vChat(m){
   const hint=async()=>{const k=prompt_ko.value.trim();if(!k)return;hintBtn.disabled=true;try{const r=await sample.json(`Korean learner wants to say this in a casual English conversation: "${k}"\nReply with ONLY JSON: {"en":"natural spoken English, 1-2 sentences, intermediate level","note":"한 줄 한국어 메모 (핵심 표현)"}`,{modelTier:"quick"});ta.value=(ta.value?ta.value+" ":"")+(r?.en||"");hintOut.textContent=r?.note||"";prompt_ko.value=""}catch(e){toast(errMsg(e))}finally{hintBtn.disabled=false}};
   const prompt_ko=h("input",{type:"text",id:"chat_ko",placeholder:"뭐라고 말하지? 한국어로 쓰면 영어로 알려줘요",onkeydown:e=>{if(e.key==="Enter"){e.preventDefault();hint()}}});const hintBtn=h("button",{class:"btn sm",onclick:hint},"영어로");const hintOut=h("span",{class:"muted small"});
   // voice mode: auto-send when dictated text stops changing
-  let vt=null,last="";const status=h("span",{class:"muted small mono"});
+  let vt=null,last="";const status=h("span",{class:"muted small mono",id:"chat_st"});
   // end of turn: silence + the words themselves. When the pause starts, a quick AI check ("is the answer finished, or still thinking?")
   // runs in the background; if it says "not finished" we keep waiting (up to END_MAX seconds of silence). "That's it" sends at once.
   const DONE_RE=/[\s,.]*\b(that'?s it|that is it|i'?m done|i am done|that'?s all|that is all)[\s.!]*$/i;const END_MAX=10;let chg=0,seenTxt="";
@@ -1513,7 +1518,8 @@ Reply with ONLY JSON: {"done":true} or {"done":false}`,{cache:false,modelTier:"q
     let i=0;while(i<hw.length&&rw.has(hw[i]))i++;const mine=heard.split(/\s+/).slice(i).join(" ");
     chat.barged=true;chat.speaking=false;ttsStop();try{micBtn_._rebase&&micBtn_._rebase(mine)}catch(e){}status.textContent="듣는 중…";armAuto()};
   const micOpts={gate:()=>!!(chat.speaking||chat.busy),onHeard:null,onFinal:v=>{if(v.trim().length>2){clearTimeout(vt);send()}}};
-  const micBtn_=azOn()?azMicBtn(ta,{onFinal:micOpts.onFinal,idleStop:20000,assess:false,onState:s=>{if(s==="listen")readyTone();status.textContent=s==="idle"?"⏸ 조용해서 녹음을 잠시 멈췄어요 — 말하면 다시 들어요":s==="listen"?"🎙 말하세요 — 듣는 중":s==="paused"?"":status.textContent}}):SR_OK?micBtn(ta,{...micOpts,keepAlive:true}):micLink();
+  const hfAz=hfChat()&&azOn();
+  const micBtn_=azOn()?azMicBtn(ta,{onFinal:micOpts.onFinal,idleStop:20000,assess:false,...(hfAz?{gate:micOpts.gate,echo:()=>chat&&chat.speakingText||""}:{}),onState:s=>{if(s==="listen"&&!(hfAz&&micOpts.gate()))readyTone();if(hfAz&&s==="listen"&&micOpts.gate()){status.textContent="📞 연결됨";return}status.textContent=s==="idle"?"⏸ 조용해서 녹음을 잠시 멈췄어요 — 말하면 다시 들어요":s==="listen"?"🎙 말하세요 — 듣는 중":s==="paused"?"":status.textContent}}):SR_OK?micBtn(ta,{...micOpts,keepAlive:true}):micLink();
   if(micBtn_&&micBtn_._isOn)micBtn_.addEventListener("click",()=>setTimeout(()=>{if(micBtn_._isOn())keepAlive(true);else if(!player.on)keepAlive(false)},800));
 
   const waitSel=h("select",{title:"말을 멈춘 뒤 얼마나 기다렸다 보낼지",onchange:e=>{chatWait=+e.target.value;try{localStorage.setItem("opic30_cwait",chatWait)}catch(x){}armAuto()}},...[[2,"2초 후 전송"],[4,"4초 후 전송"],[6,"6초 후 전송"],[10,"10초 후 전송"],[0,"직접 보내기"]].map(([v,l])=>h("option",{value:v,selected:chatWait===v},l)));waitSel.style.width="auto";
@@ -1533,15 +1539,23 @@ function chatSeed(sc){if(sc.id!=="free"&&sc.id!=="interview")return "";const p=S
   for(const id of mySurvey()){const t=TOPICS.find(x=>x.id===id);if(t)c.push((sc.id==="free"?"their interest: ":"survey topic: ")+t.en)}
   if(!c.length)return "";let recent=[];try{recent=JSON.parse(localStorage.getItem("oss_chat_seeds")||"[]")}catch(e){}
   const fresh=c.filter(x=>!recent.includes(x));const pickd=pick(fresh.length?fresh:c,1)[0];try{localStorage.setItem("oss_chat_seeds",JSON.stringify([...recent,pickd].slice(-Math.min(6,Math.max(1,c.length-1)))))}catch(e){}return pickd}
-async function startChat(sc,opt){const hf=!!(opt&&opt.hf&&hfOK());if(hf)chatMode="voice";try{if(azOn()){azSdk().catch(()=>{});azToken().catch(()=>{})}}catch(e){}chat={sc,turns:[],ui:[],n:0,busy:false,auto:true,hide:false,summary:null,hf};render();try{if(WEB&&TTS_URL&&natOK(TIP_OPEN))natUrl(TIP_OPEN).catch(()=>{})}catch(e){}
-  const bub=$("#bubbles");const w=h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")));bub.append(w);const seed=chatSeed(sc);
+async function startChat(sc,opt){const hf=!!(opt&&opt.hf&&hfOK());if(hf)chatMode="voice";try{if(azOn()){azSdk().catch(()=>{});azToken().catch(()=>{})}}catch(e){}chat={sc,turns:[],ui:[],n:0,busy:false,auto:true,hide:false,summary:null,hf};const hfAz=hf&&azOn();
+  // hands-free with Azure = a phone call: the microphone opens first (Bluetooth switches to call mode once, before anything
+  // is said) and stays open; the recogniser starts while the greeting is read, so it is already listening when the user answers
+  if(hfAz){chat.busy=true;const me=chat;micStream().then(()=>{if(chat===me&&!me.micHold){MIC.active++;me.micHold=true;audLog.push("핸즈프리: 통화 연결 (마이크 열림)")}}).catch(e=>audLog.push("핸즈프리: 마이크 열기 실패 "+(e&&e.name||e)))}
+  render();try{if(WEB&&TTS_URL&&natOK(TIP_OPEN))natUrl(TIP_OPEN).catch(()=>{})}catch(e){}
+  const bub=$("#bubbles");const w=h("div",{class:"bb ai"},h("span",{class:"thinking"},h("i"),h("i"),h("i")),hfAz?h("span",{class:"small muted",style:"margin-left:8px"},"📞 통화 연결 중…"):null);bub.append(w);const seed=chatSeed(sc);
   try{const r=await sample.json([{role:"user",content:chatRules(sc)+"\n\nStart the conversation now with a natural greeting and your first question."+(seed?" Make the first question about "+seed+", personal to them (use the profile details), not about the weekend.":"")+" Reply with ONLY the JSON object (fix: null)."}],{cache:false,modelTier:"quick"});
     w.remove();const reply=String(r?.reply||"Hi! How's it going?");chat.turns.push({role:"user",content:"(start)"},{role:"assistant",content:JSON.stringify({reply})});chat.ui.push({who:"ai",text:reply,ko:r?.reply_ko||""});render();
     const listen=()=>{if(!chat||!chat.hf)return;const b=[...AZ_BTNS].find(x=>x.isConnected);if(b){if(!b._isOn())b._start();return}const m=[...MIC_BTNS].find(x=>x.isConnected);if(m&&!m._isOn())m.onclick()};
     const tryListen=()=>{if(!chat||!chat.hf)return;if(tts.cur||(AUD.el&&!AUD.el.paused&&!AUD.el.ended)){setTimeout(tryListen,1000);return}listen()};
+    if(hfAz){const me=chat;const b=[...AZ_BTNS].find(x=>x.isConnected);chat.speaking=!!chat.auto;chat.speakingText=reply;chat.busy=false;if(b&&!b._isOn())b._start();
+      let done=false;const ready=()=>{if(done||chat!==me)return;done=true;chat.speaking=false;try{b&&b._cut&&b._cut()}catch(x){}const ta=$("#chat_in");if(ta)ta.value="";const st=$("#chat_st");if(st)st.textContent="🎙 말하세요 — 듣는 중";readyTone();if(b&&!b._isOn())b._start()};
+      const tryReady=()=>{if(done||chat!==me)return;if(tts.cur||(AUD.el&&!AUD.el.paused&&!AUD.el.ended)){setTimeout(tryReady,1000);return}ready()};
+      if(chat.auto){speak(reply,{onend:ready});setTimeout(tryReady,Math.max(6000,reply.length*80))}else ready();return}
     if(chat.auto){speak(reply,{onend:listen});setTimeout(tryListen,Math.max(6000,reply.length*80))}else listen()}
-  catch(e){w.remove();bub.append(h("div",{class:"note"},errMsg(e)))}}
-async function endChat(){if(!chat)return;if(!player.on)keepAlive(false);const mine=chat.ui.filter(u=>u.who==="me");if(mine.length<2){chat=null;render();return}
+  catch(e){if(chat){chat.busy=false;chat.speaking=false}w.remove();bub.append(h("div",{class:"note"},errMsg(e)))}}
+async function endChat(){if(!chat)return;if(chat.micHold){chat.micHold=false;MIC.active=Math.max(0,MIC.active-1)}if(!player.on)keepAlive(false);const mine=chat.ui.filter(u=>u.who==="me");if(mine.length<2){chat=null;render();return}
   chat.summary="pending";render()}
 async function vChatSummary(m){
   if(chat.summary==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"대화 평가 중…")));put(m,h("h1",{},"대화 정리"),box);
