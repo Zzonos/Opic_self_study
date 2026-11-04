@@ -646,11 +646,11 @@ async function apiCall1(input,opt={},fresh){const cfg=await apiKey(fresh);const 
   const fam=opt.modelTier==="quick"?"haiku":opt.modelTier==="complex"?"opus":((cfg.route||{})[kind]||"sonnet");const model=(cfg.models||{})[fam]||"claude-sonnet-5-5";
   const messages=Array.isArray(input)?input.map(t=>({role:t.role,content:String(t.content||"")})):[{role:"user",content:String(input||"")}];
   let r;try{r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",signal:opt.signal,headers:{"x-api-key":cfg.key,"anthropic-version":"2023-06-01","content-type":"application/json","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model,max_tokens:Math.max(((cfg.maxOut||{})[kind])||2000,kind==="chat"?1500:0),messages,stream:true,
+    body:JSON.stringify({model,max_tokens:(()=>{let mx=Math.max(((cfg.maxOut||{})[kind])||2000,kind==="chat"?1500:0);if(kind==="script"){const n=(String(messages[0].content).match(/^\d+\. \[/gm)||[]).length;if(n)mx=Math.min(mx,Math.max(2500,650*n+900))}return mx})(),messages,stream:true,
       system:"Your reply is parsed by a program. Answer with ONLY one valid JSON value exactly as requested in the user's message: no text before or after it, no markdown code fences, no comments. Inside JSON strings escape double quotes and use \\n for line breaks."})})}
   catch(e){if(e&&e.name==="AbortError"){const x=new Error("cancelled");x.code="cancelled";throw x}const x=new Error(String(e.message||e));x.code="upstream_error";throw x}
   if(!r.ok){let m="";try{const j=await r.json();m=(j.error&&j.error.message)||JSON.stringify(j).slice(0,200)}catch(e){}if(r.status===401)APIK.cfg=null;
-    const x=new Error("anthropic "+r.status+": "+m);if(r.status===401&&!fresh)x.status401=true;x.code=r.status===429||r.status===529?"rate_limited":"upstream_error";throw x}
+    const x=new Error("anthropic "+r.status+": "+m);if(r.status===401&&!fresh)x.status401=true;x.code=r.status===429||r.status===529?"rate_limited":"upstream_error";{const ra=+r.headers.get("retry-after");if(ra>0)x.retryAfter=Math.min(30,ra)}throw x}
   const rd=r.body.getReader();const dec=new TextDecoder();let buf="",text="",stop="",inT=0,outT=0;
   try{for(;;){const {value,done}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
     while((i=buf.indexOf("\n\n"))>=0){const ev=buf.slice(0,i);buf=buf.slice(i+2);const line=ev.split("\n").find(l=>l.startsWith("data:"));if(!line)continue;let d;try{d=JSON.parse(line.slice(5))}catch(e){continue}
@@ -940,6 +940,10 @@ Reply with ONLY one JSON object:
 Give 3-5 fixes and 4-6 expressions. Model answers must sound spontaneous: no stock opener that repeats the question, no fixed closer. "score" is 0-100 within the overall scale (IM3 starts around 65, IH around 78, AL around 90).`;
   const r=await sample.json(prompt,{...(typeof onText==="function"?{onText}:{}),cache:false});if(r){r.model_target=r.model_target||r.model_im3;r.model_up=r.model_up||r.model_ih;r.target=T;r.up=T==="AL"?null:up}return r;
 }
+// long AI jobs (scripts): a busy/limited API, a cut-off answer or broken JSON usually works on the next try —
+// retry twice by itself, waiting what the API asks (rate limit) or a few seconds; every failure is written to the log
+async function aiRetry(fn,what){const waits=[3,8];for(let k=0;;k++){try{return await fn()}catch(e){const c=(e&&e.code)||"";audLog.push(what+" 실패 ("+(k+1)+"회): "+(c||"")+" "+String(e&&e.message||e).slice(0,100));if(audLog.length>30)audLog.shift();
+  if(k>=waits.length||!/^(rate_limited|upstream_error|invalid_json|empty_completion)$/.test(c))throw e;const w=e.retryAfter||waits[k];toast("AI 응답 "+(c==="rate_limited"?"한도 대기":c==="invalid_json"?"형식 오류":"오류")+" — "+w+"초 뒤 자동으로 다시 시도해요");await new Promise(r=>setTimeout(r,w*1000))}}}
 // only: indexes of the questions to write (new questions added to a topic that already has scripts)
 async function genScript(topic,onText,only=null){
   const qs=topic.qs.map((q,i)=>(!only||only.includes(i))?`${i+1}. [${QT[q.t]}] ${q.q}`:null).filter(Boolean).join("\n");
@@ -952,7 +956,7 @@ ${qs}
 
 Reply with ONLY one JSON object: {"scripts":[{"n":1,"answer":"..."}],"expressions":[{"en":"...","ko":"한국어 뜻"}]}
 "n" is the question's number as listed above. Include ${only?"3-4":"6-8"} reusable expressions taken from the scripts.`;
-  return sample.json(prompt,{...(typeof onText==="function"?{onText}:{}),cache:false});
+  return aiRetry(()=>sample.json(prompt,{...(typeof onText==="function"?{onText}:{}),cache:false}),"스크립트 생성");
 }
 async function genSample(topic){
   const qs=topic.qs.map((q,i)=>`${i+1}. [${QT[q.t]}] ${q.q}`).join("\n");
@@ -964,7 +968,7 @@ Questions:
 ${qs}
 
 Reply with ONLY one JSON object: {"scripts":[{"n":1,"answer":"..."}]}`;
-  return sample.json(prompt,{cache:false});
+  return aiRetry(()=>sample.json(prompt,{cache:false}),"예시 답변 생성");
 }
 async function evalMock(items,onText){
   const body=items.map((it,i)=>`Q${i+1} (${it.kind}): ${it.q}\nA${i+1} (${it.secs}s): ${it.a||"(no answer)"}`).join("\n\n");
