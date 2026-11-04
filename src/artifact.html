@@ -945,7 +945,15 @@ Give 3-5 fixes and 4-6 expressions. Model answers must sound spontaneous: no sto
 async function aiRetry(fn,what){const waits=[3,8];for(let k=0;;k++){try{return await fn()}catch(e){const c=(e&&e.code)||"";audLog.push(what+" 실패 ("+(k+1)+"회): "+(c||"")+" "+String(e&&e.message||e).slice(0,100));if(audLog.length>30)audLog.shift();
   if(k>=waits.length||!/^(rate_limited|upstream_error|invalid_json|empty_completion)$/.test(c))throw e;const w=e.retryAfter||waits[k];toast("AI 응답 "+(c==="rate_limited"?"한도 대기":c==="invalid_json"?"형식 오류":"오류")+" — "+w+"초 뒤 자동으로 다시 시도해요");await new Promise(r=>setTimeout(r,w*1000))}}}
 // only: indexes of the questions to write (new questions added to a topic that already has scripts)
-async function genScript(topic,onText,only=null){
+async function genScript(topic,onText,only=null,depth=0){const want=only||topic.qs.map((q,i)=>i);
+  const r=await genScript1(topic,onText,only);let sc=(Array.isArray(r&&r.scripts)?r.scripts:[]).filter(x=>x&&x.answer);
+  if(r&&r._cut&&!(Array.isArray(r.expressions)&&r.expressions.length))sc=sc.slice(0,-1); // cut inside the answers: the last one is unfinished
+  const arr=[];sc.forEach((x,k)=>{let i=(+x.n||0)-1;if(!want.includes(i)||arr[i])i=want.find(w=>!arr[w]&&!sc.some(y=>(+y.n||0)-1===w));if(i!=null&&i>=0)arr[i]={...x,n:i+1}});
+  const miss=want.filter(i=>!arr[i]);
+  if(miss.length&&depth<1&&miss.length<want.length){audLog.push("스크립트 "+miss.length+"개 빠짐 → 그것만 다시 만들기");try{const r2=await genScript(topic,null,miss,depth+1);(r2.scripts||[]).forEach((x,i)=>{if(x&&x.answer&&!arr[i])arr[i]=x});r.expressions=[...(r.expressions||[]),...(r2.expressions||[])]}catch(e){}}
+  if(!arr.some(Boolean)){const e=new Error("invalid_json");e.code="invalid_json";throw e}
+  return {...r,scripts:arr,expressions:(r.expressions||[]).filter(e=>e&&e.en&&e.ko)}}
+async function genScript1(topic,onText,only){
   const qs=topic.qs.map((q,i)=>(!only||only.includes(i))?`${i+1}. [${QT[q.t]}] ${q.q}`:null).filter(Boolean).join("\n");
   const prompt=`You write OPIc answer scripts for a Korean learner whose target level is ${tgt()} (aim for a solid ${tgt()}).
 Learner profile: ${profileText()}
@@ -954,6 +962,7 @@ Write one spoken-style answer for each question below. Each answer: ${spec().wor
 Questions:
 ${qs}
 
+Never use double quotes (") inside an answer; use single quotes if you need to quote something.
 Reply with ONLY one JSON object: {"scripts":[{"n":1,"answer":"..."}],"expressions":[{"en":"...","ko":"한국어 뜻"}]}
 "n" is the question's number as listed above. Include ${only?"3-4":"6-8"} reusable expressions taken from the scripts.`;
   return aiRetry(()=>sample.json(prompt,{...(typeof onText==="function"?{onText}:{}),cache:false}),"스크립트 생성");
@@ -967,6 +976,7 @@ Write one spoken-style answer for each question below, ${spec().words} words, fi
 Questions:
 ${qs}
 
+Never use double quotes (") inside an answer; use single quotes if you need to quote something.
 Reply with ONLY one JSON object: {"scripts":[{"n":1,"answer":"..."}]}`;
   return aiRetry(()=>sample.json(prompt,{cache:false}),"예시 답변 생성");
 }
@@ -1776,7 +1786,7 @@ function vScriptTopic(m,t){
   const gen=async(btn,miss=null)=>{if(!sample){toast(ERR.not_granted);return}btn.disabled=true;ctl=new AbortController();const stop=h("button",{class:"btn sm",onclick:()=>ctl.abort()},"중지");
     box.replaceChildren(h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"스크립트 작성 중… (20–60초)")),stop));
     try{const r=await genScript(t,null,miss);
-      if(miss&&S.scripts[t.id]){const sc=S.scripts[t.id];const arr=[...(sc.scripts||[])];(r.scripts||[]).forEach((x,k)=>{const i=(+x.n||0)-1;const at=i>=0&&miss.includes(i)?i:miss[k];if(at!=null&&x.answer)arr[at]={...x,n:at+1}});
+      if(miss&&S.scripts[t.id]){const sc=S.scripts[t.id];const arr=[...(sc.scripts||[])];(r.scripts||[]).forEach((x,i)=>{if(x&&x.answer&&miss.includes(i))arr[i]=x});
         const seen=new Set((sc.expressions||[]).map(e=>e.en));S.scripts[t.id]={...sc,scripts:arr,expressions:[...(sc.expressions||[]),...(r.expressions||[]).filter(e=>e&&!seen.has(e.en))],ts:Date.now()}}
       else S.scripts[t.id]={...r,date:todayStr(),ts:Date.now()};save();show();setTimeout(()=>fillTrans(),500)}catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)))}finally{btn.disabled=false}};
   const show=()=>{const sc=S.scripts[t.id];if(!sc){box.replaceChildren(h("div",{class:"card"},h("p",{class:"muted"},"아직 스크립트가 없어요. 프로필을 설정에서 채운 뒤 생성하면 더 나다운 답변이 나옵니다."),h("div",{class:"row"},h("button",{class:"btn primary",onclick:e=>gen(e.target)},"AI로 스크립트 만들기"))),
@@ -2012,7 +2022,7 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
   const samplePick=pickTopics(sList,"stopics",t=>t.ko+((smp[t.id]?.scripts||[]).length?" ✓":""));
   const genBtn=h("button",{class:"btn primary",disabled:!sample||!sMissing.length,onclick:async e=>{const b=e.target;b.disabled=true;S.samples=S.samples||{};let k=0;
     try{for(const t of sMissing){k++;b.textContent=`예시 만드는 중 ${k}/${sMissing.length} · ${t.ko}`;const r=await genSample(t);if(r&&Array.isArray(r.scripts)){S.samples[t.id]={scripts:r.scripts.map(x=>({answer:(x.answer||"").trim()})).filter(x=>x.answer),date:todayStr(),ts:Date.now()};save()}}
-      const sents=[];for(const t of sMissing)for(const x of (S.samples[t.id]?.scripts||[]))sents.push(...needTrans(x.answer));if(sents.length){await translateSents([...new Set(sents)],(d,n)=>b.textContent=`해석 중 ${d}/${n}`)}
+      const sents=[];for(const t of sMissing)for(const x of (S.samples[t.id]?.scripts||[]))if(x&&x.answer)sents.push(...needTrans(x.answer));if(sents.length){await translateSents([...new Set(sents)],(d,n)=>b.textContent=`해석 중 ${d}/${n}`)}
       toast("예시 스크립트를 만들었어요");if(player.on&&o.mode==="sample"){player.items=buildPlaylist()}render()}catch(x){toast(errMsg(x));b.disabled=false;b.textContent="선택한 주제 예시 만들기"}}},sMissing.length?"선택한 주제 예시 만들기 ("+sMissing.length+")":"선택한 주제 모두 준비됨");
   const unitSel=o.mode==="sent"?null:h("label",{class:"f"},"읽는 단위",h("select",{onchange:e=>{o.unit=e.target.value;saveO()}},...[["whole","전체 읽고 → 전체 해석"],["sent","한 문장 읽고 → 해석"]].map(([v,l])=>h("option",{value:v,selected:(o.unit||"whole")===v},l))));
   const common=[h("div",{class:"row"},unitSel,h("label",{class:"f"},"한국어 해석",h("select",{id:"pl_ko",onchange:e=>{o.ko=e.target.value;saveO()}},...[["sent","영어 뒤에 한국어로 듣기"],["off","영어만"]].map(([v,l])=>h("option",{value:v,selected:o.ko===v},l)))),h("label",{class:"f"},"해석 위치",h("select",{onchange:e=>{o.koAt=e.target.value;saveO()}},...[["first","첫 번째 반복 후"],["last","마지막 반복 직전"]].map(([v,l])=>h("option",{value:v,selected:(o.koAt||"first")===v},l)))),h("label",{class:"f"},"한국어 속도",h("select",{onchange:e=>{o.koRate=+e.target.value;saveO();if(player.on)player.segs.forEach(x=>{if(x.t==="file"&&!x.text&&x.ko)x.rate=koR()})}},...[1,1.1,1.2,1.3,1.4,1.5].map(v=>h("option",{value:v,selected:koR()===v},v.toFixed(1)+"배"))))),o.mode!=="sent"?h("div",{style:"margin:2px 0 8px"},transBtn()):null,
@@ -2070,7 +2080,7 @@ function vListen(m){
     h("div",{class:"card"},h("p",{class:"eyebrow"},"질문 듣기 · "+it.topic.ko),h("div",{class:"row"},playBtn,cnt),guess,ans,
       h("div",{class:"row"},ld.revealed?null:h("button",{class:"btn",onclick:()=>{ld.revealed=true;render()}},"정답 확인"),ld.revealed?h("button",{class:"btn primary",onclick:()=>go("practice",{topic:it.topic,q:it.q,kind:it.kind,rp:it.rp,step:it.step})},"이 질문에 답하기 →"):null,h("button",{class:"btn ghost",onclick:()=>{ld.q=null;render()}},"다음 질문"))),
     h("div",{class:"card"},h("h3",{},"쉐도잉"),h("p",{class:"muted small"},"모범답안이나 내 스크립트를 문장 단위로 듣고 바로 따라 말하기. 스크립트 탭과 AI 피드백에서 '쉐도잉' 버튼으로 바로 올 수 있어요."),
-      h("div",{class:"list"},...Object.entries(S.scripts).map(([id,sc])=>{const t=topicById(id);if(!t)return null;return h("button",{class:"topic",onclick:()=>go("listen",{text:(sc.scripts||[]).map(x=>x.answer).join(" "),title:t.en+" 스크립트"})},h("span",{class:"en"},t.en),h("span",{class:"ko"},t.ko+" · "+(sc.scripts||[]).length+"개 답변"))}),
+      h("div",{class:"list"},...Object.entries(S.scripts).map(([id,sc])=>{const t=topicById(id);if(!t)return null;return h("button",{class:"topic",onclick:()=>go("listen",{text:(sc.scripts||[]).map(x=>x&&x.answer).filter(Boolean).join(" "),title:t.en+" 스크립트"})},h("span",{class:"en"},t.en),h("span",{class:"ko"},t.ko+" · "+(sc.scripts||[]).filter(x=>x&&x.answer).length+"개 답변"))}),
         Object.keys(S.scripts).length?null:h("p",{class:"muted small"},"저장된 스크립트가 아직 없어요. 스크립트 탭에서 먼저 만들어 보세요."),
         h("button",{class:"topic",onclick:()=>go("listen",{text:CARDS.map(c=>c.en.replace(/___/g,"something")).join(" "),title:"표현카드 42장"})},h("span",{class:"en"},"Expression cards"),h("span",{class:"ko"},"기본 표현 42개 연속 듣기")))));
 }
@@ -2461,6 +2471,20 @@ let rec=null;
 function aiKind(p){if(Array.isArray(p))return "chat";const t=String(p||"");if(/OPIc mock test/.test(t))return "mock";if(/Learner's answer|Rate ONLY the learner/.test(t))return "eval";if(/answer scripts|example OPIc answers/.test(t))return "script";if(/translat/i.test(t))return "trans";if(/speaking coach/.test(t))return "coach";return "other"}
 function aiCount(p){try{S.usage=S.usage||{};if(!S.usage.aiSince)S.usage.aiSince=Date.now();const a=S.usage.ai=S.usage.ai||{};const k=aiKind(p);a[k]=(a[k]||0)+1;a.total=(a.total||0)+1}catch(e){}}
 // parse a reply the way sample.json does: whole text, else one code fence, else first {/[ to last }/]
+// AI JSON that does not parse: (a) a double quote inside a string that the model did not escape ("he said "hi"") —
+// a quote is a real end of string only when a , } ] or : follows; (b) raw line breaks in strings; (c) a reply cut off
+// mid-way — close what is open, dropping the unfinished last element. Returns {v,cut} or null.
+function jsonRepair(t){t=String(t||"");const i0=t.search(/[\[{]/);if(i0<0)return null;t=t.slice(i0).replace(/\s*```\s*$/,"");
+  let out="",inS=false,esc=false;for(let i=0;i<t.length;i++){const c=t[i];
+    if(inS){if(esc){out+=c;esc=false;continue}if(c==="\\"){out+=c;esc=true;continue}if(c==="\n"){out+="\\n";continue}if(c==="\r")continue;
+      if(c==='"'){let j=i+1;while(j<t.length&&/\s/.test(t[j]))j++;if(j>=t.length||/[,}\]:]/.test(t[j])){inS=false;out+=c}else out+='\\"';continue}out+=c;continue}
+    if(c==='"')inS=true;out+=c}
+  const close=x=>{const st=[];let s2=false,e2=false;for(const c of x){if(s2){if(e2)e2=false;else if(c==="\\")e2=true;else if(c==='"')s2=false;continue}if(c==='"')s2=true;else if(c==="{"||c==="[")st.push(c);else if(c==="}"||c==="]")st.pop()}
+    return (s2?x+'"':x).replace(/[,:\s]+$/,"")+st.reverse().map(c=>c==="{"?"}":"]").join("")};
+  const tryP=x=>{try{return JSON.parse(x)}catch(e){return undefined}};let v=tryP(close(out));if(v!==undefined)return {v,cut:inS||!/[}\]]\s*$/.test(out)};
+  // cut off: back up to the end of the last complete element (a "," outside strings) and close from there
+  const cuts=[];{let s2=false,e2=false;for(let i=0;i<out.length;i++){const c=out[i];if(s2){if(e2)e2=false;else if(c==="\\")e2=true;else if(c==='"')s2=false;continue}if(c==='"')s2=true;else if(c===",")cuts.push(i)}}
+  for(let k=cuts.length-1,n=0;k>=0&&n<300;k--,n++){v=tryP(close(out.slice(0,cuts[k])));if(v!==undefined)return {v,cut:true}}return null}
 function parseReply(t){const tryP=x=>{try{return {ok:true,v:JSON.parse(x)}}catch(e){return {ok:false}}};let r=tryP(String(t||"").trim());if(r.ok)return r.v;
   const f=/```(?:json)?\s*([\s\S]*?)```/.exec(t||"");if(f){r=tryP(f[1].trim());if(r.ok)return r.v}
   const i=String(t).search(/[\[{]/),j=Math.max(String(t).lastIndexOf("}"),String(t).lastIndexOf("]"));if(i>=0&&j>i){r=tryP(String(t).slice(i,j+1));if(r.ok)return r.v}
@@ -2471,8 +2495,10 @@ function tierCount(req,applied){try{if(/^api:/.test(applied||""))req=applied;S.u
 function wrapSample(s){const w=(...a)=>s(...a);w.json=async(input,opt)=>{aiCount(input);
     // use the plain call so we learn which model tier actually answered (json() does not report it)
     const want=(opt&&opt.modelTier)||"default";const r=await s(input,opt);tierCount(want,r&&r.modelTierApplied);
-    if(r&&r.truncated){const e=new Error("invalid_json");e.code="invalid_json";e.text=r.text;throw e}
-    let v;try{v=parseReply(r&&r.text)}catch(pe){audLog.push("invalid_json: "+String(r&&r.text||"").slice(0,120));pe.text=r&&r.text;throw pe}const out=v==null?v:JSON.parse(JSON.stringify(v));if(out&&typeof out==="object"&&!Array.isArray(out))out._tier={req:want,applied:(r&&r.modelTierApplied)||want};return out};if(s.limits)w.limits=(...a)=>s.limits(...a);return w}
+    if(r&&r.truncated){const fx=jsonRepair(r.text);if(!(fx&&fx.v&&typeof fx.v==="object")){const e=new Error("invalid_json");e.code="invalid_json";e.text=r.text;throw e}audLog.push("응답 길이 한도 → 잘린 끝 버리고 복구");const out=JSON.parse(JSON.stringify(fx.v));out._cut=true;return out}
+    let v,cut=false;try{v=parseReply(r&&r.text)}catch(pe){const tx=String(r&&r.text||"");const fx=jsonRepair(tx);
+      if(fx&&fx.v&&typeof fx.v==="object"){v=fx.v;cut=fx.cut;audLog.push("JSON 복구"+(cut?" (끝이 잘림 → 마지막 항목 버림)":" (따옴표 등)")+" · "+tx.length+"자")}
+      else{audLog.push("invalid_json ("+tx.length+"자): "+tx.slice(0,80)+" … "+tx.slice(-80));pe.text=tx;throw pe}}const out=v==null?v:JSON.parse(JSON.stringify(v));if(cut&&out&&typeof out==="object")out._cut=true;if(out&&typeof out==="object"&&!Array.isArray(out))out._tier={req:want,applied:(r&&r.modelTierApplied)||want};return out};if(s.limits)w.limits=(...a)=>s.limits(...a);return w}
 function aiGate(){const box=h("span",{class:"row",style:"gap:6px"});const note=h("span",{class:"muted small"},"AI 기능 확인 중…");
   const btn=h("button",{class:"btn",onclick:async()=>{try{const P=await claude.use("permissions");if(!P){note.textContent="이 기기의 Claude 앱에서는 AI 평가를 쓸 수 없어요. 브라우저에서 claude.ai로 열어 주세요";return}
       let st=await P.state("sample");if(st==="prompt"){const r=await P.request(["sample"]);st=r.sample||st}
