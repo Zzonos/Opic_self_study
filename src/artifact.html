@@ -98,6 +98,10 @@ label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--mu
 .kx div{display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
 .kx .en{font-weight:500}
 .kx .ko{font-size:13px;color:var(--mute)}
+.kx .ex{flex-basis:100%;font-size:13px;color:var(--accent);line-height:1.45}
+.kx .ex .muted{display:block;color:var(--mute)}
+.flash .exb{display:flex;flex-direction:column;gap:2px;margin-top:6px;font-size:14px;line-height:1.45;text-align:center}
+.flash .exb .e{color:var(--accent)}
 .flash{perspective:1000px;min-height:200px;cursor:pointer}
 .flash .in{position:relative;width:100%;min-height:200px;transition:transform .45s;transform-style:preserve-3d}
 .flash.flip .in{transform:rotateY(180deg)}
@@ -392,48 +396,48 @@ const ADVANCED=[
 
 const ADVANCED_KO=["대도시에 사는 게 낫다는 사람도 있고 시골을 선호하는 사람도 있습니다. 어느 쪽을 선호하고 왜 그런가요?", "오늘날 사람들이 여가를 보내는 방식을 20년 전과 비교해 보세요. 무엇이 달라졌나요?", "당신 나라의 젊은이들이 오늘날 직면한 가장 큰 어려움은 무엇이라고 생각하나요? 왜요?", "기술이 삶을 편리하게 하지만 더 스트레스를 준다는 말이 있습니다. 어떻게 생각하나요?", "당신 나라 사람들이 환경에 대해 갖는 우려는 무엇인가요? 그에 대해 어떤 조치가 취해지고 있나요?", "당신 나라에서 인기 있는 두 가지 교통수단을 비교해 보세요. 각각의 장단점은 무엇인가요?"];
 const CARDS=[
- {c:"filler",en:"Well, let me think...",ko:"음, 생각 좀 해볼게요 (시간 벌기)",ex:"Well, let me think... I'd say my favorite place is the park near my apartment."},
- {c:"filler",en:"That's a good question.",ko:"좋은 질문이네요 (시간 벌기)",ex:"That's a good question. Honestly, I haven't thought about it much, but I'd say jogging."},
- {c:"filler",en:"How should I put it...",ko:"뭐라고 해야 하지...",ex:"How should I put it... it's not fancy, but it feels like home."},
- {c:"filler",en:"You know what I mean?",ko:"무슨 말인지 아시죠?",ex:"After work I just want to lie on the couch and do nothing, you know what I mean?"},
- {c:"opener",en:"Okay, so you want to know about my ___.",ko:"오케이, 제 ___에 대해 알고 싶으시군요 (질문 되받기)",ex:"Okay, so you want to know about my favorite movie. Well, it's definitely Inception."},
- {c:"opener",en:"To be honest, I'm a big fan of ___.",ko:"솔직히 저는 ___을 정말 좋아해요",ex:"To be honest, I'm a big fan of hip-hop, especially Korean artists like Epik High."},
- {c:"opener",en:"There are a couple of reasons why I like it.",ko:"제가 좋아하는 이유는 두어 가지예요",ex:"There are a couple of reasons why I like it. First, it's close to my place, and second, it's never crowded."},
- {c:"connector",en:"First of all, ... / On top of that, ...",ko:"우선... / 게다가...",ex:"First of all, the gym is open 24 hours. On top of that, it's only five minutes from my apartment."},
- {c:"connector",en:"What I mean is, ...",ko:"제 말은...",ex:"It's not that I hate cooking. What I mean is, I just don't have time on weekdays."},
- {c:"connector",en:"Speaking of which, ...",ko:"말이 나온 김에...",ex:"I usually watch movies on Friday nights. Speaking of which, I saw a great one last week."},
- {c:"connector",en:"The thing is, ...",ko:"문제는 / 중요한 건...",ex:"I'd love to travel more. The thing is, I can't take many days off work."},
- {c:"connector",en:"Anyway, long story short, ...",ko:"어쨌든 간단히 말하면...",ex:"We got lost, it started raining, we missed the bus... Anyway, long story short, we got home at midnight."},
- {c:"past",en:"It was about two years ago when I ___.",ko:"약 2년 전에 제가 ___했을 때였어요",ex:"It was about two years ago when I went to Jeju with my friends."},
- {c:"past",en:"Out of the blue, ___.",ko:"갑자기 ___",ex:"Out of the blue, it started pouring, and we had no umbrellas."},
- {c:"past",en:"At first I thought ___, but it turned out that ___.",ko:"처음엔 ___라고 생각했는데 알고 보니 ___",ex:"At first I thought the gym was closed, but it turned out that they had just changed the hours."},
- {c:"past",en:"I was so relieved / embarrassed / frustrated.",ko:"정말 안도했어요 / 창피했어요 / 답답했어요",ex:"When I finally found my phone in the taxi, I was so relieved."},
- {c:"past",en:"Looking back, it was one of the best days of my life.",ko:"돌이켜보면 인생 최고의 날 중 하나였어요",ex:"We stayed up all night talking on the beach. Looking back, it was one of the best days of my life."},
- {c:"routine",en:"I usually ___ on weekends, or whenever I have free time.",ko:"주말이나 시간 날 때마다 보통 ___해요",ex:"I usually go jogging along the river on weekends, or whenever I have free time."},
- {c:"routine",en:"The first thing I do is ___. After that, ___.",ko:"제일 먼저 ___하고, 그다음엔 ___",ex:"The first thing I do is stretch for ten minutes. After that, I run for about thirty minutes."},
- {c:"routine",en:"It helps me relieve stress and recharge.",ko:"스트레스 풀고 재충전하는 데 도움이 돼요",ex:"I go jogging along the river every Saturday morning. It helps me relieve stress and recharge."},
- {c:"desc",en:"It's located in ___, about ___ minutes from my place.",ko:"___에 있고, 집에서 약 ___분 거리예요",ex:"It's located in Suji, about ten minutes from my place."},
- {c:"desc",en:"What I like most about it is ___.",ko:"제가 가장 마음에 드는 점은 ___",ex:"What I like most about it is that it's never too crowded, even on weekends."},
- {c:"desc",en:"It's cozy and well-organized.",ko:"아늑하고 잘 정돈되어 있어요",ex:"My living room isn't big, but it's cozy and well-organized."},
- {c:"desc",en:"There's a huge window that lets in a lot of sunlight.",ko:"햇빛이 많이 들어오는 큰 창문이 있어요",ex:"My favorite part of the apartment is the living room. There's a huge window that lets in a lot of sunlight."},
- {c:"compare",en:"Compared to the past, ___ is way more ___.",ko:"예전에 비해 ___이 훨씬 더 ___",ex:"Compared to the past, shopping is way more convenient because everything is online."},
- {c:"compare",en:"Back in the day, ... but these days, ...",ko:"예전에는... 그런데 요즘은...",ex:"Back in the day, I went to the theater every weekend, but these days I mostly watch movies at home."},
- {c:"compare",en:"The biggest difference is that ___.",ko:"가장 큰 차이는 ___",ex:"The biggest difference is that people rarely carry cash these days."},
- {c:"roleplay",en:"Hi, I'm calling to ask about ___.",ko:"안녕하세요, ___에 대해 여쭤보려고 전화했어요",ex:"Hi, I'm calling to ask about the membership plans at your gym."},
- {c:"roleplay",en:"Could you tell me what time it opens?",ko:"몇 시에 여는지 알려주실 수 있나요?",ex:"Hi, I'm calling about the gym on Main Street. Could you tell me what time it opens on weekends?"},
- {c:"roleplay",en:"I'm afraid there's been a problem with ___.",ko:"___에 문제가 있는 것 같아요",ex:"I'm afraid there's been a problem with my reservation. It says the wrong date."},
- {c:"roleplay",en:"Would it be possible to ___ instead?",ko:"대신 ___하는 게 가능할까요?",ex:"Would it be possible to get a refund instead?"},
- {c:"roleplay",en:"If that doesn't work, how about ___?",ko:"그게 안 되면 ___은 어떨까요?",ex:"If that doesn't work, how about meeting next Saturday?"},
- {c:"opinion",en:"In my opinion, ___ / If you ask me, ___.",ko:"제 생각에는 ___",ex:"If you ask me, recycling should be mandatory in every apartment complex."},
- {c:"opinion",en:"I'm not 100% sure, but I'd say ___.",ko:"확실하진 않지만 ___인 것 같아요",ex:"I'm not 100% sure, but I'd say the weather here has gotten much hotter."},
- {c:"opinion",en:"On the other hand, ___.",ko:"반면에 ___",ex:"On the other hand, online classes can be really distracting at home."},
- {c:"closer",en:"So yeah, that's pretty much it.",ko:"네, 대충 그 정도예요 (마무리)",ex:"...and after dinner we just went home. So yeah, that's pretty much it."},
- {c:"closer",en:"That's why I really enjoy ___.",ko:"그래서 제가 ___을 정말 즐기는 거예요",ex:"That's why I really enjoy spending my weekends at the park."},
- {c:"closer",en:"I hope that answers your question.",ko:"답변이 됐길 바라요",ex:"That's why I prefer the park over the gym. I hope that answers your question."},
- {c:"emotion",en:"I was over the moon.",ko:"정말 기뻤어요",ex:"When I got the job offer, I was over the moon."},
- {c:"emotion",en:"It was a total disaster.",ko:"완전 엉망이었어요",ex:"We tried to cook a three-course dinner for ten people. It was a total disaster."},
- {c:"emotion",en:"It was totally worth it.",ko:"충분히 그럴 가치가 있었어요",ex:"The hike took six hours, but the view from the top was amazing. It was totally worth it."},
- {c:"emotion",en:"I couldn't stop laughing.",ko:"웃음을 멈출 수 없었어요",ex:"My friend slipped on the ice and landed in a snow pile. I couldn't stop laughing."},
+ {c:"filler",en:"Well, let me think...",ko:"음, 생각 좀 해볼게요 (시간 벌기)",ex:"Well, let me think... I'd say my favorite place is the park near my apartment.",exko:"음, 생각해 보면… 제일 좋아하는 곳은 아파트 근처 공원이에요."},
+ {c:"filler",en:"That's a good question.",ko:"좋은 질문이네요 (시간 벌기)",ex:"That's a good question. Honestly, I haven't thought about it much, but I'd say jogging.",exko:"좋은 질문이네요. 솔직히 별로 생각해 본 적은 없는데, 조깅이라고 할게요."},
+ {c:"filler",en:"How should I put it...",ko:"뭐라고 해야 하지...",ex:"How should I put it... it's not fancy, but it feels like home.",exko:"뭐라고 해야 하지… 화려하진 않지만 집처럼 편해요."},
+ {c:"filler",en:"You know what I mean?",ko:"무슨 말인지 아시죠?",ex:"After work I just want to lie on the couch and do nothing, you know what I mean?",exko:"퇴근하면 그냥 소파에 누워서 아무것도 안 하고 싶어요. 무슨 말인지 아시죠?"},
+ {c:"opener",en:"Okay, so you want to know about my ___.",ko:"오케이, 제 ___에 대해 알고 싶으시군요 (질문 되받기)",ex:"Okay, so you want to know about my favorite movie. Well, it's definitely Inception.",exko:"오케이, 제가 제일 좋아하는 영화가 궁금하신 거죠. 음, 단연 인셉션이에요."},
+ {c:"opener",en:"To be honest, I'm a big fan of ___.",ko:"솔직히 저는 ___을 정말 좋아해요",ex:"To be honest, I'm a big fan of hip-hop, especially Korean artists like Epik High.",exko:"솔직히 저는 힙합을 정말 좋아해요. 특히 에픽하이 같은 한국 아티스트요."},
+ {c:"opener",en:"There are a couple of reasons why I like it.",ko:"제가 좋아하는 이유는 두어 가지예요",ex:"There are a couple of reasons why I like it. First, it's close to my place, and second, it's never crowded.",exko:"좋아하는 이유는 두어 가지예요. 우선 집에서 가깝고, 그리고 절대 붐비지 않아요."},
+ {c:"connector",en:"First of all, ... / On top of that, ...",ko:"우선... / 게다가...",ex:"First of all, the gym is open 24 hours. On top of that, it's only five minutes from my apartment.",exko:"우선 헬스장이 24시간 열어요. 게다가 집에서 5분밖에 안 걸려요."},
+ {c:"connector",en:"What I mean is, ...",ko:"제 말은...",ex:"It's not that I hate cooking. What I mean is, I just don't have time on weekdays.",exko:"요리를 싫어하는 건 아니에요. 제 말은, 평일엔 시간이 없다는 거예요."},
+ {c:"connector",en:"Speaking of which, ...",ko:"말이 나온 김에...",ex:"I usually watch movies on Friday nights. Speaking of which, I saw a great one last week.",exko:"저는 금요일 밤에 보통 영화를 봐요. 말이 나온 김에, 지난주에 정말 좋은 영화를 봤어요."},
+ {c:"connector",en:"The thing is, ...",ko:"문제는 / 중요한 건...",ex:"I'd love to travel more. The thing is, I can't take many days off work.",exko:"여행을 더 다니고 싶어요. 문제는 휴가를 많이 못 낸다는 거예요."},
+ {c:"connector",en:"Anyway, long story short, ...",ko:"어쨌든 간단히 말하면...",ex:"We got lost, it started raining, we missed the bus... Anyway, long story short, we got home at midnight.",exko:"길을 잃고, 비가 오기 시작하고, 버스도 놓쳤어요… 어쨌든 간단히 말하면 자정에 집에 왔어요."},
+ {c:"past",en:"It was about two years ago when I ___.",ko:"약 2년 전에 제가 ___했을 때였어요",ex:"It was about two years ago when I went to Jeju with my friends.",exko:"약 2년 전에 친구들이랑 제주도에 갔을 때였어요."},
+ {c:"past",en:"Out of the blue, ___.",ko:"갑자기 ___",ex:"Out of the blue, it started pouring, and we had no umbrellas.",exko:"갑자기 비가 쏟아지기 시작했는데 우산이 없었어요."},
+ {c:"past",en:"At first I thought ___, but it turned out that ___.",ko:"처음엔 ___라고 생각했는데 알고 보니 ___",ex:"At first I thought the gym was closed, but it turned out that they had just changed the hours.",exko:"처음엔 헬스장이 문을 닫은 줄 알았는데, 알고 보니 영업시간만 바뀐 거였어요."},
+ {c:"past",en:"I was so relieved / embarrassed / frustrated.",ko:"정말 안도했어요 / 창피했어요 / 답답했어요",ex:"When I finally found my phone in the taxi, I was so relieved.",exko:"택시에서 마침내 휴대폰을 찾았을 때 정말 안도했어요."},
+ {c:"past",en:"Looking back, it was one of the best days of my life.",ko:"돌이켜보면 인생 최고의 날 중 하나였어요",ex:"We stayed up all night talking on the beach. Looking back, it was one of the best days of my life.",exko:"해변에서 밤새 이야기를 나눴어요. 돌이켜보면 인생 최고의 날 중 하나였어요."},
+ {c:"routine",en:"I usually ___ on weekends, or whenever I have free time.",ko:"주말이나 시간 날 때마다 보통 ___해요",ex:"I usually go jogging along the river on weekends, or whenever I have free time.",exko:"주말이나 시간 날 때마다 보통 강변을 따라 조깅해요."},
+ {c:"routine",en:"The first thing I do is ___. After that, ___.",ko:"제일 먼저 ___하고, 그다음엔 ___",ex:"The first thing I do is stretch for ten minutes. After that, I run for about thirty minutes.",exko:"제일 먼저 10분 동안 스트레칭을 해요. 그다음엔 30분 정도 달려요."},
+ {c:"routine",en:"It helps me relieve stress and recharge.",ko:"스트레스 풀고 재충전하는 데 도움이 돼요",ex:"I go jogging along the river every Saturday morning. It helps me relieve stress and recharge.",exko:"매주 토요일 아침에 강변을 따라 조깅해요. 스트레스 풀고 재충전하는 데 도움이 돼요."},
+ {c:"desc",en:"It's located in ___, about ___ minutes from my place.",ko:"___에 있고, 집에서 약 ___분 거리예요",ex:"It's located in Suji, about ten minutes from my place.",exko:"수지에 있고, 집에서 약 10분 거리예요."},
+ {c:"desc",en:"What I like most about it is ___.",ko:"제가 가장 마음에 드는 점은 ___",ex:"What I like most about it is that it's never too crowded, even on weekends.",exko:"가장 마음에 드는 점은 주말에도 그렇게 붐비지 않는다는 거예요."},
+ {c:"desc",en:"It's cozy and well-organized.",ko:"아늑하고 잘 정돈되어 있어요",ex:"My living room isn't big, but it's cozy and well-organized.",exko:"거실이 크진 않지만 아늑하고 잘 정돈되어 있어요."},
+ {c:"desc",en:"There's a huge window that lets in a lot of sunlight.",ko:"햇빛이 많이 들어오는 큰 창문이 있어요",ex:"My favorite part of the apartment is the living room. There's a huge window that lets in a lot of sunlight.",exko:"우리 집에서 제일 좋아하는 곳은 거실이에요. 햇빛이 많이 들어오는 큰 창문이 있거든요."},
+ {c:"compare",en:"Compared to the past, ___ is way more ___.",ko:"예전에 비해 ___이 훨씬 더 ___",ex:"Compared to the past, shopping is way more convenient because everything is online.",exko:"예전에 비해 쇼핑이 훨씬 편해졌어요. 뭐든 온라인으로 되니까요."},
+ {c:"compare",en:"Back in the day, ... but these days, ...",ko:"예전에는... 그런데 요즘은...",ex:"Back in the day, I went to the theater every weekend, but these days I mostly watch movies at home.",exko:"예전에는 주말마다 극장에 갔는데, 요즘은 주로 집에서 영화를 봐요."},
+ {c:"compare",en:"The biggest difference is that ___.",ko:"가장 큰 차이는 ___",ex:"The biggest difference is that people rarely carry cash these days.",exko:"가장 큰 차이는 요즘 사람들이 현금을 거의 안 들고 다닌다는 거예요."},
+ {c:"roleplay",en:"Hi, I'm calling to ask about ___.",ko:"안녕하세요, ___에 대해 여쭤보려고 전화했어요",ex:"Hi, I'm calling to ask about the membership plans at your gym.",exko:"안녕하세요, 헬스장 회원권에 대해 여쭤보려고 전화했어요."},
+ {c:"roleplay",en:"Could you tell me what time it opens?",ko:"몇 시에 여는지 알려주실 수 있나요?",ex:"Hi, I'm calling about the gym on Main Street. Could you tell me what time it opens on weekends?",exko:"안녕하세요, 메인 스트리트에 있는 헬스장 때문에 전화했는데요. 주말엔 몇 시에 여는지 알려주실 수 있나요?"},
+ {c:"roleplay",en:"I'm afraid there's been a problem with ___.",ko:"___에 문제가 있는 것 같아요",ex:"I'm afraid there's been a problem with my reservation. It says the wrong date.",exko:"제 예약에 문제가 있는 것 같아요. 날짜가 잘못 나와 있어요."},
+ {c:"roleplay",en:"Would it be possible to ___ instead?",ko:"대신 ___하는 게 가능할까요?",ex:"Would it be possible to get a refund instead?",exko:"대신 환불받는 게 가능할까요?"},
+ {c:"roleplay",en:"If that doesn't work, how about ___?",ko:"그게 안 되면 ___은 어떨까요?",ex:"If that doesn't work, how about meeting next Saturday?",exko:"그게 안 되면 다음 주 토요일에 만나는 건 어때요?"},
+ {c:"opinion",en:"In my opinion, ___ / If you ask me, ___.",ko:"제 생각에는 ___",ex:"If you ask me, recycling should be mandatory in every apartment complex.",exko:"제 생각에는 모든 아파트 단지에서 재활용을 의무화해야 해요."},
+ {c:"opinion",en:"I'm not 100% sure, but I'd say ___.",ko:"확실하진 않지만 ___인 것 같아요",ex:"I'm not 100% sure, but I'd say the weather here has gotten much hotter.",exko:"확실하진 않지만 이곳 날씨가 훨씬 더워진 것 같아요."},
+ {c:"opinion",en:"On the other hand, ___.",ko:"반면에 ___",ex:"On the other hand, online classes can be really distracting at home.",exko:"반면에 온라인 수업은 집에서 집중하기가 정말 어려울 수 있어요."},
+ {c:"closer",en:"So yeah, that's pretty much it.",ko:"네, 대충 그 정도예요 (마무리)",ex:"...and after dinner we just went home. So yeah, that's pretty much it.",exko:"…그리고 저녁 먹고 그냥 집에 갔어요. 네, 대충 그 정도예요."},
+ {c:"closer",en:"That's why I really enjoy ___.",ko:"그래서 제가 ___을 정말 즐기는 거예요",ex:"That's why I really enjoy spending my weekends at the park.",exko:"그래서 제가 주말을 공원에서 보내는 걸 정말 즐기는 거예요."},
+ {c:"closer",en:"I hope that answers your question.",ko:"답변이 됐길 바라요",ex:"That's why I prefer the park over the gym. I hope that answers your question.",exko:"그래서 저는 헬스장보다 공원이 더 좋아요. 답변이 됐길 바라요."},
+ {c:"emotion",en:"I was over the moon.",ko:"정말 기뻤어요",ex:"When I got the job offer, I was over the moon.",exko:"합격 연락을 받았을 때 정말 기뻤어요."},
+ {c:"emotion",en:"It was a total disaster.",ko:"완전 엉망이었어요",ex:"We tried to cook a three-course dinner for ten people. It was a total disaster.",exko:"열 명을 위해 코스 요리를 해 보려고 했는데, 완전 엉망이었어요."},
+ {c:"emotion",en:"It was totally worth it.",ko:"충분히 그럴 가치가 있었어요",ex:"The hike took six hours, but the view from the top was amazing. It was totally worth it.",exko:"등산이 6시간 걸렸지만 정상에서 본 경치가 정말 멋졌어요. 충분히 그럴 가치가 있었어요."},
+ {c:"emotion",en:"I couldn't stop laughing.",ko:"웃음을 멈출 수 없었어요",ex:"My friend slipped on the ice and landed in a snow pile. I couldn't stop laughing.",exko:"친구가 얼음에 미끄러져서 눈더미에 처박혔어요. 웃음을 멈출 수 없었어요."},
 ].map((c,i)=>({id:"c"+i,...c}));
 const CAT={filler:"시간 벌기",opener:"시작",connector:"연결",past:"과거 경험",routine:"루틴",desc:"묘사",compare:"비교",roleplay:"롤플레이",opinion:"의견",closer:"마무리",emotion:"감정"};
 
@@ -936,7 +940,7 @@ ${pron?`Pronunciation assessment of the recording (Azure, 0-100): overall ${pron
 Rules: evaluate this answer alone. Every comment, strength and fix must refer to what is actually in the answer above — places, people and events exactly as the learner said them. Do not mention places, trips or details that appear only in the profile. The model answers must tell the SAME story as the learner (same place, same event), just better.
 
 Reply with ONLY one JSON object:
-{"level":"IM2","score":62,"summary":"한국어 총평 2-3문장","strengths":["한국어로 잘한 점 2-3개"],"rehearsed":"none | some | heavy — how much sounds recited","rehearsed_note":"한국어 한 줄 (some/heavy일 때만, 아니면 빈 문자열)","fixes":[{"original":"learner's phrase","better":"improved phrase","why":"한국어 설명 한 줄"}],"model_target":"A model answer at ${T} level (${spec().words} words): ${spec().desc} First person, natural spoken English, keeping the learner's own story and details from the answer",${T==="AL"?"":`"model_up":"The same answer upgraded to ${up} level (${TARGET_SPEC[up].words} words)",`}"expressions":[{"en":"useful expression from the model answers","ko":"한국어 뜻"}]}
+{"level":"IM2","score":62,"summary":"한국어 총평 2-3문장","strengths":["한국어로 잘한 점 2-3개"],"rehearsed":"none | some | heavy — how much sounds recited","rehearsed_note":"한국어 한 줄 (some/heavy일 때만, 아니면 빈 문자열)","fixes":[{"original":"learner's phrase","better":"improved phrase","why":"한국어 설명 한 줄"}],"model_target":"A model answer at ${T} level (${spec().words} words): ${spec().desc} First person, natural spoken English, keeping the learner's own story and details from the answer",${T==="AL"?"":`"model_up":"The same answer upgraded to ${up} level (${TARGET_SPEC[up].words} words)",`}"expressions":[{"en":"useful expression from the model answers","ko":"한국어 뜻","ex":"a new natural example sentence using it in a first-person OPIc answer","exko":"예문의 한국어 해석"}]}
 Give 3-5 fixes and 4-6 expressions. Model answers must sound spontaneous: no stock opener that repeats the question, no fixed closer. "score" is 0-100 within the overall scale (IM3 starts around 65, IH around 78, AL around 90).`;
   const r=await sample.json(prompt,{...(typeof onText==="function"?{onText}:{}),cache:false});if(r){r.model_target=r.model_target||r.model_im3;r.model_up=r.model_up||r.model_ih;r.target=T;r.up=T==="AL"?null:up}return r;
 }
@@ -963,7 +967,7 @@ Questions:
 ${qs}
 
 Never use double quotes (") inside an answer; use single quotes if you need to quote something.
-Reply with ONLY one JSON object: {"scripts":[{"n":1,"answer":"..."}],"expressions":[{"en":"...","ko":"한국어 뜻"}]}
+Reply with ONLY one JSON object: {"scripts":[{"n":1,"answer":"..."}],"expressions":[{"en":"...","ko":"한국어 뜻","ex":"a short new example sentence using the expression (not copied from the scripts)","exko":"예문 한국어 해석"}]}
 "n" is the question's number as listed above. Include ${only?"3-4":"6-8"} reusable expressions taken from the scripts.`;
   return aiRetry(()=>sample.json(prompt,{...(typeof onText==="function"?{onText}:{}),cache:false}),"스크립트 생성");
 }
@@ -1395,10 +1399,11 @@ function renderFeedback(box0,r,q,a){const box={replaceChildren:(...k)=>box0.repl
     r.fixes?.length?h("div",{class:"card"},h("h3",{},"고칠 표현"),...r.fixes.map(f=>h("div",{class:"fix"},h("span",{class:"o"},f.original),h("span",{class:"b"},f.better),h("span",{class:"w"},f.why)))):null,
     (()=>{const mt=r.model_target||r.model_im3||"";const T=r.target||"IM3";return h("div",{class:"card"},h("h3",{},"모범답안 · "+T),h("div",{class:"model"},mt),h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>copy(mt)},"복사"),h("button",{class:"btn sm",onclick:()=>go("listen",{text:mt,title:"모범답안 · "+T})},"쉐도잉"),spkBtn(mt)))})(),
     (()=>{const mu=r.model_up||r.model_ih;if(!mu)return null;const U=r.up||"IH";return h("details",{class:"card"},h("summary",{},"한 단계 위 · "+U+" 버전"),h("div",{class:"model",style:"margin-top:8px"},mu),h("div",{class:"row",style:"margin-top:8px"},h("button",{class:"btn sm",onclick:()=>go("listen",{text:mu,title:"모범답안 · "+U})},"쉐도잉"),spkBtn(mu)))})(),
-    r.expressions?.length?h("div",{class:"card"},h("h3",{},"챙겨갈 표현"),h("div",{class:"kx"},...r.expressions.map(x=>h("div",{},h("span",{class:"en"},x.en),h("span",{class:"ko"},x.ko)))),h("button",{class:"btn sm",onclick:()=>{addCards(r.expressions,q);}},"표현카드에 추가")):null);
+    r.expressions?.length?h("div",{class:"card"},h("h3",{},"챙겨갈 표현"),h("div",{class:"kx"},...r.expressions.map(kxRow)),h("button",{class:"btn sm",onclick:()=>{addCards(r.expressions,q);}},"표현카드에 추가")):null);
 }
 function copy(t){navigator.clipboard?.writeText(t||"").then(()=>toast("복사했어요")).catch(()=>toast("복사가 막혀 있어요. 직접 선택해 복사해 주세요"))}
-function addCards(list,src){let n=0;for(const x of list){if(!x?.en)continue;if(S.custom.some(c=>c.en===x.en))continue;S.custom.push({id:"u"+Date.now()+"_"+n,c:"custom",en:x.en,ko:x.ko||"",...(x.why?{why:x.why}:{}),src:(src||"").slice(0,60)});n++}save();if(n){setTimeout(()=>fillCardKo().then(()=>clipSync(false)),1500)}toast(n?n+"장 추가했어요":"이미 있는 표현이에요")}
+function kxRow(x){return h("div",{},h("span",{class:"en"},x.en),h("span",{class:"ko"},x.ko),x.ex?h("span",{class:"ex"},"예) "+x.ex,x.exko?h("span",{class:"muted"},x.exko):null):null)}
+function addCards(list,src){let n=0;for(const x of list){if(!x?.en)continue;if(S.custom.some(c=>c.en===x.en))continue;S.custom.push({id:"u"+Date.now()+"_"+n,c:"custom",en:x.en,ko:x.ko||"",...(x.ex?{ex:String(x.ex)}:{}),...(x.exko?{exko:String(x.exko)}:{}),...(x.why?{why:x.why}:{}),src:(src||"").slice(0,60)});n++}save();if(n){setTimeout(()=>fillCardKo().then(fillCardEx).then(()=>clipSync(false)),1500)}toast(n?n+"장 추가했어요":"이미 있는 표현이에요")}
 
 /* ---- ANALYSIS (예상 등급·추세) ---- */
 const QTN={desc:"묘사",routine:"습관·루틴",exp:"경험",compare:"비교·변화",rp:"롤플레이",adv:"고난도",intro:"자기소개",chat:"AI 대화",mock:"모의시험"};
@@ -1643,14 +1648,14 @@ async function endChat(){if(!chat)return;if(chat.micHold){chat.micHold=false;MIC
 async function vChatSummary(m){
   if(chat.summary==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"대화 평가 중…")));put(m,h("h1",{},"대화 정리"),box);
     const tr=chat.ui.filter(u=>u.who==="ai"||u.who==="me").map(u=>(u.who==="ai"?"Partner: ":"Learner: ")+u.text).join("\n");
-    try{const r=await sample.json(`${RUBRIC()}\n\nThis is a transcript of a practice conversation (${chat.sc.en}). Rate ONLY the learner's turns.\n\n${tr}\n\nReply with ONLY JSON: {"level":"IM2","score":60,"summary":"한국어 총평 2-3문장","fixes":[{"original":"...","better":"...","why":"한국어"}],"expressions":[{"en":"useful natural expression the learner could have used","ko":"뜻"}],"next":"다음 대화에서 시도할 한 가지 (한국어)"}\nGive 3-5 fixes and 4-6 expressions.`,{cache:false});
+    try{const r=await sample.json(`${RUBRIC()}\n\nThis is a transcript of a practice conversation (${chat.sc.en}). Rate ONLY the learner's turns.\n\n${tr}\n\nReply with ONLY JSON: {"level":"IM2","score":60,"summary":"한국어 총평 2-3문장","fixes":[{"original":"...","better":"...","why":"한국어"}],"expressions":[{"en":"useful natural expression the learner could have used","ko":"뜻","ex":"one natural example sentence using it, about the learner's own life","exko":"예문 한국어 해석"}],"next":"다음 대화에서 시도할 한 가지 (한국어)"}\nGive 3-5 fixes and 4-6 expressions.`,{cache:false});
       chat.summary=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"chat",tier:r._tier,qt:"chat",sum:r.summary||"",title:"대화 · "+chat.sc.ko+" · "+chat.n+"턴",level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:chat.n*45,fixes:[...(chat.ui.filter(u=>u.who==="fix").map(u=>({o:u.fix.original,b:u.fix.better,w:u.fix.why}))),...(r.fixes||[]).map(f=>({o:f.original,b:f.better,w:f.why}))].slice(0,8)});S.today.practice++;save();render()}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("button",{class:"btn",onclick:()=>{chat=null;render()}},"닫기"))}return}
   const r=chat.summary;
   put(m,h("div",{},h("p",{class:"eyebrow"},"Conversation review · "+chat.sc.ko),h("h1",{},"대화 정리")),
     h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level||"?"),h("span",{class:"muted mono"},(r.score??"")+" / 100")),h("p",{},r.summary||""),r.next?h("p",{class:"small"},h("b",{},"다음엔: "),r.next):null,tierLine(r._tier)),
     r.fixes?.length?h("div",{class:"card"},h("h3",{},"고칠 표현"),...r.fixes.map(f=>h("div",{class:"fix"},h("span",{class:"o"},f.original),h("span",{class:"b"},f.better),h("span",{class:"w"},f.why)))):null,
-    r.expressions?.length?h("div",{class:"card"},h("h3",{},"이렇게 말할 수 있었어요"),h("div",{class:"kx"},...r.expressions.map(x=>h("div",{},h("span",{class:"en"},x.en),h("span",{class:"ko"},x.ko)))),h("button",{class:"btn sm",onclick:()=>addCards(r.expressions,chat.sc.ko)},"표현카드에 추가")):null,
+    r.expressions?.length?h("div",{class:"card"},h("h3",{},"이렇게 말할 수 있었어요"),h("div",{class:"kx"},...r.expressions.map(kxRow)),h("button",{class:"btn sm",onclick:()=>addCards(r.expressions,chat.sc.ko)},"표현카드에 추가")):null,
     h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{const sc=chat.sc;chat=null;startChat(sc)}},"같은 상대와 다시"),h("button",{class:"btn",onclick:()=>{chat=null;render()}},"닫기")));
 }
 
@@ -1795,7 +1800,7 @@ function vScriptTopic(m,t){
       (()=>{const miss=t.qs.map((q,i)=>sc.scripts?.[i]?.answer?null:i).filter(x=>x!=null);return miss.length?h("div",{class:"note"},h("span",{class:"grow"},"새로 추가된 질문 "+miss.length+"개는 아직 스크립트가 없어요. 기존 스크립트는 그대로 두고 이것만 만들 수 있어요."),h("button",{class:"btn sm primary",onclick:e=>gen(e.target,miss)},"새 질문 스크립트 만들기")):null})(),
       ...t.qs.map((q,i)=>{const s=sc.scripts?.[i];return h("div",{class:"card"},h("span",{class:"chip neutral",style:"align-self:flex-start"},QT[q.t]+(q.hot?" · 🔥 최근":"")),h("p",{class:"q",style:"font-size:16px"},q.q),s?.fromModel?h("span",{class:"chip good",style:"align-self:flex-start"},"내 말하기 기반"):null,h("div",{class:"model"},s?.answer||"—"),h("div",{class:"row"},spkBtn(s?.answer||""),h("button",{class:"btn sm",onclick:()=>go("listen",{text:s?.answer,title:t.en+" · "+QT[q.t]})},"쉐도잉"),h("button",{class:"btn sm",onclick:()=>copy(s?.answer)},"복사"),h("button",{class:"btn sm",onclick:()=>go("practice",{topic:t,q,kind:QT[q.t]})},"말하기 연습")),modelBlock(t,q,i))}),
       ...(t.more||[]).filter(q=>myModel(q)).map(q=>h("div",{class:"card"},h("span",{class:"chip neutral",style:"align-self:flex-start"},QT[q.t]+" · 추가 문제"),h("p",{class:"q",style:"font-size:16px"},q.q),modelBlock(t,q,-1))),
-      sc.expressions?.length?h("div",{class:"card"},h("h3",{},"핵심 표현"),h("div",{class:"kx"},...sc.expressions.map(x=>h("div",{},h("span",{class:"en"},x.en),h("span",{class:"ko"},x.ko)))),h("button",{class:"btn sm",onclick:()=>addCards(sc.expressions,t.en)},"표현카드에 추가")):null)};
+      sc.expressions?.length?h("div",{class:"card"},h("h3",{},"핵심 표현"),h("div",{class:"kx"},...sc.expressions.map(kxRow)),h("button",{class:"btn sm",onclick:()=>addCards(sc.expressions,t.en)},"표현카드에 추가")):null)};
   show();
   put(m,h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("scripts")},"← 스크립트 목록"),h("p",{class:"eyebrow",style:"margin-top:10px"},t.ko),h("h1",{},t.en)),box);
 }
@@ -1841,6 +1846,12 @@ async function fillCardKo(){if(fillCardKo.on)return;const ai=!!sample;const miss
     else{for(const c of miss.slice(0,60)){try{const r=await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&q="+encodeURIComponent(c.en.replace(/___/g,"something")));if(!r.ok)break;const j=await r.json();const t=(j&&j[0]||[]).map(x=>x&&x[0]||"").join("").trim();if(t){c.ko=t;c.koSrc="mt";n++}}catch(e){break}}}}
   finally{fillCardKo.on=false}
   if(n){save();if(view==="cards")render();if(player.on)for(const it of player.items){if(it.kind==="C"&&!it.ko){const c=S.custom.find(x=>x.en.replace(/___/g,"something")===it.en);if(c&&c.ko)it.ko=c.ko}}toast("내 표현 "+n+"개 해석을 채웠어요")}}
+async function fillCardEx(){if(fillCardEx.on||!sample)return;const miss=(S.custom||[]).filter(c=>c&&/[a-z]/i.test(c.en||"")&&!c.ex);if(!miss.length)return;fillCardEx.on=true;let n=0;
+  try{for(let i=0;i<miss.length;i+=20){const b=miss.slice(i,i+20);let r=null;
+    try{r=await sample.json(`For each English expression below, write ONE short natural example sentence (8-18 words) a Korean office worker could say in an OPIc speaking test, using the expression as written (fill any ___ naturally). If the item is already a full sentence, write a sentence that could come right before or after it and include the item itself. Also give a natural Korean translation of each example (해요체). No double quotes inside the strings.${profileText?"\nLearner: "+profileText().slice(0,300):""}\n\n${b.map((c,k)=>(k+1)+". "+c.en).join("\n")}\n\nReply with ONLY JSON: {"ex":[{"ex":"...","exko":"..."}, ...]} — exactly ${b.length} items, same order.`)}catch(e){break}
+    const arr=r&&Array.isArray(r.ex)?r.ex:null;if(!arr)continue;b.forEach((c,k)=>{const x=arr[k];if(x&&x.ex){c.ex=String(x.ex).trim();if(x.exko)c.exko=String(x.exko).trim();n++}})}}
+  finally{fillCardEx.on=false}
+  if(n){save();if(view==="cards")render();toast("내 표현 "+n+"개에 예문을 넣었어요")}}
 function transOf(sent){if(S.trans[sent])return S.trans[sent];for(const c of (S.custom||[]))if(c&&c.ko&&String(c.en||"").replace(/___/g,"something").trim()===sent)return c.ko;return ""}
 
 /* ============ BACKGROUND AUDIO SESSION ============ */
@@ -2107,15 +2118,15 @@ function vCards(m){
   const card=filtered.find(c=>c.id===deck.order[deck.i]);const known=Object.keys(S.cards).filter(k=>S.cards[k]==="known").length;
   const sel=h("select",{id:"cardcat",onchange:e=>{deck.cat=e.target.value;deck.order=[];render()}},...cats.map(c=>h("option",{value:c,selected:deck.cat===c},c==="all"?"전체 ("+all.length+")":c==="custom"?"내가 추가한 표현 ("+S.custom.length+")":CAT[c]+" ("+CARDS.filter(x=>x.c===c).length+")")));
   const fl=h("div",{class:"flash"+(deck.flip?" flip":""),onclick:()=>{deck.flip=!deck.flip;fl.classList.toggle("flip",deck.flip)}},h("div",{class:"in"},
-    h("div",{class:"face"},h("span",{class:"eyebrow"},CAT[card?.c]||"추가 표현"),h("span",{class:"big"},card?.en||"—"),card?.ex?h("span",{class:"small",style:"color:var(--accent);margin-top:2px"},"예) "+card.ex):null,h("span",{class:"muted small"},"탭해서 뜻 보기")),
-    h("div",{class:"face back"},h("span",{class:"big"},card?.ko||"—"),card?.ex?h("span",{class:"small",style:"color:var(--accent)"},"예) "+card.ex):null,card?.src?h("span",{class:"muted small"},"출처: "+card.src):null,h("span",{class:"muted small"},"소리 내어 3번 말해 보세요"))));
+    h("div",{class:"face"},h("span",{class:"eyebrow"},CAT[card?.c]||"추가 표현"),h("span",{class:"big"},card?.en||"—"),card?.ex?h("div",{class:"exb"},h("span",{class:"e"},"예) "+card.ex)):null,h("span",{class:"muted small"},"탭해서 뜻 보기")),
+    h("div",{class:"face back"},h("span",{class:"big"},card?.ko||"—"),card?.ex?h("div",{class:"exb"},h("span",{class:"e"},"예) "+card.ex),card.exko?h("span",{class:"muted"},card.exko):null):null,card?.src?h("span",{class:"muted small"},"출처: "+card.src):null,h("span",{class:"muted small"},"소리 내어 3번 말해 보세요"))));
   const mark=v=>{if(!card)return;S.cards[card.id]=v;S.today.cards++;save();deck.i=(deck.i+1)%deck.order.length;deck.flip=false;render()};
   put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},"Expression cards · 외운 표현 "+known),h("h1",{},"표현카드")),h("div",{style:"min-width:170px"},sel)),
     h("p",{class:"muted small mono"},(deck.i+1)+" / "+deck.order.length+(card&&S.cards[card.id]==="known"?" · 외움":card&&S.cards[card.id]==="again"?" · 다시":"")),
     fl,
     h("div",{class:"row"},spkBtn(card?.en||"",null,card?.id),h("button",{class:"btn grow",onclick:()=>mark("again")},"다시 볼래요"),h("button",{class:"btn primary grow",onclick:()=>mark("known")},"외웠어요")),
     h("div",{class:"note"},"카드 앞면을 보고 먼저 입으로 말한 다음 뒤집어 확인하세요. AI 피드백에서 '표현카드에 추가'를 누르면 내 표현이 여기 쌓입니다."),
-    S.custom.length?h("details",{class:"card"},h("summary",{},"내가 추가한 표현 ("+S.custom.length+")"),h("div",{class:"kx",style:"margin-top:8px"},...S.custom.map(c=>h("div",{},h("span",{class:"en"},c.en),h("span",{class:"ko"},c.ko),h("button",{class:"btn sm ghost",onclick:()=>{S.custom=S.custom.filter(x=>x.id!==c.id);deck.order=[];save();render()}},"삭제"))))):null);
+    S.custom.length?h("details",{class:"card"},h("summary",{},"내가 추가한 표현 ("+S.custom.length+")"),h("div",{class:"kx",style:"margin-top:8px"},...S.custom.map(c=>h("div",{},h("span",{class:"en"},c.en),h("span",{class:"ko"},c.ko),c.ex?h("span",{class:"ex"},"예) "+c.ex):null,h("button",{class:"btn sm ghost",onclick:()=>{S.custom=S.custom.filter(x=>x.id!==c.id);deck.order=[];save();render()}},"삭제"))))):null);
 }
 
 /* ---- WEAK-POINT DRILL (약점 훈련) ----
@@ -2578,6 +2589,6 @@ loadLocal();cloudInit();render();setTimeout(prepSyncCode,500);setTimeout(()=>{if
       if((remote.updatedAt||0)>(S.updatedAt||0)){S=Object.assign(structuredClone(DEF),remote);try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}else if((S.updatedAt||0)>(remote.updatedAt||0)){mergeState(remote,true)}
       claudeSavedAt=remote.updatedAt||0}
     docRef=col;if(!m.exists&&S.updatedAt)claudePush()}catch(e){docRef=null;toast("Claude 계정 저장소 연결 실패: "+(e.code||e.message||e))}}
-  render();setTimeout(applyPendingSync,300);setTimeout(()=>fillCardKo().then(()=>fillTrans()),5000);
+  render();setTimeout(applyPendingSync,300);setTimeout(()=>fillCardKo().then(fillCardEx).then(()=>fillTrans()),5000);
 })();
 </script>
