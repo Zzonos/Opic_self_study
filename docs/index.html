@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261105-104751-47869c">
+<html lang="ko" data-build="20261105-225958-b49732">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -2392,9 +2392,8 @@ function dStage3(m,P,p){const review=!P;let R=drill.round;
       h("p",{class:"muted small",style:"margin:2px 0"},"⏱ 마이크가 켜진 뒤 "+lim+"초 안에 말을 시작하면 '빠름'. 끝까지는 "+dlim+"초 목표(느려도 통과)."),
       h("div",{class:"row",style:"flex-wrap:nowrap"},h("div",{class:"grow"},bar),tEl),inp.ta,
       h("div",{class:"row"},inp.mic,h("button",{class:"btn",onclick:()=>finish(inp.ta.value)},"확인"),h("button",{class:"btn ghost",onclick:()=>finish("")},"모르겠어요")),fb));
-  // Azure: start listening by itself (the clock starts only once it is really listening)
-  if(inp.mic&&inp.mic._az&&inp.mic._start)koReady.then(()=>{if(inp.mic.isConnected&&!answered)inp.mic._start()});
-  else if(!inp.real)setTimeout(()=>{try{inp.ta.focus()}catch(e){}},50)}
+  // the mic starts only when I tap it, with Azure too (the clock starts once it is really listening)
+  if(!inp.real)setTimeout(()=>{try{inp.ta.focus()}catch(e){}},50)}
 // stage 4: a question that needs the pattern; one-sentence answer judged by Claude (or by the pattern check when AI is off)
 // stage 4/5 AI checks: a misheard proper noun is not the learner's mistake
 const D_ASR=`Speech recognition often mishears proper nouns (place, shop, brand and people names) and writes them as odd or unrelated words (e.g. "sushi sports Park" for "Suji Sports Park"). Treat any such odd word that stands where a name would be as a correct name: never mark the answer wrong, correct it, or mention it because of that. Keep the name as the learner said it in your corrected sentence.`;
