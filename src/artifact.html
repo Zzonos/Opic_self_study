@@ -540,6 +540,11 @@ let syncCode=null,syncCodeAt=0,syncVer=-1;
 // the prepared code is used only while nothing has changed since (a save here, or records merged in from the account)
 function curSyncCode(){return (syncCode&&syncVer===stVer)?syncCode:packStateSync()}
 let prepT=null;function prepSyncCode(){clearTimeout(prepT);prepT=setTimeout(()=>{syncCodeAt=Date.now();const v=stVer;try{packState().then(c=>{if(v!==stVer)return;syncCode=c;syncVer=v;const u=webUrl();if(u)document.querySelectorAll("a[data-weblink]").forEach(a=>a.href=webUrl(a.dataset.weblink)||a.href)}).catch(()=>{})}catch(e){}},400)}
+function copyNow(text){let ok=false;try{const ta=document.createElement("textarea");ta.value=text;ta.setAttribute("readonly","");ta.style.cssText="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px";document.body.appendChild(ta);ta.focus();ta.select();ta.setSelectionRange(0,text.length);ok=document.execCommand("copy");ta.remove()}catch(e){}
+  if(!ok){try{navigator.clipboard.writeText(text).catch(()=>{})}catch(e){}}return ok}
+// web → Claude: copy the latest code in the tap itself, then the link opens Claude
+function sendToClaude(){const code=curSyncCode();const ok=copyNow(code);S.webSentAt=Date.now();try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}
+  setTimeout(()=>toast(ok?"기록 코드 복사됨 ("+Math.round(code.length/1024)+"KB) — Claude 오늘 화면 맨 위 칸에 붙여넣으면 바로 합쳐져요":"복사가 막혔어요. 설정 → '기록 코드 복사'를 써 주세요"),50)}
 function syncToClaude(){try{const code=curSyncCode();
   // everything below must stay synchronous: Safari only allows clipboard + new window inside the click itself
   let p=null;try{p=navigator.clipboard.writeText(code)}catch(e){}
@@ -548,11 +553,19 @@ function syncToClaude(){try{const code=curSyncCode();
   const done=ok=>toast(ok?"기록 코드를 복사했어요 ("+Math.round(code.length/1024)+"KB). Claude 앱에서 '클립보드에서 가져오기'를 누르세요":"복사가 막혔어요. 설정 → '기록 코드 복사'를 눌러 수동으로 옮겨 주세요");
   if(p&&p.then)p.then(()=>done(true),()=>done(false));else done(false);
   if(!w)toast("팝업이 차단됐어요. 브라우저에서 팝업을 허용해 주세요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
-function webImportCard(){if(!window.claude?.use)return null;const ta=h("textarea",{id:"wimp",autocapitalize:"off",autocorrect:"off",spellcheck:"false",style:"min-height:56px;font-family:var(--mono);font-size:11px",placeholder:"웹 앱에서 'Claude에서 열기'를 누르면 복사되는 기록 코드를 여기에 붙여넣기"});
-  const cnt=h("span",{class:"muted small mono"},"0자");ta.oninput=()=>{cnt.textContent=ta.value.length+"자"};
-  const doImport=async t=>{if(!(t||"").trim()){toast("칸이 비어 있어요. 칸을 길게 눌러 '붙여넣기'를 선택한 뒤 다시 누르세요");return}try{const o=await parseCode(t);const n=(o.log||[]).length;mergeState(o,false);S.webImportedAt=Date.now();save();ta.value="";cnt.textContent="0자";toast("웹 계정 기록을 합쳤어요 (기록 "+n+"건·프로필·스크립트)");render()}catch(e){toast("가져오기 실패: "+(e&&e.message||e))}};
-  return h("div",{class:"card"},h("h3",{},"웹 계정 기록 가져오기"),h("p",{class:"muted small"},"웹(OSS 계정)에서 입력한 프로필·스크립트·기록을 여기로 가져와요. 웹 앱에서 'Claude에서 열기'를 누르면 기록 코드가 자동 복사됩니다."),
-    ta,h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>doImport(ta.value)},"붙여넣어 합치기"),cnt,navigator.clipboard?.readText?h("button",{class:"btn",onclick:async()=>{try{const t=await navigator.clipboard.readText();if(!t.trim()){toast("클립보드가 비어 있어요");return}doImport(t)}catch(e){toast("클립보드를 읽을 수 없어요. 위 칸에 직접 붙여넣어 주세요")}}},"클립보드에서 가져오기"):null))}
+async function importWebCode(t){t=String(t||"").trim();if(!t){toast("칸이 비어 있어요. 칸을 길게 눌러 '붙여넣기'를 선택하세요");return false}
+  try{const o=await parseCode(t);const n0=S.log.length;const sc0=JSON.stringify(S.scripts).length;mergeState(o,false);S.webImportedAt=Date.now();save();const nn=S.log.length-n0;
+    toast(nn?"웹 기록 "+nn+"건을 새로 합쳤어요"+(JSON.stringify(S.scripts).length!==sc0?" · 스크립트도 갱신":""):"합쳤어요 — 새 기록은 없었어요 (이미 최신)");render();return true}catch(e){toast("가져오기 실패: "+(e&&e.message||e));return false}}
+// a box that merges by itself the moment a code is pasted
+function webPasteBox(ph){const ta=h("textarea",{autocapitalize:"off",autocorrect:"off",spellcheck:"false",rows:1,style:"min-height:44px;font-family:var(--mono);font-size:11px",placeholder:ph});let busy=false;
+  const go=async()=>{const v=ta.value.trim();if(busy||v.length<20)return;busy=true;ta.disabled=true;const ok=await importWebCode(v);busy=false;ta.disabled=false;if(ok)ta.value=""};
+  ta.addEventListener("paste",()=>setTimeout(go,30));ta.addEventListener("input",()=>{if(ta.value.trim().length>200)setTimeout(go,30)});return ta}
+function webImportCard(){if(!window.claude?.use)return null;
+  return h("div",{class:"card"},h("h3",{},"웹 계정 기록 가져오기"),h("p",{class:"muted small"},"웹에서 'Claude 모드'나 '기록 코드 복사'를 누르면 기록 코드가 복사돼요. 아래 칸을 길게 눌러 붙여넣으면 바로 합쳐집니다 (기록은 양쪽 모두 남고, 스크립트·프로필은 더 최신 쪽으로). Claude 앱은 보안상 클립보드를 직접 읽지 못해 붙여넣기는 한 번 해 주셔야 해요."),
+    webPasteBox("여기를 길게 눌러 붙여넣기 → 자동으로 합쳐져요"))}
+// Claude 오늘 화면 맨 위: 웹에서 넘어왔을 때 바로 붙여넣는 칸
+function webPasteNote(){if(!window.claude?.use)return null;const t=S.webImportedAt?new Date(S.webImportedAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):"";
+  return h("div",{class:"note",style:"flex-direction:column;align-items:stretch;gap:6px"},h("span",{class:"small"},"🔄 웹(API 모드)에서 넘어왔다면 여기에 붙여넣기 — 바로 합쳐져요"+(t?" · 마지막 가져오기 "+t:"")),webPasteBox("길게 눌러 붙여넣기"))}
 
 /* ============ CLOUD ACCOUNT (Firebase, web build only) ============ */
 const FB_CONFIG={apiKey:"AIzaSyAkIuOOuG_MUlgE3GRrqlC3THnVcZHeq8M",authDomain:"opic-self-study.firebaseapp.com",projectId:"opic-self-study",storageBucket:"opic-self-study.firebasestorage.app",messagingSenderId:"542185929571",appId:"1:542185929571:web:11560af55c5c3e928cb156"};
@@ -1248,9 +1261,9 @@ const ART_URL_WEB="https://claude.ai/artifact/HuASd2nEpXENsSugPoScyp";
 // Android: open the Claude app directly (falls back to the browser if the app is not installed)
 const IS_ANDROID=/Android/i.test(navigator.userAgent);
 const ART_URL=(IS_ANDROID&&!window.claude?.use)?"intent://claude.ai/artifact/HuASd2nEpXENsSugPoScyp#Intent;scheme=https;package=com.anthropic.claude;S.browser_fallback_url="+encodeURIComponent(ART_URL_WEB)+";end":ART_URL_WEB;
-function aiNote(){if(sample||window.claude?.use)return null;prepSyncCode();return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"프로필 입력·스크립트 생성·AI 평가·대화는 Claude 앱에서 해요. Claude 앱의 '웹으로 통합' 버튼으로 여기로 오면 최신 기록이 자동으로 합쳐집니다. 여기서는 무한 재생·마이크 연습·표현카드를 쓰세요."),h("a",{class:"btn sm",href:ART_URL,target:IS_ANDROID?"_self":"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",onclick:()=>{try{navigator.clipboard?.writeText(curSyncCode()).catch(()=>{})}catch(e){}}},"Claude에서 열기"))}
+function aiNote(){if(sample||window.claude?.use)return null;prepSyncCode();return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"프로필 입력·스크립트 생성·AI 평가·대화는 Claude 앱에서 해요. Claude 앱의 '웹으로 통합' 버튼으로 여기로 오면 최신 기록이 자동으로 합쳐집니다. 여기서는 무한 재생·마이크 연습·표현카드를 쓰세요."),h("a",{class:"btn sm",href:ART_URL,target:IS_ANDROID?"_self":"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",onclick:sendToClaude},"Claude에서 열기"))}
 // small "open in Claude" link for the web build when the AI already runs here (API mode)
-function claudeMini(){if(window.claude?.use||!sample)return null;prepSyncCode();return h("a",{class:"btn sm",href:ART_URL,target:IS_ANDROID?"_self":"_blank",rel:"noopener",title:"Claude 앱에서 열기 (최신 기록 함께 보냄)",style:"text-decoration:none;white-space:nowrap;padding:4px 10px;font-size:12px;min-height:0",onclick:()=>{try{navigator.clipboard?.writeText(curSyncCode()).catch(()=>{})}catch(e){}}},"Claude 모드")}
+function claudeMini(){if(window.claude?.use||!sample)return null;prepSyncCode();return h("a",{class:"btn sm",href:ART_URL,target:IS_ANDROID?"_self":"_blank",rel:"noopener",title:"Claude 앱에서 열기 (최신 기록 함께 보냄)",style:"text-decoration:none;white-space:nowrap;padding:4px 10px;font-size:12px;min-height:0",onclick:sendToClaude},"Claude 모드")}
 function webNote(){if(!window.claude?.use)return null;const n=unsyncedCount();return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"여기(Claude)의 프로필·스크립트·예시·기록을 웹 계정에 보내요. '웹으로 통합'은 저장만 하고 완료 화면을 띄우니, 그 뒤 홈 화면의 OSS 앱을 열면 반영돼 있어요."+(n?" (새 기록 "+n+"건)":"")),h("div",{class:"row",style:"gap:6px"},webLink("웹으로 통합","btn sm primary","x"),webLink("열기 →","btn sm","s")))}
 
 /* ---- TODAY ---- */
@@ -1262,7 +1275,7 @@ function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);if(sub&&sub.history)
   put(m,
     h("div",{class:"hdr",style:"flex-wrap:nowrap"},h("div",{style:"min-width:0;word-break:keep-all"},h("p",{class:"eyebrow"},todayStr()+" · 목표 "+tgt()),h("h1",{},S.profile.name?`${S.profile.name}님, 오늘의 30분`:"오늘의 30분")),
       h("div",{class:"hdrR"},claudeMini(),h("span",{class:"chip "+(done.every(Boolean)?"good":"neutral")},done.filter(Boolean).length+"/3 완료"))),
-    aiNote(),webNote(),
+    webPasteNote(),aiNote(),webNote(),
     h("div",{class:"stats"},
       h("div",{class:"stat"},h("b",{class:"mono"},streak),h("span",{},"연속 학습일")),
       h("div",{class:"stat"},h("b",{class:"mono"},Math.round(todayMin)),h("span",{},"오늘 말한 시간(분)")),
@@ -2481,7 +2494,7 @@ function vSettings(m){
     tts.ok?voiceCard():null,
     syncCard(),webImportCard(),
     h("div",{class:"card"},h("h3",{},"기록 옮기기 (웹 ↔ Claude)"),h("p",{class:"muted small"},"학습 기록·스크립트·내 표현·해석·프로필을 코드로 복사해 다른 곳에서 붙여넣으면 합쳐져요. 양쪽 기록이 모두 남습니다."),
-      h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{const code=curSyncCode();const box=$("#expbox");box.hidden=false;box.value=code;let p=null;try{p=navigator.clipboard.writeText(code)}catch(e){}
+      h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{const code=curSyncCode();const box=$("#expbox");box.hidden=false;box.value=code;let p=copyNow(code)?Promise.resolve():null;if(!p){try{p=navigator.clipboard.writeText(code)}catch(e){}}
         const fail=()=>{box.focus();box.select();toast("자동 복사가 막혔어요. 아래 칸을 길게 눌러 전체 선택 → 복사하세요")};if(p&&p.then)p.then(()=>toast("기록 코드를 복사했어요 ("+Math.round(code.length/1024)+"KB). 안 되면 아래 칸에서 직접 복사하세요"),fail);else fail()}},"기록 코드 복사"),h("button",{class:"btn sm ghost",onclick:()=>{const b=$("#expbox");if(b.hidden||!b.value){toast("먼저 '기록 코드 복사'를 누르세요");return}b.focus();b.select();b.setSelectionRange(0,b.value.length);toast("전체 선택됨 — 복사하세요")}},"전체 선택")),
       h("textarea",{id:"expbox",readonly:"",hidden:true,autocapitalize:"off",autocorrect:"off",spellcheck:"false",style:"min-height:60px;font-family:var(--mono);font-size:11px",onclick:e=>{e.target.select()}}),
       h("textarea",{id:"imp",autocapitalize:"off",autocorrect:"off",spellcheck:"false",style:"min-height:70px;font-family:var(--mono);font-size:11px",placeholder:"다른 곳에서 복사한 기록 코드를 붙여넣기"}),
