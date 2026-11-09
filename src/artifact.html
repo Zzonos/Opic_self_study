@@ -469,11 +469,14 @@ let claudeCanWrite=true;
 function claudePush(){if(!docRef||!claudeCanWrite)return;clearTimeout(claudePushT);claudePushT=setTimeout(()=>{claudeBusy=claudeBusy.then(async()=>{try{await claudeSave(docRef);claudeErr=false;claudeSavedAt=Date.now();const el=$("#csave");if(el)el.textContent=claudeStatus()}catch(e){if(!claudeErr){claudeErr=true;
       toast(e&&e.code==="invalid_argument"&&window.__oss_notOwner?"이 계정은 이 페이지에 '보기' 권한으로 초대돼 Claude에 저장할 수 없어요. 소유자에게 '편집' 권한으로 초대해 달라고 하세요":"Claude 계정 저장 실패: "+(e.code||e.message||e))}}})},800)}
 let claudeSavedAt=0;function claudeStatus(){if(!claudeCanWrite)return "보기 권한이라 Claude에 저장되지 않아요 (이 기기에만 저장) — 소유자에게 편집 권한을 요청하세요";return claudeSavedAt?"Claude 계정에 저장됨 · "+new Date(claudeSavedAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}):"Claude 계정 저장 대기 중"}
-const logKey=l=>l.date+"|"+l.kind+"|"+l.title+"|"+(l.score??"");
+// a record's identity: its creation time when it has one — two tries of the same topic on the same day with the same score are still two records
+const logKey0=l=>l.date+"|"+l.kind+"|"+l.title+"|"+(l.score??"");
+const logKey=l=>l.ts?logKey0(l)+"|"+l.ts:logKey0(l);
+const logDead=(dead,l)=>dead.has(logKey(l))||dead.has(logKey0(l)); // older deletions were saved without the time
 function mergeUsage(u){if(!u||typeof u!=="object")return;S.usage=S.usage||{};const mx=(a,b)=>{for(const [k,v] of Object.entries(b||{})){if(typeof v==="number")a[k]=Math.max(a[k]||0,v);else if(v&&typeof v==="object"){a[k]=a[k]&&typeof a[k]==="object"?a[k]:{};mx(a[k],v)}}};mx(S.usage,u)}
 function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;mergeUsage(o.usage);const key=logKey;
-  if(Array.isArray(o.del)&&o.del.length){const d=new Set(S.del||[]);o.del.forEach(k=>d.add(k));S.del=[...d].slice(-3000)}const dead=new Set(S.del||[]);if(dead.size)S.log=S.log.filter(l=>!dead.has(key(l)));
-  const seen=new Set([...S.log.map(key),...dead]);for(const l of (o.log||[]))if(!seen.has(key(l))){S.log.push(l);seen.add(key(l))}S.log.sort((a,b)=>a.date<b.date?-1:1);
+  if(Array.isArray(o.del)&&o.del.length){const d=new Set(S.del||[]);o.del.forEach(k=>d.add(k));S.del=[...d].slice(-3000)}const dead=new Set(S.del||[]);if(dead.size)S.log=S.log.filter(l=>!logDead(dead,l));
+  const seen=new Set([...S.log.map(key),...dead]);for(const l of (o.log||[]))if(!seen.has(key(l))&&!logDead(dead,l)){S.log.push(l);seen.add(key(l))}S.log.sort((a,b)=>a.date<b.date?-1:1);
   // newer wins (exact time when known); a record sent from Claude also wins a tie, since scripts are made there
   const stamp=x=>x?(x.ts||(x.date?Date.parse(x.date):0)||0):0;const newer=(v,cur)=>!cur||stamp(v)>stamp(cur)||(!fromCloud&&stamp(v)===stamp(cur)&&JSON.stringify(v)!==JSON.stringify(cur));
   for(const [k,v] of Object.entries(o.scripts||{}))if(newer(v,S.scripts[k]))S.scripts[k]=v;
