@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261109-230203-d5571a">
+<html lang="ko" data-build="20261110-114047-216ad0">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -738,9 +738,33 @@ function apiCard(){if(!WEB||!isAdminUser())return null;const st=h("p",{class:"mu
 // one microphone stream for the whole visit, so the browser asks for permission once; stopped after a while
 // without recording (2 min in the background, 10 min in the foreground) — the next recording asks again
 const MIC={stream:null,last:0,active:0,hifi:null};
-let RAWMIC=false;try{RAWMIC=localStorage.getItem("oss_rawmic")==="1"}catch(e){}
-function setRawMic(v){RAWMIC=!!v;try{localStorage.setItem("oss_rawmic",RAWMIC?"1":"0")}catch(e){}toast(RAWMIC?"잡음 제거 끔 — 조용한 곳에서 더 정확해요 (다음 녹음부터)":"잡음 제거 켬 — 시끄러운 곳에 적합 (다음 녹음부터)")}
-const rawMicBox=()=>h("label",{class:"row small",style:"cursor:pointer;gap:4px",title:"휴대폰의 잡음 제거·에코 제거·자동 음량을 끄고 원본 소리를 Azure에 보내요. 조용한 곳에서는 인식이 더 정확하고, 시끄러운 곳(차량 등)에서는 켜 두는 게 나아요."},h("input",{type:"checkbox",checked:RAWMIC,onchange:e=>setRawMic(e.target.checked)}),"조용한 곳 모드 (잡음 제거 끔)");
+// microphone processing. Phones: the phone's own clean-up works well. Laptops: the far built-in mic plus Chrome's noise
+// suppression / auto-gain cuts into speech (and Chrome's auto-gain keeps lowering the Windows mic level) — Azure does best
+// with unprocessed sound, so a laptop keeps only echo cancellation (needed when the AI voice comes out of the speakers).
+const DESK=!/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)&&!(navigator.maxTouchPoints>1&&/Mac/.test(navigator.userAgent));
+const MIC_MODES={auto:"자동 ("+(DESK?"노트북: 에코 제거만":"휴대폰: 전체 보정")+")",full:"전체 보정 (잡음 제거·자동 음량·에코 제거)",clean:"에코 제거만 (노트북 권장)",raw:"원본 (보정 모두 끔, 이어폰·조용한 곳)"};
+let MICMODE="auto",MICDEV="";try{MICMODE=localStorage.getItem("oss_micmode")||(localStorage.getItem("oss_rawmic")==="1"?"raw":"auto");MICDEV=localStorage.getItem("oss_micdev")||""}catch(e){}
+if(!MIC_MODES[MICMODE])MICMODE="auto";
+const micModeNow=()=>MICMODE==="auto"?(DESK?"clean":"full"):MICMODE;
+let RAWMIC=micModeNow()+"|"+MICDEV; // what the open stream was made with
+function micCons(){const m=micModeNow();const c=m==="raw"?{echoCancellation:false,noiseSuppression:false,autoGainControl:false}:m==="clean"?{echoCancellation:true,noiseSuppression:false,autoGainControl:false}:{echoCancellation:true,noiseSuppression:true,autoGainControl:true};
+  c.channelCount=1;if(MICDEV)c.deviceId={exact:MICDEV};return c}
+function setMicMode(v){MICMODE=v;try{localStorage.setItem("oss_micmode",v)}catch(e){}RAWMIC=micModeNow()+"|"+MICDEV;toast("마이크: "+MIC_MODES[v]+" (다음 녹음부터)")}
+function setMicDev(v){MICDEV=v;try{localStorage.setItem("oss_micdev",v)}catch(e){}RAWMIC=micModeNow()+"|"+MICDEV;toast(v?"이 마이크를 쓸게요 (다음 녹음부터)":"기본 마이크를 쓸게요")}
+function micDesc(st){try{const t=st&&st.getAudioTracks()[0];if(!t)return "";const g=t.getSettings?t.getSettings():{};const on=x=>x===true?"켬":x===false?"끔":"?";
+  return (t.label||"마이크")+" · 잡음제거 "+on(g.noiseSuppression)+" · 자동음량 "+on(g.autoGainControl)+" · 에코제거 "+on(g.echoCancellation)+(g.sampleRate?" · "+Math.round(g.sampleRate/1000)+"kHz":"")}catch(e){return ""}}
+// settings: processing mode, which mic (laptops often have several), and a 4-second level test
+const rawMicBox=()=>{const sel=h("select",{onchange:e=>setMicMode(e.target.value)},...Object.entries(MIC_MODES).map(([k,v])=>h("option",{value:k,selected:k===MICMODE},v)));
+  const dev=h("select",{onchange:e=>setMicDev(e.target.value)},h("option",{value:""},"기본 마이크"));
+  const fill=async()=>{try{const ds=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==="audioinput"&&d.deviceId&&d.deviceId!=="default"&&d.deviceId!=="communications");dev.replaceChildren(h("option",{value:""},"기본 마이크"),...ds.map((d,i)=>h("option",{value:d.deviceId,selected:d.deviceId===MICDEV},d.label||"마이크 "+(i+1))));dev.hidden=ds.length<2&&!MICDEV}catch(e){}};
+  const out=h("span",{class:"muted small"});
+  const test=h("button",{class:"ghost",onclick:async()=>{test.disabled=true;out.textContent="영어로 한 문장 말해 보세요… (4초)";let st=null;
+    try{st=await micStream();MIC.active++;const ac=new (window.AudioContext||window.webkitAudioContext)();const an=ac.createAnalyser();an.fftSize=2048;ac.createMediaStreamSource(st).connect(an);const buf=new Float32Array(an.fftSize);let pk=0,sum=0,n=0;const t0=Date.now();
+      await new Promise(r=>{const f=()=>{an.getFloatTimeDomainData(buf);let x=0;for(const v of buf)x+=v*v;const rms=Math.sqrt(x/buf.length);pk=Math.max(pk,rms);if(rms>0.005){sum+=rms;n++}if(Date.now()-t0<4000)requestAnimationFrame(f);else r()};f()});
+      ac.close();const db=pk?Math.round(20*Math.log10(pk)):-99;
+      out.textContent=(db<-38?"🔇 소리가 너무 작아요 ("+db+"dB) — 마이크에 가까이, 또는 Windows 마이크 볼륨을 올리거나 이어폰 마이크를 쓰세요":db>-6?"📢 소리가 너무 커서 찌그러질 수 있어요 ("+db+"dB)":"✅ 음량 적당 ("+db+"dB)")+" · "+micDesc(st);fill()}
+    catch(e){out.textContent="마이크를 열 수 없어요: "+(e.message||e)}finally{MIC.active=Math.max(0,MIC.active-1);test.disabled=false}}},"마이크 테스트");
+  fill();return h("div",{style:"display:flex;flex-direction:column;gap:6px;margin:6px 0"},h("span",{class:"small"},"🎙 Azure 마이크"),sel,dev,h("div",{class:"row"},test,out))};
 let PRON_ON=false;try{PRON_ON=localStorage.getItem("oss_pron")==="1"}catch(e){}
 // normal conversation: the mic closes while the AI talks (phone stays in media mode = good sound).
 // hands-free conversation (API mode only, e.g. in the car): the mic stays open for the whole conversation, so Bluetooth
@@ -751,7 +775,8 @@ const hfOK=()=>!window.claude?.use&&WEB&&API.on&&!!sample&&(azOn()||SR_OK);
 async function micStream(){try{return await micStream1()}catch(e){if(e&&e.name==="NotAllowedError")throw e;await new Promise(r=>setTimeout(r,1000));return await micStream1()}}
 async function micStream1(){if(MIC.stream&&MIC.raw!==RAWMIC&&!MIC.active)micRelease();if(MIC.stream&&!MIC.active&&MIC.stream.getAudioTracks().some(t=>t.muted)){audLog.push("마이크 스트림 음소거 상태 → 새로 열기");micRelease()}
   if(MIC.stream&&MIC.stream.getAudioTracks().some(t=>t.readyState==="live")){MIC.last=Date.now();return MIC.stream}
-  MIC.stream=await navigator.mediaDevices.getUserMedia({audio:RAWMIC?{echoCancellation:false,noiseSuppression:false,autoGainControl:false}:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});MIC.hifi=HIFI;MIC.raw=RAWMIC;MIC.last=Date.now();return MIC.stream}
+  try{MIC.stream=await navigator.mediaDevices.getUserMedia({audio:micCons()})}catch(e){if(MICDEV&&e&&(e.name==="OverconstrainedError"||e.name==="NotFoundError")){audLog.push("선택한 마이크가 없어 기본 마이크 사용");MICDEV="";RAWMIC=micModeNow()+"|";MIC.stream=await navigator.mediaDevices.getUserMedia({audio:micCons()})}else throw e}
+  MIC.hifi=HIFI;MIC.raw=RAWMIC;MIC.last=Date.now();audLog.push("마이크 열기: "+micDesc(MIC.stream));return MIC.stream}
 const MIC_BTNS=new Set();
 // app went to the background: turn every microphone off (recognisers, voice detector, shared stream)
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState!=="hidden")return;
