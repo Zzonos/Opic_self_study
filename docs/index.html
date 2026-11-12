@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261110-114047-216ad0">
+<html lang="ko" data-build="20261112-233207-171856">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -762,8 +762,8 @@ const rawMicBox=()=>{const sel=h("select",{onchange:e=>setMicMode(e.target.value
     try{st=await micStream();MIC.active++;const ac=new (window.AudioContext||window.webkitAudioContext)();const an=ac.createAnalyser();an.fftSize=2048;ac.createMediaStreamSource(st).connect(an);const buf=new Float32Array(an.fftSize);let pk=0,sum=0,n=0;const t0=Date.now();
       await new Promise(r=>{const f=()=>{an.getFloatTimeDomainData(buf);let x=0;for(const v of buf)x+=v*v;const rms=Math.sqrt(x/buf.length);pk=Math.max(pk,rms);if(rms>0.005){sum+=rms;n++}if(Date.now()-t0<4000)requestAnimationFrame(f);else r()};f()});
       ac.close();const db=pk?Math.round(20*Math.log10(pk)):-99;
-      out.textContent=(db<-38?"🔇 소리가 너무 작아요 ("+db+"dB) — 마이크에 가까이, 또는 Windows 마이크 볼륨을 올리거나 이어폰 마이크를 쓰세요":db>-6?"📢 소리가 너무 커서 찌그러질 수 있어요 ("+db+"dB)":"✅ 음량 적당 ("+db+"dB)")+" · "+micDesc(st);fill()}
-    catch(e){out.textContent="마이크를 열 수 없어요: "+(e.message||e)}finally{MIC.active=Math.max(0,MIC.active-1);test.disabled=false}}},"마이크 테스트");
+      out.textContent=(db<-38?"🔇 소리가 너무 작아요 ("+db+"dB) — 마이크에 가까이, 또는 Windows 마이크 볼륨을 올리거나 이어폰 마이크를 쓰세요":db>-6?"📢 소리가 너무 커서 찌그러질 수 있어요 ("+db+"dB)":"✅ 음량 적당 ("+db+"dB)")+" · "+micDesc(st)+(btMic(st)?" · ⚠️ 블루투스 헤드셋 마이크예요. 이 마이크가 켜져 있는 동안은 헤드셋이 통화 모드가 되어 소리가 지지직거리고 음질이 떨어져요 → 위에서 노트북 내장 마이크를 고르면 소리는 헤드셋으로 깨끗하게 들려요":"");fill()}
+    catch(e){out.textContent="마이크를 열 수 없어요: "+(e.message||e)}finally{MIC.active=Math.max(0,MIC.active-1);if(!MIC.active)micRelease();test.disabled=false}}},"마이크 테스트");
   fill();return h("div",{style:"display:flex;flex-direction:column;gap:6px;margin:6px 0"},h("span",{class:"small"},"🎙 Azure 마이크"),sel,dev,h("div",{class:"row"},test,out))};
 let PRON_ON=false;try{PRON_ON=localStorage.getItem("oss_pron")==="1"}catch(e){}
 // normal conversation: the mic closes while the AI talks (phone stays in media mode = good sound).
@@ -776,7 +776,7 @@ async function micStream(){try{return await micStream1()}catch(e){if(e&&e.name==
 async function micStream1(){if(MIC.stream&&MIC.raw!==RAWMIC&&!MIC.active)micRelease();if(MIC.stream&&!MIC.active&&MIC.stream.getAudioTracks().some(t=>t.muted)){audLog.push("마이크 스트림 음소거 상태 → 새로 열기");micRelease()}
   if(MIC.stream&&MIC.stream.getAudioTracks().some(t=>t.readyState==="live")){MIC.last=Date.now();return MIC.stream}
   try{MIC.stream=await navigator.mediaDevices.getUserMedia({audio:micCons()})}catch(e){if(MICDEV&&e&&(e.name==="OverconstrainedError"||e.name==="NotFoundError")){audLog.push("선택한 마이크가 없어 기본 마이크 사용");MICDEV="";RAWMIC=micModeNow()+"|";MIC.stream=await navigator.mediaDevices.getUserMedia({audio:micCons()})}else throw e}
-  MIC.hifi=HIFI;MIC.raw=RAWMIC;MIC.last=Date.now();audLog.push("마이크 열기: "+micDesc(MIC.stream));return MIC.stream}
+  MIC.hifi=HIFI;MIC.raw=RAWMIC;MIC.last=Date.now();audLog.push("마이크 열기: "+micDesc(MIC.stream)+(btMic(MIC.stream)?" · 블루투스(통화 모드 음질)":""));if(DESK&&btMic(MIC.stream)&&!micStream1.warned){micStream1.warned=1;toast("블루투스 헤드셋 마이크를 쓰는 중이라 소리가 통화 음질로 떨어져요. 설정 → Azure 마이크에서 내장 마이크를 고르면 해결돼요")}return MIC.stream}
 const MIC_BTNS=new Set();
 // app went to the background: turn every microphone off (recognisers, voice detector, shared stream)
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState!=="hidden")return;
@@ -785,7 +785,11 @@ document.addEventListener("visibilitychange",()=>{if(document.visibilityState!==
 // phone speech recognition left running on a screen that was redrawn: stop it (only one session can listen at a time on a phone)
 function micSweep(){for(const b of [...MIC_BTNS]){if(b.isConnected)continue;MIC_BTNS.delete(b);try{if(b._isOn&&b._isOn()){b._abort();audLog.push("화면 전환: 이전 음성인식 종료")}}catch(e){}}}
 function micRelease(){if(MIC.stream){try{MIC.stream.getTracks().forEach(t=>t.stop())}catch(e){}MIC.stream=null}}
-setInterval(()=>{if(!MIC.stream||MIC.active>0)return;const idle=Date.now()-MIC.last;if(idle>(document.hidden?2:10)*60e3)micRelease()},20000);
+// phones keep the mic open for a while (re-opening flips the phone in and out of call mode). On a PC an open mic has a cost instead:
+// a Bluetooth headset stays in hands-free (call) mode, so everything sounds crackly and low quality — close it seconds after use.
+let micFreeAt=0;setInterval(()=>{if(!MIC.stream||MIC.active>0){micFreeAt=0;return}if(!micFreeAt)micFreeAt=Date.now();const idle=Date.now()-micFreeAt;
+  if(idle>(DESK?5e3:(document.hidden?2:10)*60e3)){micRelease();if(DESK)audLog.push("마이크 닫음 (PC: 사용 후 바로 닫기)")}},1000);
+const btMic=st=>{try{return /hands-?free|bluetooth|headset|헤드셋|핸즈프리|airpods|buds|\bWH-|\bWF-/i.test(st.getAudioTracks()[0].label||"")}catch(e){return false}};
 const AZ={tok:null,at:0,region:"",direct:false,sdk:null,live:new Map()};
 // per month, per device (devices sum up; the account sync keeps the largest value per key, so counts only grow)
 const azMon=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")};
