@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261115-095854-a4fe7b">
+<html lang="ko" data-build="20261115-123629-7d86f4">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1300,7 +1300,13 @@ const PRAC=[["practice","질문 연습"],["scripts","스크립트"],["chat","AI 
 let LASTPRAC="practice";try{const v=localStorage.getItem("oss_lastprac");if(inPrac(v))LASTPRAC=v}catch(e){}
 function pracTabs(){return h("div",{class:"segs",style:"margin-bottom:-4px"},...PRAC.map(([v,l])=>h("button",{class:"seg"+(view===v?" on":""),onclick:()=>{if(view!==v)go(v)}},l)))}
 function renderNav(){const n=$("#nav");n.replaceChildren(...VIEWS.map(v=>h("button",{class:(view===v.id||(v.id==="practice"&&inPrac(view)))?"on":"",onclick:()=>go(v.id==="practice"&&!inPrac(view)?LASTPRAC:v.id),"aria-label":v.ko},h("span",{html:`<svg viewBox="0 0 24 24">${v.ic}</svg>`}),v.ko)))}
-function go(v,s=null){view=v;sub=s;if(inPrac(v)){LASTPRAC=v;try{localStorage.setItem("oss_lastprac",v)}catch(e){}}if(v==="drill"&&!s)drill=null;timerStop();if(!player.on)ttsStop();render();window.scrollTo({top:0})}
+// 쉐도잉 opened from another page (script, feedback, history): keep that page as it is, so ← goes back to exactly where I was
+const FROM_KO={scripts:"스크립트",practice:"연습",today:"오늘",chat:"AI 대화",mock:"모의시험",drill:"훈련",cards:"표현카드",settings:"설정"};
+function goBack(f){for(const b of [...AZ_BTNS])try{b._kill()}catch(e){}timerStop();if(!player.on)ttsStop();view=f.view;sub=f.sub;renderNav();const m=$("#main");m.replaceChildren(...f.nodes);micSweep();
+  for(const b of m.querySelectorAll("button")){if(b._kill)AZ_BTNS.add(b);else if(b._isOn&&b._abort)MIC_BTNS.add(b)}
+  stickStack();window.scrollTo({top:f.y});requestAnimationFrame(()=>{window.scrollTo({top:f.y});stickStack()})}
+function go(v,s=null){if(v==="listen"&&s&&s.text&&!s.from&&!(view==="listen"&&!sub)){try{s.from={view,sub,nodes:[...$("#main").childNodes],y:window.scrollY,ko:(view==="today"&&sub&&sub.history)?"기록":FROM_KO[view]||""}}catch(e){}}
+  view=v;sub=s;if(inPrac(v)){LASTPRAC=v;try{localStorage.setItem("oss_lastprac",v)}catch(e){}}if(v==="drill"&&!s)drill=null;timerStop();if(!player.on)ttsStop();render();window.scrollTo({top:0})}
 function render(){renderNav();ensureToday();for(const b of [...AZ_BTNS])try{b._kill()}catch(e){}const m=$("#main");m.replaceChildren();
   if(gated){$("#nav").hidden=true;put(m,h("div",{class:"login"},h("div",{},h("p",{class:"eyebrow"},"Opic Self Study"),h("div",{class:"brand"},"OSS"),h("p",{class:"muted",style:"margin-top:6px"},"이 앱은 Claude 계정으로 로그인한 사람만 쓸 수 있어요.")),h("div",{class:"card"},h("h3",{},"로그인이 필요해요"),h("p",{class:"small"},"Claude에 로그인한 뒤 이 링크를 다시 열어 주세요. 초대받은 계정으로 로그인하면 AI 대화·평가와 기록 저장이 본인 계정으로 동작합니다."),h("p",{class:"muted small"},"Claude 계정이 없다면 claude.ai에서 무료로 만들 수 있어요."))));return}
   if(cloud.ok&&cloud.ready&&!cloud.user&&!cloud.skip){$("#nav").hidden=true;vLogin(m);return}$("#nav").hidden=false;({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings,drill:vDrill})[view](m);micSweep();pageLabelTop(m);stampMode(m);if(inPrac(view)&&!sub&&!(view==="chat"&&chat&&chat.summary)){const hd=[...m.children].find(c=>c.matches(".eyebrow")||c.querySelector(".eyebrow"));const tb=pracTabs();
@@ -2154,7 +2160,7 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
 /* ---- LISTEN ---- */
 let ld={mode:"quiz",q:null,revealed:false,plays:0};
 function vListen(m){
-  if(sub&&sub.text)return vShadow(m,sub.text,sub.title||"쉐도잉");
+  if(sub&&sub.text)return vShadow(m,sub.text,sub.title||"쉐도잉",sub.from);
   if(!tts.ok){put(m,h("h1",{},"듣기"),h("div",{class:"note"},"이 브라우저는 음성 재생(speechSynthesis)을 지원하지 않아요. Chrome, Safari, Edge에서 열어 주세요."));return}
   const pool=[];TOPICS.filter(t=>t.id!=="intro"&&(mySurvey().includes(t.id)||t.group==="돌발")).forEach(t=>allQs(t).forEach(q=>pool.push({topic:t,q,kind:QT[q.t]})));
   ROLEPLAYS.forEach(r=>pool.push({topic:{id:r.id,en:"Role-play",ko:r.ko},q:{t:"rp",q:r.q11},kind:"롤플레이",rp:r,step:11}));
@@ -2176,13 +2182,13 @@ function vListen(m){
         Object.keys(S.scripts).length?null:h("p",{class:"muted small"},"저장된 스크립트가 아직 없어요. 스크립트 탭에서 먼저 만들어 보세요."),
         h("button",{class:"topic",onclick:()=>go("listen",{text:CARDS.map(c=>c.en.replace(/___/g,"something")).join(" "),title:"표현카드 42장"})},h("span",{class:"en"},"Expression cards"),h("span",{class:"ko"},"기본 표현 42개 연속 듣기")))));
 }
-function vShadow(m,text,title){
+function vShadow(m,text,title,from){
   const sents=splitSent(text);let i=0;let loop=false;let auto=false;
   const rows=sents.map((s,k)=>h("div",{class:"sent",onclick:()=>{i=k;playCur()}},s,transOf(s)?h("div",{class:"muted small"},transOf(s)):null));
   const mark=()=>{rows.forEach((r,k)=>r.classList.toggle("cur",k===i));rows[i]?.scrollIntoView({block:"nearest"})};
   const playCur=()=>{mark();speak(sents[i],{onend:()=>{if(loop){setTimeout(playCur,700)}else if(auto&&i<sents.length-1){i++;setTimeout(playCur,900)}}})};
   const btn=(l,f,c="btn")=>h("button",{class:c,onclick:f},l);
-  put(m,h("div",{},h("button",{class:"btn sm ghost",onclick:()=>go("listen")},"← 듣기"),h("p",{class:"eyebrow",style:"margin-top:10px"},"Shadowing · "+sents.length+"문장"),h("h1",{},title)),
+  put(m,h("div",{},h("button",{class:"btn sm ghost",onclick:()=>{if(from&&from.nodes){ttsStop();goBack(from)}else go("listen")}},"← "+(from&&from.ko||"듣기")),h("p",{class:"eyebrow",style:"margin-top:10px"},"Shadowing · "+sents.length+"문장"),h("h1",{},title)),
     h("div",{class:"card"},h("div",{class:"row"},btn("▶ 이 문장",playCur,"btn primary"),btn("◀",()=>{i=Math.max(0,i-1);playCur()}),btn("▶▶",()=>{i=Math.min(sents.length-1,i+1);playCur()}),rateCtl()),
       h("div",{class:"row"},h("label",{class:"row small",style:"cursor:pointer;gap:6px"},h("input",{type:"checkbox",id:"sh_auto",onchange:e=>auto=e.target.checked}),"자동으로 다음 문장"),h("label",{class:"row small",style:"cursor:pointer;gap:6px"},h("input",{type:"checkbox",id:"sh_loop",onchange:e=>loop=e.target.checked}),"한 문장 반복"),btn("■ 정지",ttsStop,"btn sm ghost")),
       h("p",{class:"muted small"},"듣고 → 0.5초 뒤 똑같은 리듬으로 따라 말하기. 막히는 문장은 '한 문장 반복'을 켜고 3번 이상.")),
