@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261112-233207-171856">
+<html lang="ko" data-build="20261115-095854-a4fe7b">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -183,6 +183,12 @@ svg.chart{width:100%;height:auto;display:block}
 .login input[type=password],.login input[type=email]{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:var(--bg)}
 .stick{position:sticky;top:env(safe-area-inset-top,0px);z-index:4;background:var(--bg);padding-block:8px;margin-block:-8px}
 .stick .segs{position:static}
+/* every page: the page label, its back button and the page tabs stay pinned at the top */
+.pagetop{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;flex-direction:column;gap:8px;padding-top:calc(env(safe-area-inset-top,0px) + 8px);padding-bottom:8px;margin-block:-8px}
+.pagetop .ptrow{display:flex;align-items:center;gap:10px;min-width:0}
+.pagetop .ptrow .btn{flex-shrink:0}
+.pagetop .ptrow .eyebrow{min-width:0;margin:0}
+.pagetop .segs{position:static;box-shadow:none;margin:0}
 .main > .segs{box-shadow:0 -8px 0 var(--bg)}
 .hdr{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .hdrR{display:flex;align-items:center;gap:6px;flex-shrink:0}
@@ -1299,10 +1305,18 @@ function render(){renderNav();ensureToday();for(const b of [...AZ_BTNS])try{b._k
   if(gated){$("#nav").hidden=true;put(m,h("div",{class:"login"},h("div",{},h("p",{class:"eyebrow"},"Opic Self Study"),h("div",{class:"brand"},"OSS"),h("p",{class:"muted",style:"margin-top:6px"},"이 앱은 Claude 계정으로 로그인한 사람만 쓸 수 있어요.")),h("div",{class:"card"},h("h3",{},"로그인이 필요해요"),h("p",{class:"small"},"Claude에 로그인한 뒤 이 링크를 다시 열어 주세요. 초대받은 계정으로 로그인하면 AI 대화·평가와 기록 저장이 본인 계정으로 동작합니다."),h("p",{class:"muted small"},"Claude 계정이 없다면 claude.ai에서 무료로 만들 수 있어요."))));return}
   if(cloud.ok&&cloud.ready&&!cloud.user&&!cloud.skip){$("#nav").hidden=true;vLogin(m);return}$("#nav").hidden=false;({today:vToday,practice:vPractice,chat:vChat,mock:vMock,scripts:vScripts,listen:vListen,cards:vCards,settings:vSettings,drill:vDrill})[view](m);micSweep();pageLabelTop(m);stampMode(m);if(inPrac(view)&&!sub&&!(view==="chat"&&chat&&chat.summary)){const hd=[...m.children].find(c=>c.matches(".eyebrow")||c.querySelector(".eyebrow"));const tb=pracTabs();
     // page label on top, then the tabs, then the title (and its buttons)
-    if(hd&&hd.matches(".eyebrow"))hd.after(tb);else if(hd){const eb=hd.querySelector(".eyebrow");hd.before(eb);eb.after(tb)}else m.prepend(tb)}}
+    if(hd&&hd.matches(".eyebrow"))hd.after(tb);else if(hd){const eb=hd.querySelector(".eyebrow");hd.before(eb);eb.after(tb)}else m.prepend(tb)}pinTop(m)}
 // the page label (and the mode next to it) always sits at the very top of a page, above back buttons and options
 // page tabs and a sticky header (chat: 대화 끝내기) both pinned: stack the header under the tabs
-function stickStack(){try{const m=$("#main");if(!m)return;const k=m.querySelector(":scope > .stick");if(!k)return;const sg=m.querySelector(":scope > .segs");const t=sg&&(sg.compareDocumentPosition(k)&4)?sg.offsetHeight+6:0;const v=t?"calc(env(safe-area-inset-top,0px) + "+t+"px)":"";if(k.style.top!==v)k.style.top=v}catch(e){}}
+function stickStack(){try{const m=$("#main");if(!m)return;const pt=m.querySelector(":scope > .pagetop");const t=pt?pt.offsetHeight-8:0;for(const k of m.querySelectorAll(":scope > .stick")){const v=t?t+"px":"";if(k.style.top!==v)k.style.top=v}}catch(e){}}
+window.addEventListener("resize",stickStack,{passive:true});
+// gather the page label, the page's back button (← …) and the page tabs into one bar pinned at the top
+function pinTop(m){try{if(m.querySelector(":scope > .pagetop"))return;const out=e=>!e.closest(".card,.note,details,.stick,.fix");
+  const eb=[...m.querySelectorAll(".eyebrow")].find(out);const back=[...m.querySelectorAll("button")].find(b=>out(b)&&/^←/.test(b.textContent.trim()));const sg=m.querySelector(":scope > .segs");
+  if(!eb&&!back&&!sg)return;const row=h("div",{class:"ptrow"});if(back)row.append(back);if(eb){eb.style.marginTop="";row.append(eb)}
+  const bar=h("div",{class:"pagetop"});if(row.children.length)bar.append(row);if(sg){sg.style.marginBottom="";bar.append(sg)}
+  m.prepend(bar);for(const c of [...m.children])if(c!==bar&&c.tagName==="DIV"&&!c.children.length&&!c.textContent.trim()&&!c.className&&!c.id)c.remove();
+  stickStack();requestAnimationFrame(stickStack)}catch(e){}}
 window.addEventListener("scroll",stickStack,{passive:true});
 function pageLabelTop(m){try{const eb=[...m.querySelectorAll(".eyebrow")].find(e=>!e.closest(".card,.note,details"));if(!eb)return;const f=m.firstElementChild;if(f===eb||(f&&f.firstElementChild===eb&&eb.parentElement===f))return;eb.style.marginTop="";m.prepend(eb)}catch(e){}}
 // current mode next to the page's top label on every screen (웹 모드 / API 모드 / 클로드 모드)
