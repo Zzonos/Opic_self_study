@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261116-223052-0cd37a">
+<html lang="ko" data-build="20261116-223452-ee787b">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -736,7 +736,7 @@ function apiCard(){if(!WEB||!isAdminUser())return null;const st=h("p",{class:"mu
   const sw=h("input",{type:"checkbox",checked:API.on,onchange:e=>{API.on=e.target.checked;try{localStorage.setItem("oss_api_mode",API.on?"1":"0")}catch(x){}apiApply();toast(API.on?"API 모드를 켰어요 — 웹에서 AI 기능을 바로 써요":"API 모드를 껐어요");if(API.on)check()}});
   if(API.on)setTimeout(check,50);
   return h("div",{class:"card"},h("h3",{},"API 모드"),h("p",{class:"muted small"},"이 계정 전용. 켜면 평가·스크립트·대화·해석·코치·모의시험 등 AI 기능을 웹 앱에서 바로 써요 (내 Anthropic API 키, 음성 서버를 거쳐 호출). 기록은 이 계정에 바로 저장돼요."),
-    h("label",{class:"row",style:"cursor:pointer"},sw,"API 모드 사용"),use,rawMicBox(),h("details",{style:"margin:4px 0"},h("summary",{class:"small",style:"cursor:pointer"},"내 고유명사 (AI 평가에 반영)"),
+    h("label",{class:"row",style:"cursor:pointer"},sw,"API 모드 사용"),use,azStatusBox(),rawMicBox(),h("details",{style:"margin:4px 0"},h("summary",{class:"small",style:"cursor:pointer"},"내 고유명사 (AI 평가에 반영)"),
       h("p",{class:"muted small"},"내 스크립트·예시 답변에 나오는 고유명사(지명·이름·브랜드)를 AI 평가·교정에 알려줘요. 받아쓰기에서 이름이 비슷한 소리로 잘못 적혀도(Suji→Suzy) 틀린 걸로 보지 않아요. 고유명사만 대상이라 점수가 부풀려지지 않아요. 더 넣을 이름이 있으면 쉼표로 적어 주세요."),
       h("textarea",{style:"min-height:48px",placeholder:"예: Suji, Tancheon, Gwanggyo Lake Park",oninput:e=>{S.profile.asrWords=e.target.value;S.updatedAt=Date.now();save()}},S.profile.asrWords||""),
       (()=>{const l=asrPhrases();return h("p",{class:"muted small",style:"word-break:break-word"},"AI에 알려주는 이름 "+Math.min(50,l.length)+"개: "+l.slice(0,30).join(", ")+(l.length>30?" …":""))})()),h("div",{class:"row"},h("button",{class:"btn sm",onclick:check},"연결 확인")),st,test,az)}
@@ -826,7 +826,15 @@ setInterval(()=>{const now=Date.now();for(const [k,since] of AZ.live){azAdd((now
 const azMonth=()=>new Date(Date.now()+9*3600e3).toISOString().slice(0,7);
 // free tier used up (or key problem) → switch Azure off until next month, device recognition takes over
 const azOff=()=>{try{return localStorage.getItem("oss_az_off")===azMonth()}catch(e){return false}};
-function azDisable(why){try{localStorage.setItem("oss_az_off",azMonth())}catch(e){}toast("Azure 음성 인식을 이번 달은 끕니다 ("+why+") — 기기 음성 인식으로 계속해요");render()}
+// the last Azure failure is kept (on this device) so settings can say why Azure is not working
+function azErr(msg){try{localStorage.setItem("oss_az_err",Date.now()+"|"+String(msg).slice(0,160))}catch(e){}audLog.push("Azure 오류: "+String(msg).slice(0,120))}
+function azStatusBox(){if(!(WEB&&API.on&&isAdminUser()))return null;let why="",err="";try{why=localStorage.getItem("oss_az_why")||"";err=localStorage.getItem("oss_az_err")||""}catch(e){}
+  const out=h("span",{class:"muted small"});const off=azOff();const et=err?new Date(+err.split("|")[0]).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})+" — "+err.split("|").slice(1).join("|"):"";
+  const chk=h("button",{class:"ghost",onclick:async()=>{chk.disabled=true;out.textContent="확인 중…";try{AZ.tok=null;const a=await azToken();out.textContent="✅ 서버의 Azure 키 정상 (지역 "+(a.region||"?")+"). 그래도 인식이 안 되면 이번 달 무료 한도(5시간)를 다 썼을 수 있어요 — Azure 포털의 Speech 리소스에서 사용량을 확인하세요."}
+      catch(e){const m=String(e&&e.message||e);out.textContent="❌ "+(e.status===500?"서버(Worker)에 Azure 키가 없어요":/401|403/.test(m)?"Azure 키가 거부됐어요 (키가 바뀌었거나 리소스가 정지·삭제됨) — Azure 포털에서 키를 확인해 Worker의 AZURE_SPEECH_KEY를 바꿔 주세요":"연결 실패: "+m.slice(0,100));azErr(m)}finally{chk.disabled=false}}},"Azure 연결 확인");
+  const on=off?h("button",{class:"ghost",onclick:()=>{try{localStorage.removeItem("oss_az_off");localStorage.removeItem("oss_az_why")}catch(e){}toast("Azure를 다시 켰어요");render()}},"Azure 다시 켜기"):null;
+  return h("div",{style:"display:flex;flex-direction:column;gap:6px;margin:6px 0"},h("span",{class:"small"},off?"⛔ Azure 음성 인식: 이 기기에서 이번 달 꺼짐"+(why?" ("+why+")":"")+" — 기기 음성 인식을 쓰는 중":"✅ Azure 음성 인식: 켜짐"),et?h("span",{class:"muted small"},"마지막 오류: "+et):null,h("div",{class:"row"},on,chk),out)}
+function azDisable(why){try{localStorage.setItem("oss_az_off",azMonth());localStorage.setItem("oss_az_why",why)}catch(e){}azErr(why);toast("Azure 음성 인식을 이번 달은 끕니다 ("+why+") — 기기 음성 인식으로 계속해요");render()}
 const azOn=()=>WEB&&API.on&&!!sample&&isAdminUser()&&!azOff()&&!!navigator.mediaDevices;
 function azSdk(){if(AZ.sdk)return AZ.sdk;AZ.sdk=new Promise((res,rej)=>{if(window.SpeechSDK)return res(window.SpeechSDK);const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.48.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js";s.onload=()=>window.SpeechSDK?res(window.SpeechSDK):rej(new Error("sdk"));s.onerror=()=>{AZ.sdk=null;rej(new Error("SDK를 불러오지 못했어요"))};document.head.appendChild(s)});return AZ.sdk}
 async function azToken(){if(AZ.tok&&Date.now()-AZ.at<8*60e3)return AZ;const u=firebase.auth().currentUser;if(!u)throw new Error("로그인 필요");
@@ -924,13 +932,13 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
         try{const j=JSON.parse(e.result.properties.getProperty(sdk.PropertyId.SpeechServiceResponse_JsonResult));const nb=(j.NBest||[])[0]||{};segs.push({text:e.result.text,dur:(j.Duration||0)/1e7,pa:nb.PronunciationAssessment||{},words:nb.Words||[]})}catch(x){}showDoubt()};
       r.canceled=(s,e)=>{if(my!==gen||e.reason!==sdk.CancellationReason.Error)return;const d=String(e.errorDetails||"");audLog.push("azure canceled "+e.errorCode+" "+d.slice(0,80));
         if(document.hidden){stopRec();return}
-        if(/quota|429|1007|exceed/i.test(d)||e.errorCode===sdk.CancellationErrorCode.TooManyRequests){want=false;azDisable("무료 한도 소진")}else if(/401|403|auth/i.test(d)||e.errorCode===sdk.CancellationErrorCode.AuthenticationFailure){AZ.tok=null;toast("Azure 인증 오류 — 다시 눌러 주세요");want=false}else{toast("Azure 연결이 끊겼어요: "+d.slice(0,60));want=false}stopRec()};
+        if(/quota|429|1007|exceed/i.test(d)||e.errorCode===sdk.CancellationErrorCode.TooManyRequests){want=false;azDisable("무료 한도 소진")}else if(/401|403|auth/i.test(d)||e.errorCode===sdk.CancellationErrorCode.AuthenticationFailure){AZ.tok=null;toast("Azure 인증 오류 — 다시 눌러 주세요");want=false}else{toast("Azure 연결이 끊겼어요: "+d.slice(0,60));azErr(d);want=false}stopRec()};
       await new Promise((ok,bad)=>r.startContinuousRecognitionAsync(ok,bad));t0=Date.now();lastProg=Date.now();
       if(my!==gen){try{r.close()}catch(e){}starting=false;paint();return}
       live=true;want=true;MIC.active++;AZ.live.set(b,Date.now());lastAct=Date.now();starting=false;paint();{const cs=(Date.now()-c0)/1000;if(cs>0.8){audLog.push("Azure 연결 "+cs.toFixed(1)+"초");if(audLog.length>30)audLog.shift()}}st("listen");health(my);try{onStart&&onStart()}catch(x){}
       // long silence in a conversation: stop paying Azure, wake up again by the local voice detector
       if(idleStop)idleT=setInterval(()=>{if(live&&!pend&&Date.now()-lastAct>idleStop)b._pause(true)},1000)}
-    catch(e){starting=false;rec=null;live=false;want=false;paint();const m=String(e.message||e);if(e.status===500&&/AZURE_SPEECH_KEY/.test(m))toast("Worker에 Azure 키가 아직 없어요");else if(/azure 401/.test(m))azDisable("키 오류");else toast("Azure 연결 실패: "+m.slice(0,80))}
+    catch(e){starting=false;rec=null;live=false;want=false;paint();const m=String(e.message||e);if(e.status===500&&/AZURE_SPEECH_KEY/.test(m))toast("Worker에 Azure 키가 아직 없어요");else if(/azure 401/.test(m))azDisable("키 오류");else{toast("Azure 연결 실패: "+m.slice(0,80));azErr(m)}}
     finally{starting=false;paint()}};
   b._pause=async(idle)=>{if(!want)return;await stopRec();if(idle){st("idle");unVad();vadStop=vadWatch({onVoice:()=>{unVad();b._resume()}})}else st("paused")};
   b._resume=async()=>{if(!want||rec||starting)return;await startRec()};
