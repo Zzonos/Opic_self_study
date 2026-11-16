@@ -932,7 +932,7 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
   let ab=0;b._abort=async()=>{ab++;want=false;unVad();gen++;base="";fin="";pend="";segs=[];segCut=0;if(ta._doubtEl)ta._doubtEl.hidden=true;await stopRec();starting=false;paint();st("off")};
   b._finish=async()=>{const was=want,myAb=ab;want=false;unVad();await b._drain();if(myAb!==ab)return;await stopRec();if(myAb!==ab)return;st("off");if(!was)return;ta.value=(base+fin).trim();ta.dispatchEvent(new Event("input"));onFinal&&onFinal(ta.value)};
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&want&&!rec&&!vadStop&&b.isConnected&&!b._held)startRec()});
-  b.onclick=async()=>{ttsStop();if(want){await b._finish();return}want=true;await startRec()};
+  b.onclick=async()=>{ttsStop();if(want){try{b._onStopTap&&b._onStopTap()}catch(e){}await b._finish();return}want=true;await startRec()};
   return b}
 function pronCard(p){if(!p)return null;const bar=(l,v)=>h("div",{class:"row",style:"gap:8px;align-items:center"},h("span",{class:"small",style:"width:64px"},l),h("div",{class:"bar grow"},h("i",{style:"width:"+Math.max(0,Math.min(100,v||0))+"%"})),h("b",{class:"small mono",style:"width:30px;text-align:right"},v==null?"-":v));
   return h("div",{class:"card"},h("h3",{},"발음 평가 (Azure)"),bar("종합",p.pron),bar("정확도",p.acc),bar("유창성",p.flu),p.pros!=null?bar("억양",p.pros):null,
@@ -1453,7 +1453,7 @@ function vAnswer(m,s){
   const {topic,q}=s;let secs=0;let fbBox=h("div",{class:"fb"});let ctl=null;
   const tEl=h("div",{class:"timer"},"0:00");const bar=h("div",{class:"bar"},h("i"));
   const ta=h("textarea",{id:"ans_"+topic.id,placeholder:"여기에 말한 내용을 받아쓰기로 입력하세요. (휴대폰: 키보드의 마이크 키 / Windows: Win+H / Mac: 🎤 키 또는 Fn 두 번)"});if(PDRAFT.q===q.q&&PDRAFT.text)ta.value=PDRAFT.text;ta.addEventListener("input",()=>{PDRAFT={q:q.q,text:ta.value}});
-  const startBtn=h("button",{class:"btn primary",onclick:async()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작";}else{if(startBtn.textContent==="다시 시작"){try{if(mic&&mic._abort)await mic._abort()}catch(e){}ta.value="";ta.dispatchEvent(new Event("input"));fbBox.replaceChildren();evalBtn.disabled=false;secs=0;try{mic&&mic._reset&&mic._reset()}catch(e){}}ta._timed=true;timerStart(tEl,bar.firstChild);startBtn.textContent="답변 끝";if(mic&&mic._az){mic._start()}else ta.focus()}
+  const startBtn=h("button",{class:"btn primary",onclick:async()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작";try{if(mic&&mic._isOn&&mic._isOn()&&mic._finish)mic._finish()}catch(e){}}else{if(startBtn.textContent==="다시 시작"){try{if(mic&&mic._abort)await mic._abort()}catch(e){}ta.value="";ta.dispatchEvent(new Event("input"));fbBox.replaceChildren();evalBtn.disabled=false;secs=0;try{mic&&mic._reset&&mic._reset()}catch(e){}}ta._timed=true;timerStart(tEl,bar.firstChild);startBtn.textContent="답변 끝";if(mic&&mic._az){mic._start()}else ta.focus()}
     if(!timer.on&&mic&&mic._az&&mic._isOn&&mic._isOn())mic._finish()}},"말하기 시작");autoTimer(ta,startBtn);
   const evalBtn=h("button",{class:"btn primary",disabled:!sample,onclick:async()=>{
     if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}
@@ -1475,6 +1475,7 @@ function vAnswer(m,s){
   }},"AI 평가 받기");
   const stopBtn=h("button",{class:"btn",hidden:true,onclick:()=>ctl?.abort()},"중지");
   const mic=(azOn()?azMicBtn:micBtn)(ta,{assess:()=>PRON_ON,onFinal:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}},onStart:()=>{if(!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild)}else timerBind(tEl,bar.firstChild);startBtn.textContent="답변 끝"}});ta.addEventListener("input",()=>{ta._lastInput=Date.now()});
+  if(mic)mic._onStopTap=()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}};
   if(timerBind(tEl,bar.firstChild)){ta._timed=true;startBtn.textContent="답변 끝"}
   const scr=S.scripts[topic.id];const sIdx=topic.qs?topic.qs.indexOf(q):-1;const myScript=scr&&sIdx>=0?scr.scripts?.[sIdx]?.answer:null;
   put(m,
@@ -2658,7 +2659,7 @@ function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false,gate=nul
   // make the words still being recognised final before the text is sent: ask the browser to close the
   // session (it then finalises them); keepAlive starts listening again right after
   b._flush=()=>new Promise(res=>{if(!on||!rec||!pend.trim())return res();settled=res;try{rec.stop()}catch(e){}setTimeout(()=>{if(settled===res){settled=null;res()}},1800)});
-  b.onclick=()=>{const busy=!!tts.cur;ttsStop();if(on){want=false;if(rec&&rec._st)rec._st.by="사용자";stop();return}if(!wdInt)wdN=0;
+  b.onclick=()=>{const busy=!!tts.cur;ttsStop();if(on){try{b._onStopTap&&b._onStopTap()}catch(e){}want=false;if(rec&&rec._st)rec._st.by="사용자";stop();return}if(!wdInt)wdN=0;
     // iPhone: a second recogniser object often hears sound but never returns words, so keep one and start it again;
     // after a session that heard sound but returned nothing, try a brand-new one instead
     let r0=SR_ONE&&!SR_ONE._live&&!SR_FRESH?SR_ONE:null;const prev=[...SR_ALL].filter(r=>r!==r0&&r._live).length;
