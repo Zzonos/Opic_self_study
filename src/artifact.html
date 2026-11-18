@@ -1907,7 +1907,7 @@ function transSources(){const out=[];const add=(t,q)=>{if(typeof t==="string"&&t
   for(const [store,isS] of [[S.scripts,0],[S.samples||{},1]])for(const [tid,sc] of Object.entries(store)){const t=TOPICS.find(x=>x.id===tid);(sc&&sc.scripts||[]).forEach((x,i)=>add(x&&x.answer,t&&t.qs[i]?t.qs[i].q:""))}
   for(const [q,m] of Object.entries(S.models||{}))add(m,q);if(SHADOW_SRC)add(SHADOW_SRC.text,SHADOW_SRC.q);return out}
 let SHADOW_SRC=null;const TRANS_MT={}; // machine translations (web without AI): kept for this visit only, so an AI translation can replace them later
-async function translateSents(sents,onProgress,force){if(!sample)throw{code:"not_granted"};if(!Object.keys(S.trans||{}).length)S.transVer=TRANS_VER;const want=new Set(sents.filter(x=>force||!S.trans[x]));if(!want.size)return;
+async function translateSents(sents,onProgress,force){if(!sample)throw{code:"not_granted"};translateSents.err="";if(!Object.keys(S.trans||{}).length)S.transVer=TRANS_VER;const want=new Set(sents.filter(x=>force||!S.trans[x]));if(!want.size)return;
   // translate whole answers (with their question) so each sentence is rendered in context, not in isolation
   const groups=[];const seen=new Set();for(const g of transSources()){if(!g.sents.some(x=>want.has(x)))continue;const key=g.sents.join(" ");if(seen.has(key))continue;seen.add(key);groups.push(g)}
   const orphan=[...want].filter(x=>!groups.some(g=>g.sents.includes(x)));if(orphan.length)groups.push({q:"",sents:orphan});
@@ -1921,12 +1921,14 @@ Rules:
 - Spoken, friendly 해요체 (e.g. "저는 주말마다 공원에 가요."), the way someone would answer an interviewer. Never stiff written style (~이다/~하였다), never literal word-by-word translation.
 - Render idioms, fillers and discourse markers by meaning (e.g. "You know," → "있잖아요,", "To be honest," → "솔직히 말하면,", "It was a blast" → "정말 재밌었어요").
 - Keep proper nouns and numbers; drop "I" (저는) when Korean would naturally omit it. Keep each translation about as short as the original.
-- Exactly one Korean string per numbered sentence, same order, nothing merged or split.
-Reply with ONLY a JSON object: {"answers":[["번역1","번역2",...], ...]} — one array per answer, in order.
+- Exactly one Korean string per numbered sentence, keyed by its number, nothing merged or split.
+Reply with ONLY a JSON object: {"answers":[{"1":"번역1","2":"번역2",...}, ...]} — one object per answer, in order.
 
-${body}`,{cache:false});
+${body}`,{cache:false}).catch(e=>{audLog.push("번역 요청 실패: "+(e&&(e.code||e.message)||e));translateSents.err=(e&&(e.code||e.message))||"오류";return null});
     const arr=r&&Array.isArray(r.answers)?r.answers:Array.isArray(r)?r:[];
-    batch.forEach((g,k)=>{const tr=arr[k];if(!Array.isArray(tr)||tr.length!==g.sents.length){audLog.push("번역 줄 수 불일치 → 다시 시도");if(batch.length>1||!g._retry)retry.push(g);return}g.sents.forEach((en,m)=>{if((force?want.has(en):!S.trans[en]||want.has(en))&&typeof tr[m]==="string"&&tr[m].trim())S.trans[en]=tr[m].trim()})});
+    batch.forEach((g,k)=>{const tr=arr[k];const at=m=>Array.isArray(tr)?(tr.length===g.sents.length?tr[m]:null):tr&&typeof tr==="object"?(tr[m+1]??tr[String(m+1)]):null;let miss=0;
+      g.sents.forEach((en,m)=>{const t=at(m);if(typeof t==="string"&&t.trim()){if(force?want.has(en):!S.trans[en]||want.has(en))S.trans[en]=t.trim()}else if(want.has(en)&&!S.trans[en])miss++});
+      if(miss){audLog.push("번역 빠짐 "+miss+"/"+g.sents.length+"문장 → 다시 시도");if(batch.length>1||!g._retry)retry.push(g)}});
     done+=n;onProgress&&onProgress(Math.min(done,total),total);save();
     // an answer whose line count came back wrong is asked again on its own, once
     if(i>=groups.length&&retry.length){for(const g of retry.splice(0))if(!g._retry){g._retry=true;groups.push(g)}}}}
@@ -2201,7 +2203,7 @@ function vShadow(m,text,title,from){
   if(miss.length)(async()=>{st.hidden=false;
     if(sample){st.textContent="해석 만드는 중… (0/"+miss.length+")";SHADOW_SRC={text,q:title};try{await translateSents(miss,(d,t)=>{st.textContent="해석 만드는 중… ("+Math.min(d,miss.length)+"/"+miss.length+")";fillKo()});save()}catch(e){}finally{SHADOW_SRC=null}}
     else if(WEB&&navigator.onLine){st.textContent="해석 만드는 중… (기계 번역)";for(const s of miss){try{const r=await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&q="+encodeURIComponent(s));if(!r.ok)break;const j=await r.json();const t=(j&&j[0]||[]).map(x=>x&&x[0]||"").join("").trim();if(t)TRANS_MT[s]=t;fillKo()}catch(e){break}}}
-    fillKo();const left=sents.filter(s=>!transOf(s)).length;st.textContent=left?"해석 "+left+"문장은 만들지 못했어요"+(sample?"":" (AI 연결 시 자동으로 채워져요)"):"";st.hidden=!left})();
+    fillKo();const left=sents.filter(s=>!transOf(s)).length;st.textContent=left?"해석 "+left+"문장은 만들지 못했어요"+(sample?(translateSents.err?" ("+translateSents.err+")":"")+" — 다시 열면 한 번 더 시도해요":" (AI 연결 시 자동으로 채워져요)"):"";st.hidden=!left})();
   const mark=()=>{rows.forEach((r,k)=>r.classList.toggle("cur",k===i));rows[i]?.scrollIntoView({block:"nearest"})};
   const playCur=()=>{mark();speak(sents[i],{onend:()=>{if(loop){setTimeout(playCur,700)}else if(auto&&i<sents.length-1){i++;setTimeout(playCur,900)}}})};
   const btn=(l,f,c="btn")=>h("button",{class:c,onclick:f},l);
