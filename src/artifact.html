@@ -477,13 +477,28 @@ function claudePush(){if(!docRef||!claudeCanWrite)return;clearTimeout(claudePush
 let claudeSavedAt=0;function claudeStatus(){if(!claudeCanWrite)return "보기 권한이라 Claude에 저장되지 않아요 (이 기기에만 저장) — 소유자에게 편집 권한을 요청하세요";return claudeSavedAt?"Claude 계정에 저장됨 · "+new Date(claudeSavedAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}):"Claude 계정 저장 대기 중"}
 // a record's identity: its creation time when it has one — two tries of the same topic on the same day with the same score are still two records
 const logKey0=l=>l.date+"|"+l.kind+"|"+l.title+"|"+(l.score??"");
-const logKey=l=>l.ts?logKey0(l)+"|"+l.ts:logKey0(l);
-const logDead=(dead,l)=>dead.has(logKey(l))||dead.has(logKey0(l)); // older deletions were saved without the time
+// a record with a creation time is that record, whatever its score or title becomes later (a re-graded mock test changes its score)
+const logKey=l=>l.ts?"t|"+l.kind+"|"+l.ts:logKey0(l);
+const logDead=(dead,l)=>dead.has(logKey(l))||dead.has(logKey0(l))||(!!l.ts&&dead.has(logKey0(l)+"|"+l.ts)); // older deletions used the longer keys
+// one record per creation time: copies that drifted apart (re-graded on one side) are folded into the newest one, keeping
+// detail, lecture and answers that only the other copy has
+const RATING_F=["level","lvRaw","lvPrev","score","sum","tier","perq","regAt"];
+function dedupeLog(){const by=new Map();let n=0;const keep=[];
+  for(const l of S.log){if(!l||!l.ts){keep.push(l);continue}const k=l.kind+"|"+l.ts;const cur=by.get(k);if(!cur){by.set(k,l);keep.push(l);continue}n++;
+    const [win,lose]=(l.detAt||0)>(cur.detAt||0)?[l,cur]:[cur,l];
+    for(const f of ["lec","pat","pron","model","str"])if(win[f]==null&&lose[f]!=null)win[f]=lose[f];
+    if(!(win.pq||[]).some(q=>q&&(q.fx||q.t))&&(lose.pq||[]).some(q=>q&&(q.fx||q.t))){win.pq=lose.pq;win.pat=win.pat||lose.pat}
+    if(!win.a&&lose.a)win.a=lose.a;
+    const rg=(lose.regAt||0)>(win.regAt||0)?lose:null;if(rg){for(const f of RATING_F)if(rg[f]!=null)win[f]=rg[f];
+      if(win.pq&&rg.pq)win.pq=win.pq.map((q,i)=>rg.pq[i]?Object.assign({},q,{l:rg.pq[i].l,c:rg.pq[i].c||q.c}):q)}
+    if(win!==cur){keep[keep.indexOf(cur)]=win;by.set(k,win)}}
+  if(n){S.log=keep;audLog.push("같은 기록 "+n+"건 하나로 합침")}return n}
 function mergeUsage(u){if(!u||typeof u!=="object")return;S.usage=S.usage||{};const mx=(a,b)=>{for(const [k,v] of Object.entries(b||{})){if(typeof v==="number")a[k]=Math.max(a[k]||0,v);else if(v&&typeof v==="object"){a[k]=a[k]&&typeof a[k]==="object"?a[k]:{};mx(a[k],v)}}};mx(S.usage,u)}
 function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;mergeUsage(o.usage);const key=logKey;
+  setTimeout(()=>{if(dedupeLog()){save();render()}},0);
   if(Array.isArray(o.del)&&o.del.length){const d=new Set(S.del||[]);o.del.forEach(k=>d.add(k));S.del=[...d].slice(-3000)}const dead=new Set(S.del||[]);if(dead.size)S.log=S.log.filter(l=>!logDead(dead,l));
   const seen=new Set([...S.log.map(key),...dead]);const byKey=new Map(S.log.map(l=>[key(l),l]));
-  for(const l of (o.log||[])){if(logDead(dead,l))continue;const k=key(l);if(!seen.has(k)){S.log.push(l);seen.add(k);continue}const cur=byKey.get(k);const hasDet2=x=>!!(x&&(x.pq||[]).some(q=>q&&(q.fx||q.t)));if(cur&&((l.detAt||0)>(cur.detAt||0)||hasDet2(l)&&!hasDet2(cur)||l.lec&&!cur.lec)){for(const f of ["pq","pat","fixes","detAt","level","lvRaw","lvPrev","score","sum","tier","perq","regAt","lec"])if(l[f]!=null)cur[f]=l[f];if(l.a&&(!cur.a||l.a.length>cur.a.length))cur.a=l.a}}S.log.sort((a,b)=>a.date<b.date?-1:1);
+  for(const l of (o.log||[])){if(logDead(dead,l))continue;const k=key(l);if(!seen.has(k)){S.log.push(l);seen.add(k);continue}const cur=byKey.get(k);const hasDet2=x=>!!(x&&(x.pq||[]).some(q=>q&&(q.fx||q.t)));if(cur&&((l.detAt||0)>(cur.detAt||0)||hasDet2(l)&&!hasDet2(cur)||l.lec&&!cur.lec)){const keepRate=(cur.regAt||0)>(l.regAt||0)?RATING_F.reduce((o,f)=>(o[f]=cur[f],o),{}):null;for(const f of ["pq","pat","fixes","detAt","level","lvRaw","lvPrev","score","sum","tier","perq","regAt","lec"])if(l[f]!=null)cur[f]=l[f];if(keepRate){Object.assign(cur,keepRate);if(cur.pq&&keepRate.perq)cur.pq=cur.pq.map((q,i)=>keepRate.perq[i]?Object.assign({},q,{l:keepRate.perq[i].level||q.l}):q)}if(l.a&&(!cur.a||l.a.length>cur.a.length))cur.a=l.a}}S.log.sort((a,b)=>a.date<b.date?-1:1);
   // newer wins (exact time when known); a record sent from Claude also wins a tie, since scripts are made there
   const stamp=x=>x?(x.ts||(x.date?Date.parse(x.date):0)||0):0;const newer=(v,cur)=>!cur||stamp(v)>stamp(cur)||(!fromCloud&&stamp(v)===stamp(cur)&&JSON.stringify(v)!==JSON.stringify(cur));
   for(const [k,v] of Object.entries(o.scripts||{}))if(newer(v,S.scripts[k]))S.scripts[k]=v;
@@ -2867,7 +2882,7 @@ function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false,gate=nul
   return b}
 // web build: auto-refresh when a newer version is deployed (home-screen apps cache the old page)
 (async()=>{if(window.claude?.use||!/github\.io|localhost/.test(location.host))return;try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)return;const v=(await r.json()).v;const cur=document.documentElement.dataset.build;if(cur&&v&&v!==cur){toast("새 버전으로 업데이트 중…");setTimeout(()=>location.reload(),800)}}catch(e){}})();
-loadLocal();cloudInit();render();setTimeout(prepSyncCode,500);setTimeout(()=>{if(!cloud.ok||cloud.skip)applyPendingSync()},800);loadManifests().then(()=>{if(view==="listen"||view==="settings")render()});loadTextManifests();
+loadLocal();if(dedupeLog())save();cloudInit();render();setTimeout(prepSyncCode,500);setTimeout(()=>{if(!cloud.ok||cloud.skip)applyPendingSync()},800);loadManifests().then(()=>{if(view==="listen"||view==="settings")render()});loadTextManifests();
 (async()=>{
   if(!window.claude?.use)return;
   const [u,d,s]=await Promise.all([claude.use("user"),claude.use("db"),claude.use("sample")]);
@@ -2880,7 +2895,7 @@ loadLocal();cloudInit();render();setTimeout(prepSyncCode,500);setTimeout(()=>{if
     if(remote){/* db data is frozen: claudeLoad returns a plain copy */
       if((remote.updatedAt||0)>(S.updatedAt||0)){S=Object.assign(structuredClone(DEF),remote);profSnap=JSON.stringify(S.profile||{});try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}else if((S.updatedAt||0)>(remote.updatedAt||0)){mergeState(remote,true)}
       claudeSavedAt=remote.updatedAt||0}
-    docRef=col;if(!m.exists&&S.updatedAt)claudePush()}catch(e){docRef=null;toast("Claude 계정 저장소 연결 실패: "+(e.code||e.message||e))}}
+    docRef=col;if(!m.exists&&S.updatedAt)claudePush();if(dedupeLog())save()}catch(e){docRef=null;toast("Claude 계정 저장소 연결 실패: "+(e.code||e.message||e))}}
   render();setTimeout(applyPendingSync,300);setTimeout(()=>fillCardKo().then(fillCardEx).then(()=>fillTrans()),5000);
 })();
 </script>
