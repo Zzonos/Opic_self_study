@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261119-230230-8929e8">
+<html lang="ko" data-build="20261119-230523-c3735f">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1091,18 +1091,13 @@ async function evalMock(items,onText){
   const body=items.map((it,i)=>`Q${i+1} (${it.kind}): ${it.q}\nA${i+1} (${it.secs}s): ${it.a||"(no answer)"}`).join("\n\n");
   const prompt=`${RUBRIC()}
 
-This is a full ${items.length}-question OPIc mock test taken at self-assessment difficulty ${mock?mockDiffLabel():"?"} (scale 1-6; 1-2 = easy 12-question form, 3-4 = standard, 5-6 = hardest form with advanced questions 14-15). Judge only what was demonstrated: easier forms give less evidence of IH/AL-level ability, so do not reward an easy form beyond what the answers show. Rate the overall level as a real OPIc rater would: one holistic rating for the whole sample, set by the highest level the learner sustains across the test (the floor), not by the best single answer. Per-question levels are only diagnostic. Watch for the same memorized story or template reused across questions. Then give per-question feedback a Korean learner can act on:
-- "fixes": up to 3 real mistakes per answer, most important first. "original" = the learner's exact words copied from the answer (short span), "better" = the natural corrected version, "why" = 한국어 한 줄 (어떤 규칙/왜 어색한지). Grammar, wrong word, Korean-style phrasing, missing past tense etc. Skip misheard names and filler words. No fixes for a solid answer.
-- "good": 한국어 한 줄, one thing done well (specific).
-- "tip": 한국어 1-2문장, how to build this answer better next time for this question type (구성, 더 넣을 디테일, 쓸 표현).
-- "patterns": up to 3 mistakes that repeat across several answers — the learner's habits.
+This is a full ${items.length}-question OPIc mock test taken at self-assessment difficulty ${mock?mockDiffLabel():"?"} (scale 1-6; 1-2 = easy 12-question form, 3-4 = standard, 5-6 = hardest form with advanced questions 14-15). Judge only what was demonstrated: easier forms give less evidence of IH/AL-level ability, so do not reward an easy form beyond what the answers show. Rate the overall level as a real OPIc rater would: one holistic rating for the whole sample, set by the highest level the learner sustains across the test (the floor), not by the best single answer. Per-question levels are only diagnostic. Watch for the same memorized story or template reused across questions. Then give short per-question feedback.
 Background profile (NOT part of the answers; never mention places or events that appear only here — comment only on what each answer actually says): ${profileText()}
 ${nameHint()}
 ${body}
 
 Reply with ONLY one JSON object:
-{"level":"IM2","score":60,"summary":"한국어 총평 3-4문장 (레벨 판정 근거, 다음 목표)","top_fixes":["가장 시급한 개선점 3개, 한국어"],"rehearsed":"none | some | heavy","rehearsed_note":"한국어 한 줄 (some/heavy일 때만)","patterns":[{"issue":"반복된 실수 한국어 한 줄","ex":"learner's words → corrected","fix":"이렇게 고치세요 (한국어 한 줄)"}],"per_question":[{"n":1,"level":"IM2","comment":"한국어 1-2문장 코멘트","good":"잘한 점 한 줄","fixes":[{"original":"exact words from the answer","better":"corrected words","why":"한국어 이유"}],"tip":"다음에 이렇게 (한국어 1-2문장)","better":"One improved English sentence the learner could have said"}]}
-Keep every string short; no double quotes inside strings.`;
+{"level":"IM2","score":60,"summary":"한국어 총평 3-4문장 (레벨 판정 근거, 다음 목표)","top_fixes":["가장 시급한 개선점 3개, 한국어"],"rehearsed":"none | some | heavy","rehearsed_note":"한국어 한 줄 (some/heavy일 때만)","per_question":[{"n":1,"level":"IM2","comment":"한국어 한 줄 코멘트","better":"One improved English sentence the learner could have said"}]}`;
   return sample.json(prompt,{...(typeof onText==="function"?{onText}:{}),cache:false});
 }
 
@@ -1899,9 +1894,8 @@ function mockQCard(p,it){const fx=(p.fixes||[]).filter(f=>f&&f.original&&f.bette
     p.better?h("div",{},h("p",{class:"eyebrow"},"이렇게 말해 보세요"),h("p",{class:"small",style:"color:var(--accent)"},p.better),h("div",{class:"row",style:"margin-top:4px"},spkBtn(p.better),save)):save)}
 // an earlier mock test (before detailed feedback): grade its saved answers again for corrections, tips and repeated mistakes.
 // The level and score stay as they were — only the detail is added.
-async function mockDetail(l0,l,btn){if(!sample){toast(ERR.not_granted);return}const pq=(l.pq||[]).filter(x=>x);if(!pq.length)return;btn.disabled=true;btn.textContent="자세한 피드백 만드는 중… (30–60초)";
-  const body=pq.map((x,i)=>`Q${i+1}: ${x.q||""}\nA${i+1}: ${x.a||"(no answer)"}`).join("\n\n");
-  const prompt=`You are an experienced OPIc rater and speaking coach for a Korean learner (target ${tgt()}). Below are the questions and the learner's answers (voice-dictated) from a mock test that was already rated ${l.lvRaw||l.level||"?"} overall. Do NOT re-rate; give feedback the learner can act on.
+async function mockDetailAI(pq,lvl){const body=pq.map((x,i)=>`Q${i+1}: ${x.q||""}\nA${i+1}: ${x.a||"(no answer)"}`).join("\n\n");
+  const prompt=`You are an experienced OPIc rater and speaking coach for a Korean learner (target ${tgt()}). Below are the questions and the learner's answers (voice-dictated) from a mock test that was already rated ${lvl||"?"} overall. Do NOT re-rate; give feedback the learner can act on.
 - "fixes": up to 3 real mistakes per answer, most important first. "original" = the learner's exact words copied from the answer (short span), "better" = the natural corrected version, "why" = 한국어 한 줄. Grammar, wrong word, Korean-style phrasing, tense etc. Skip misheard names and fillers. No fixes for a solid answer.
 - "good": 한국어 한 줄, one specific thing done well. "comment": 한국어 1-2문장. "tip": 한국어 1-2문장, how to build this answer better next time (구성, 더 넣을 디테일, 쓸 표현). "better": one improved English sentence.
 - "patterns": up to 3 mistakes that repeat across several answers.
@@ -1910,23 +1904,35 @@ ${body}
 
 Reply with ONLY JSON: {"patterns":[{"issue":"한국어","ex":"learner's words → corrected","fix":"한국어"}],"per_question":[{"n":1,"comment":"...","good":"...","fixes":[{"original":"...","better":"...","why":"..."}],"tip":"...","better":"..."}]}
 Keep every string short; no double quotes inside strings.`;
-  try{const r=await aiRetry(()=>sample.json(prompt,{cache:false}),"모의시험 피드백");const per=r&&r.per_question||[];if(!per.length)throw new Error("빈 응답");
-    l0.pq=pq.map((x,i)=>{const d=per.find(p=>+p.n===i+1)||per[i]||{};return Object.assign({},x,{c:d.comment||x.c,g:d.good||"",t:d.tip||"",b:d.better||x.b,fx:(d.fixes||[]).filter(f=>f&&f.original&&f.better).slice(0,3).map(f=>({o:f.original,b:f.better,w:f.why||""}))})});
-    l0.pat=(r.patterns||[]).slice(0,3);l0.fixes=[...l0.pq.flatMap(x=>x.fx),...(l0.fixes||l.fixes||[]).filter(f=>!f.o)];
-    if(l0.a==null&&l.a)l0.a=l.a;save();toast("자세한 피드백을 넣었어요");render()}
+  const r=await aiRetry(()=>sample.json(prompt,{cache:false}),"모의시험 피드백");const per=r&&r.per_question||[];if(!per.length)throw new Error("빈 응답");
+  return {patterns:(r.patterns||[]).slice(0,3),at:i=>per.find(p=>+p.n===i+1)||per[i]||{}}}
+const fxOf=d=>(d.fixes||[]).filter(f=>f&&f.original&&f.better).slice(0,3);
+// write the detail into a saved record (history keeps it; corrections feed the weak-point drill)
+function mockDetailSave(l0,pq,D){l0.pq=pq.map((x,i)=>{const d=D.at(i);return Object.assign({},x,{c:d.comment||x.c,g:d.good||"",t:d.tip||"",b:d.better||x.b,fx:fxOf(d).map(f=>({o:f.original,b:f.better,w:f.why||""}))})});
+  l0.pat=D.patterns;l0.fixes=[...l0.pq.flatMap(x=>x.fx),...(l0.fixes||[]).filter(f=>!f.o)];save()}
+// history: a saved mock test (answers kept up to 600 characters each)
+async function mockDetail(l0,l,btn){if(!sample){toast(ERR.not_granted);return}const pq=(l.pq||[]).filter(x=>x);if(!pq.length)return;btn.disabled=true;btn.textContent="자세한 피드백 만드는 중… (30–60초)";
+  try{const D=await mockDetailAI(pq,l.lvRaw||l.level);if(l0.a==null&&l.a)l0.a=l.a;mockDetailSave(l0,pq,D);toast("자세한 피드백을 넣었어요");render()}
+  catch(e){btn.disabled=false;btn.textContent="자세한 피드백 받기";toast("만들지 못했어요: "+errMsg(e))}}
+// result screen: the test just taken (full answers)
+async function mockDetailNow(r,btn){if(!sample){toast(ERR.not_granted);return}btn.disabled=true;btn.textContent="자세한 피드백 만드는 중… (30–60초)";
+  try{const D=await mockDetailAI(mock.items.map(it=>({q:it.q,a:it.a})),r.level);
+    (r.per_question||[]).forEach((p,k)=>{const d=D.at((p.n||k+1)-1);p.comment=d.comment||p.comment;p.good=d.good||"";p.tip=d.tip||"";p.better=d.better||p.better;p.fixes=fxOf(d)});r.patterns=D.patterns;r._detail=true;
+    const l0=S.log.find(x=>x.kind==="mock"&&x.ts===r._ts);if(l0&&l0.pq)mockDetailSave(l0,l0.pq.map((x,i)=>Object.assign({},x,{a:((mock.items[i]||{}).a||x.a||"").slice(0,600)})),D);
+    toast("자세한 피드백을 넣었어요");render()}
   catch(e){btn.disabled=false;btn.textContent="자세한 피드백 받기";toast("만들지 못했어요: "+errMsg(e))}}
 async function vMockResult(m){
   if(mock.result==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"15문항 채점 중… (30–90초)")));
     put(m,h("h1",{},"채점 중"),box);
     if(!sample){box.replaceChildren(h("p",{},ERR.not_granted),h("button",{class:"btn",onclick:()=>{mock=null;render()}},"닫기"));return}
-    try{const r=await evalMock(mock.items,null);{const ap=new Set();for(const it of mock.items){const nf=fixNames(it.a,r.name_fixes);if(nf.applied.length){it.a=nf.text;nf.applied.forEach(x=>ap.add(x))}}r._nfix=[...ap]}mock.result=r;S.log.push({date:todayStr(),ts:Date.now(),kind:"mock",tier:r._tier,qt:"mock",sum:r.summary||"",pq:(r.per_question||[]).map((x,i)=>({q:(mock.items[i]||{}).q||"",a:((mock.items[i]||{}).a||"").slice(0,600),l:x.level,c:x.comment,b:x.better,g:x.good||"",t:x.tip||"",fx:(x.fixes||[]).filter(f=>f&&f.original&&f.better).slice(0,3).map(f=>({o:f.original,b:f.better,w:f.why||""}))})),pat:(r.patterns||[]).slice(0,3),title:"모의시험 "+mock.items.length+"문항 · 난이도 "+mockDiffLabel(),diff:mockDiffLabel(),level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0),fixes:[...(r.per_question||[]).flatMap(x=>(x.fixes||[]).filter(f=>f&&f.original&&f.better).map(f=>({o:f.original,b:f.better,w:f.why||""}))),...(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)}))],perq:(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}))});save();render()}
+    try{const r=await evalMock(mock.items,null);{const ap=new Set();for(const it of mock.items){const nf=fixNames(it.a,r.name_fixes);if(nf.applied.length){it.a=nf.text;nf.applied.forEach(x=>ap.add(x))}}r._nfix=[...ap]}mock.result=r;r._ts=Date.now();S.log.push({date:todayStr(),ts:r._ts,kind:"mock",tier:r._tier,qt:"mock",sum:r.summary||"",pq:(r.per_question||[]).map((x,i)=>({q:(mock.items[i]||{}).q||"",a:((mock.items[i]||{}).a||"").slice(0,600),l:x.level,c:x.comment,b:x.better,g:x.good||"",t:x.tip||"",fx:(x.fixes||[]).filter(f=>f&&f.original&&f.better).slice(0,3).map(f=>({o:f.original,b:f.better,w:f.why||""}))})),pat:(r.patterns||[]).slice(0,3),title:"모의시험 "+mock.items.length+"문항 · 난이도 "+mockDiffLabel(),diff:mockDiffLabel(),level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0),fixes:[...(r.per_question||[]).flatMap(x=>(x.fixes||[]).filter(f=>f&&f.original&&f.better).map(f=>({o:f.original,b:f.better,w:f.why||""}))),...(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)}))],perq:(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}))});save();render()}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{render()}},"다시 시도"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"닫기")))}
     return}
   const r=mock.result;
   put(m,h("div",{},h("p",{class:"eyebrow"},"Mock result"),h("h1",{},"모의시험 결과")),
     h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level),h("span",{class:"muted mono"},(r.score??"")+" / 100"),lvIdx(r.level)>=tgtIdx()?h("span",{class:"chip good"},"목표 달성"):h("span",{class:"chip warn"},"목표 "+tgt())),h("p",{},r.summary||""),rehWarn(r),tierLine(r._tier),nameNote(r._nfix),
       r.top_fixes?.length?h("div",{},h("p",{class:"eyebrow"},"가장 먼저 고칠 것"),h("ol",{style:"margin:4px 0 0;padding-left:18px"},...r.top_fixes.map(s=>h("li",{},s)))):null),
-    mockPatterns(r.patterns),
+    r._detail?mockPatterns(r.patterns):h("div",{class:"card"},h("h3",{},"자세한 피드백"),h("p",{class:"muted small"},"문항마다 틀린 표현 → 고친 표현과 이유, 잘한 점, 다음에 어떻게 말하면 좋을지, 여러 문항에서 반복된 실수를 정리해 줘요. (30–60초)"),h("button",{class:"btn primary",onclick:e=>mockDetailNow(r,e.currentTarget)},"자세한 피드백 받기")),
     h("h3",{style:"margin:6px 2px 0"},"문항별 피드백"),
     ...(r.per_question||[]).map(p=>mockQCard(p,mock.items[(p.n||1)-1]||{})),
     h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{mock=null;render()}},"닫기")));
