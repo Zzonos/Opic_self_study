@@ -785,7 +785,7 @@ async function micStream1(){if(MIC.stream&&MIC.raw!==RAWMIC&&!MIC.active)micRele
   // first use: device names only appear after permission — check again and switch if an earphone / external mic is there
   if(DESK&&!MICDEV&&!named&&await micAuto()&&AUTODEV){let cur="";try{cur=MIC.stream.getAudioTracks()[0].getSettings().deviceId||""}catch(e){}
     if(cur!==AUTODEV){try{const st=await navigator.mediaDevices.getUserMedia({audio:micCons()});MIC.stream.getTracks().forEach(t=>t.stop());MIC.stream=st}catch(e){AUTODEV=""}}}
-  MIC.hifi=HIFI;MIC.raw=RAWMIC;MIC.last=Date.now();audLog.push("마이크 열기: "+micDesc(MIC.stream)+(btMic(MIC.stream)?" · 블루투스(통화 모드 음질)":""));return MIC.stream}
+  MIC.hifi=HIFI;MIC.raw=RAWMIC;MIC.last=Date.now();MIC.chgAt=Date.now();audLog.push("마이크 열기: "+micDesc(MIC.stream)+(btMic(MIC.stream)?" · 블루투스(통화 모드 음질)":""));return MIC.stream}
 const MIC_BTNS=new Set();
 // app went to the background: turn every microphone off (recognisers, voice detector, shared stream)
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState!=="hidden")return;
@@ -793,7 +793,7 @@ document.addEventListener("visibilitychange",()=>{if(document.visibilityState!==
   setTimeout(()=>{MIC.active=0;micRelease()},300)});
 // phone speech recognition left running on a screen that was redrawn: stop it (only one session can listen at a time on a phone)
 function micSweep(){for(const b of [...MIC_BTNS]){if(b.isConnected)continue;MIC_BTNS.delete(b);try{if(b._isOn&&b._isOn()){b._abort();audLog.push("화면 전환: 이전 음성인식 종료")}}catch(e){}}}
-function micRelease(){if(MIC.stream){try{if(DESK&&btMic(MIC.stream))MIC.btAt=Date.now()}catch(e){}try{MIC.stream.getTracks().forEach(t=>t.stop())}catch(e){}MIC.stream=null}}
+function micRelease(){if(MIC.stream){MIC.chgAt=Date.now();try{if(DESK&&btMic(MIC.stream))MIC.btAt=Date.now()}catch(e){}try{MIC.stream.getTracks().forEach(t=>t.stop())}catch(e){}MIC.stream=null}}
 // phones keep the mic open for a while (re-opening flips the phone in and out of call mode). On a PC an open mic has a cost instead:
 // a Bluetooth headset stays in hands-free (call) mode, so everything sounds crackly and low quality — close it seconds after use.
 let micFreeAt=0;setInterval(()=>{if(!MIC.stream||MIC.active>0){micFreeAt=0;return}if(!micFreeAt)micFreeAt=Date.now();const idle=Date.now()-micFreeAt;
@@ -1088,7 +1088,7 @@ try{const t=localStorage.getItem("opic30_aud");if(t)AUD.tag=t}catch(e){}
 function audEl(){if(!AUD.el){AUD.el=new Audio();AUD.el.preload="auto";
     // a pause the app did not ask for = the system interrupted (notification, call, Siri, another app)
     AUD.el.addEventListener("pause",()=>{const a=AUD.el,src=a.src;const cb=audCb;
-      if(!player.on&&cb&&src&&!a.ended){setTimeout(()=>{if(audCb!==cb||a.src!==src||!a.paused||a.ended)return;a._rs=(a._rsSrc===src?a._rs||0:0)+1;a._rsSrc=src;if(a._rs>3)return;audLog.push("재생이 끊김(통화 모드 전환 등) → 이어서 재생");a.play().catch(()=>{})},450);return}
+      if(!player.on&&cb&&src&&!a.ended&&Date.now()-(MIC.chgAt||0)<4000){setTimeout(()=>{if(audCb!==cb||a.src!==src||!a.paused||a.ended)return;a._rs=(a._rsSrc===src?a._rs||0:0)+1;a._rsSrc=src;if(a._rs>3)return;audLog.push("재생이 끊김(통화 모드 전환 등) → 이어서 재생");a.play().catch(()=>{})},450);return}
       setTimeout(()=>{if(!player.on||player.paused||player.sys||!a.paused||a.ended||a.src!==src||!src||Date.now()-(AUD.own||0)<600)return;sysPaused()},300)});
     AUD.el.addEventListener("timeupdate",()=>{const a=AUD.el;if(player.on&&a.src&&!/silence_/.test(a.src)&&a.currentTime>0){player.lastT=a.currentTime;player.lastSi=player.si;player.lastI=player.i}});
     AUD.el.addEventListener("playing",()=>{if(player.sys){player.sys=false;clearInterval(player.sysT);mediaSession()}})}
@@ -1837,13 +1837,13 @@ function vMock(m){
   const nav=h("div",{class:"mocknav"},...mock.items.map((x,i)=>h("i",{class:i<mock.i?"done":i===mock.i?"cur":""})));
   const next=async e=>{const nb=e&&e.currentTarget;if(next.busy)return;next.busy=1;if(timer.on){it.secs=timerStop()||it.secs;sb.textContent="다시 시작"}const used=!!(mic&&(mic._isOn&&mic._isOn()||MIC.stream||!!ta.value.trim()));const wasBt=DESK&&MIC.stream&&btMic(MIC.stream);
     if(mic&&mic._isOn&&mic._isOn())await mic._finish();it.a=ta.value.trim();
-    if(used&&mock.i<n-1&&mock.listen){if(nb){nb.disabled=true;nb.textContent="다음 문항 준비 중…"}try{if(mic&&mic._kill)await mic._kill()}catch(x){}if(!MIC.active)micRelease();
-      audLog.push("모의시험: 마이크 닫고 통화 모드 해제 대기");await new Promise(r=>setTimeout(r,DESK?(wasBt?2500:300):1500));MIC.btAt=0}
+    if(used&&DESK&&mock.i<n-1&&mock.listen){if(nb){nb.disabled=true;nb.textContent="다음 문항 준비 중…"}try{if(mic&&mic._kill)await mic._kill()}catch(x){}if(!MIC.active)micRelease();
+      audLog.push("모의시험: 마이크 닫고 통화 모드 해제 대기");await new Promise(r=>setTimeout(r,wasBt?2500:300));MIC.btAt=0}
     next.busy=0;if(mock.i<n-1){mock.i++;mock.fromMic=used;render()}else{mock.result="pending";render()}};
   let plays=0;const qText=h("p",{class:"q grow",style:"margin-top:10px"},it.q);const hid=h("div",{class:"hidden-q",style:"margin-top:10px"},"질문을 듣고 답하세요. 실제 시험처럼 재생은 2번까지 가능해요.");
   const reveal=h("button",{class:"btn sm ghost",onclick:()=>{hid.hidden=true;qText.hidden=false;reveal.hidden=true}},"질문 텍스트 보기");
   const replay=h("button",{class:"btn sm",onclick:()=>{if(plays>=2){toast("실제 시험에서는 2번까지만 들을 수 있어요");return}plays++;speak(it.q,{key:it.key});replay.textContent="다시 듣기 ("+(2-plays)+"회 남음)"}},"질문 듣기 (2회)");
-  if(mock.listen){qText.hidden=true;const wait=mock.fromMic&&!DESK?600:300;mock.fromMic=false;setTimeout(()=>{if(!qText.isConnected)return;plays=1;speak(it.q,{key:it.key});replay.textContent="다시 듣기 (1회 남음)"},wait)}else{hid.hidden=true;reveal.hidden=true}
+  if(mock.listen){qText.hidden=true;const wait=300;mock.fromMic=false;setTimeout(()=>{if(!qText.isConnected)return;plays=1;speak(it.q,{key:it.key});replay.textContent="다시 듣기 (1회 남음)"},wait)}else{hid.hidden=true;reveal.hidden=true}
   // "답변 끝" stops the clock AND the recording; starting either one starts the other
   const micOn=()=>!!(mic&&mic._isOn&&mic._isOn());
   const stopAll=async()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}if(micOn())await mic._finish()};
