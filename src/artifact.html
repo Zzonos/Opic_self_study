@@ -1415,7 +1415,7 @@ function vHistory(m){const KIND={practice:"연습",mock:"모의시험",chat:"대
         l.lvPrev?h("p",{class:"muted small"},"다시 채점됨 · 처음 판정 "+l.lvPrev):null,
         h("div",{class:"row"},h("button",{class:"btn primary sm",onclick:e=>mockDetail(l0,l,e.currentTarget)},mockOld?"자세한 피드백 받기":"자세한 피드백 다시 받기"),h("button",{class:"btn sm",onclick:e=>mockRegrade(l0,l,e.currentTarget)},"다시 채점")),
         h("p",{class:"muted small"},"저장된 답변으로 다시 분석해요. 설정의 '채점·분석 모델'"+(S.profile.aiTier==="complex"?" (지금: 최고 성능)":" (지금: 기본)")+"을 써요."+((l.pq||[]).some(x=>x&&x.a&&x.a.length===600)?" 이 시험은 답변이 600자까지만 저장돼 긴 답변은 뒷부분이 빠진 채로 분석돼요.":""))):null,
-      (l.pq||[]).length?h("details",{open:!!(l.pq||[]).some(x=>x&&x.fx)},h("summary",{},"문항별 피드백 ("+l.pq.length+")"),mockPatterns(l.pat),...l.pq.map((x,i)=>h("div",{style:"margin-top:10px;display:flex;flex-direction:column;gap:4px"},h("p",{class:"small",style:"font-weight:600"},(i+1)+". "+(x.q||"")+(x.l?" · "+x.l:"")),x.a?h("p",{class:"muted small"},x.a):null,x.c?h("p",{class:"small"},x.c):null,x.g?h("p",{class:"small",style:"color:var(--good)"},"👍 "+x.g):null,mockFixList(x.fx),x.t?h("p",{class:"small"},h("b",{},"💡 다음에는 "),x.t):null,x.b?h("p",{class:"small",style:"color:var(--accent)"},"→ "+x.b):null))):null,
+      (l.pq||[]).length?h("details",{open:!!(l.pq||[]).some(x=>x&&x.fx)},h("summary",{},"문항별 피드백 ("+l.pq.length+")"),mockPatterns(l.pat),...l.pq.map((x,i)=>h("div",{style:"margin-top:10px;display:flex;flex-direction:column;gap:4px"},h("p",{class:"small",style:"font-weight:600"},(i+1)+". "+(x.q||"")+(x.l?" · "+x.l:"")),x.a?h("p",{class:"muted small"},x.a):null,x.c?h("p",{class:"small"},x.c):null,x.g?h("p",{class:"small",style:"color:var(--good)"},"👍 "+x.g):null,mockFixList(x.fx),mockClosing(x.cl),x.t?h("p",{class:"small"},h("b",{},"💡 다음에는 "),x.t):null,x.b?h("p",{class:"small",style:"color:var(--accent)"},"→ "+x.b):null))):null,
       l.recovered&&!l.a?h("p",{class:"muted small"},"예전 기록이라 내 답변·총평은 저장돼 있지 않아요."):!hasDet(l)&&!fx.length?h("p",{class:"muted small"},HIST["_"+l0.ts]&&!HIST[l0.ts]&&cloud.ref?"세부 내용을 불러오는 중이거나, 세부 내용이 저장되기 전에 만든 기록이에요.":"세부 내용이 저장되기 전에 만든 기록이라 점수만 남아 있어요."):null,
       h("div",{class:"row"},t&&q?h("button",{class:"btn sm primary",onclick:()=>go("practice",{topic:t,q,kind:QT[q.t]})},"이 질문 다시 연습"):null,(()=>{const b=h("button",{class:"btn sm ghost",style:"color:var(--bad);margin-left:auto",onclick:()=>{if(b.dataset.ok){histDelete([l0])}else{b.dataset.ok=1;b.textContent="한 번 더 누르면 삭제";setTimeout(()=>{if(b.isConnected){delete b.dataset.ok;b.textContent="🗑 이 기록 삭제"}},3000)}}},"🗑 이 기록 삭제");return b})()));
     return h("div",{},head,det)};
@@ -1871,16 +1871,17 @@ function vMock(m){
 // mock feedback pieces (result screen and history share them)
 function mockFixList(fx){fx=(fx||[]).filter(f=>f&&(f.original||f.o)&&(f.better||f.b));if(!fx.length)return null;
   return h("div",{style:"display:flex;flex-direction:column;gap:6px"},h("p",{class:"eyebrow"},"틀린 표현 → 이렇게"),...fx.map(f=>h("div",{class:"fix"},h("span",{class:"o"},f.original||f.o),h("span",{class:"b"},"→ "+(f.better||f.b)),(f.why||f.w)?h("span",{class:"w"},f.why||f.w):null)))}
+function mockClosing(c){if(!c||!c.en)return null;return h("div",{class:"fix",style:"border-left-color:var(--accent)"},h("span",{class:"small",style:"font-weight:600"},"🔚 마무리"+(c.i?" — "+c.i:"")),h("span",{class:"b"},c.en),c.ko?h("span",{class:"w"},c.ko):null,h("div",{class:"row"},spkBtn(c.en)))}
 function mockPatterns(ps){ps=(ps||[]).filter(x=>x&&x.issue);if(!ps.length)return null;
   return h("div",{class:"card"},h("h3",{},"반복된 실수 · 습관"),h("p",{class:"muted small"},"여러 문항에서 되풀이된 것들이에요. 이것부터 고치면 전체 레벨이 올라가요."),
     ...ps.map(x=>h("div",{class:"fix",style:"border-left-color:var(--warn)"},h("span",{class:"b"},x.issue),x.ex?h("span",{class:"small mono"},x.ex):null,x.fix?h("span",{class:"w"},"→ "+x.fix):null)))}
 function mockQCard(p,it){const fx=(p.fixes||[]).filter(f=>f&&f.original&&f.better);
-  const save=fx.length||p.better?h("button",{class:"btn sm",onclick:e=>{addCards([...fx.map(f=>({en:f.better,ko:f.why||"",why:"모의시험 Q"+p.n+": "+f.original})),...(p.better?[{en:p.better,ko:"",why:"모의시험 Q"+p.n+" 모범 문장"}]:[])],"mock");e.currentTarget.disabled=true}},"고친 표현 카드로 저장"):null;
+  const save=fx.length||p.better||p.closing?h("button",{class:"btn sm",onclick:e=>{addCards([...fx.map(f=>({en:f.better,ko:f.why||"",why:"모의시험 Q"+p.n+": "+f.original})),...(p.better?[{en:p.better,ko:"",why:"모의시험 Q"+p.n+" 모범 문장"}]:[]),...(p.closing?[{en:p.closing.en,ko:p.closing.ko,why:"모의시험 Q"+p.n+" 마무리"}]:[])],"mock");e.currentTarget.disabled=true}},"고친 표현 카드로 저장"):null;
   return h("div",{class:"card"},h("div",{class:"row"},h("span",{class:"mono small muted"},"Q"+p.n),h("span",{class:"grow small"},it.kind||""),lvChip(p.level)),
     it.q?h("p",{class:"small",style:"font-weight:600"},it.q):null,
     it.a?h("details",{},h("summary",{class:"small"},"내 답변 보기"+(it.secs?" · "+fmt(it.secs):"")),h("p",{class:"muted small",style:"margin-top:6px"},it.a)):h("p",{class:"muted small"},"(답변 없음)"),
     p.comment?h("p",{class:"small"},p.comment):null,p.good?h("p",{class:"small",style:"color:var(--good)"},"👍 "+p.good):null,
-    mockFixList(fx),p.tip?h("p",{class:"small"},h("b",{},"💡 다음에는 "),p.tip):null,
+    mockFixList(fx),mockClosing(p.closing),p.tip?h("p",{class:"small"},h("b",{},"💡 다음에는 "),p.tip):null,
     p.better?h("div",{},h("p",{class:"eyebrow"},"이렇게 말해 보세요"),h("p",{class:"small",style:"color:var(--accent)"},p.better),h("div",{class:"row",style:"margin-top:4px"},spkBtn(p.better),save)):save)}
 // an earlier mock test (before detailed feedback): grade its saved answers again for corrections, tips and repeated mistakes.
 // The level and score stay as they were — only the detail is added.
@@ -1888,17 +1889,19 @@ async function mockDetailAI(pq,lvl){const body=pq.map((x,i)=>`Q${i+1}: ${x.q||""
   const prompt=`You are an experienced OPIc rater and speaking coach for a Korean learner (target ${tgt()}). Below are the questions and the learner's answers (voice-dictated) from a mock test that was already rated ${lvl||"?"} overall. Do NOT re-rate; give feedback the learner can act on.
 - "fixes": up to 3 real mistakes per answer, most important first. "original" = the learner's exact words copied from the answer (short span), "better" = the natural corrected version, "why" = 한국어 한 줄. Grammar, wrong word, Korean-style phrasing, tense etc. Skip misheard names and fillers. No fixes for a solid answer.
 - "good": 한국어 한 줄, one specific thing done well. "comment": 한국어 1-2문장. "tip": 한국어 1-2문장, how to build this answer better next time (구성, 더 넣을 디테일, 쓸 표현). "better": one improved English sentence.
+- "closing": check how the answer ENDS. If it stops abruptly, trails off ("so... yeah", "that's it"), or never wraps up, give "ok":false, "issue" = 한국어 한 줄 (무엇이 부족한지), and "en" = 1-2 natural English closing sentences that fit THIS answer's content (sum up + a short feeling/opinion or a link back to the question; no generic "That's all, thank you"), plus "ko" = its Korean meaning. If the ending is already good, "ok":true and leave the rest empty.
 - "patterns": up to 3 mistakes that repeat across several answers.
 ${nameHint()}
 ${body}
 
-Reply with ONLY JSON: {"patterns":[{"issue":"한국어","ex":"learner's words → corrected","fix":"한국어"}],"per_question":[{"n":1,"comment":"...","good":"...","fixes":[{"original":"...","better":"...","why":"..."}],"tip":"...","better":"..."}]}
+Reply with ONLY JSON: {"patterns":[{"issue":"한국어","ex":"learner's words → corrected","fix":"한국어"}],"per_question":[{"n":1,"comment":"...","good":"...","fixes":[{"original":"...","better":"...","why":"..."}],"tip":"...","closing":{"ok":false,"issue":"한국어","en":"...","ko":"..."},"better":"..."}]}
 Keep every string short; no double quotes inside strings.`;
   const r=await aiRetry(()=>sample.json(prompt,{cache:false}),"모의시험 피드백");const per=r&&r.per_question||[];if(!per.length)throw new Error("빈 응답");
   return {patterns:(r.patterns||[]).slice(0,3),at:i=>per.find(p=>+p.n===i+1)||per[i]||{}}}
 const fxOf=d=>(d.fixes||[]).filter(f=>f&&f.original&&f.better).slice(0,3);
+const clOf=d=>{const c=d&&d.closing;return c&&c.ok===false&&c.en?{i:String(c.issue||""),en:String(c.en),ko:String(c.ko||"")}:null};
 // write the detail into a saved record (history keeps it; corrections feed the weak-point drill)
-function mockDetailSave(l0,pq,D){l0.pq=pq.map((x,i)=>{const d=D.at(i);return Object.assign({},x,{c:d.comment||x.c,g:d.good||"",t:d.tip||"",b:d.better||x.b,fx:fxOf(d).map(f=>({o:f.original,b:f.better,w:f.why||""}))})});
+function mockDetailSave(l0,pq,D){l0.pq=pq.map((x,i)=>{const d=D.at(i);return Object.assign({},x,{c:d.comment||x.c,g:d.good||"",t:d.tip||"",cl:clOf(d),b:d.better||x.b,fx:fxOf(d).map(f=>({o:f.original,b:f.better,w:f.why||""}))})});
   l0.pat=D.patterns;l0.fixes=[...l0.pq.flatMap(x=>x.fx),...(l0.fixes||[]).filter(f=>!f.o)];l0.detAt=Date.now();save()}
 // history: a saved mock test (answers kept up to 600 characters each)
 async function mockDetail(l0,l,btn){if(!sample){toast(ERR.not_granted);return}const pq=(l.pq||[]).filter(x=>x);if(!pq.length)return;btn.disabled=true;btn.textContent="자세한 피드백 만드는 중… (30–60초)";
@@ -1907,7 +1910,7 @@ async function mockDetail(l0,l,btn){if(!sample){toast(ERR.not_granted);return}co
 // result screen: the test just taken (full answers)
 async function mockDetailNow(r,btn){if(!sample){toast(ERR.not_granted);return}btn.disabled=true;btn.textContent="자세한 피드백 만드는 중… (30–60초)";
   try{const D=await mockDetailAI(mock.items.map(it=>({q:it.q,a:it.a})),r.level);
-    (r.per_question||[]).forEach((p,k)=>{const d=D.at((p.n||k+1)-1);p.comment=d.comment||p.comment;p.good=d.good||"";p.tip=d.tip||"";p.better=d.better||p.better;p.fixes=fxOf(d)});r.patterns=D.patterns;r._detail=true;
+    (r.per_question||[]).forEach((p,k)=>{const d=D.at((p.n||k+1)-1);p.comment=d.comment||p.comment;p.good=d.good||"";p.tip=d.tip||"";p.better=d.better||p.better;p.fixes=fxOf(d);p.closing=clOf(d)});r.patterns=D.patterns;r._detail=true;
     const l0=S.log.find(x=>x.kind==="mock"&&x.ts===r._ts);if(l0&&l0.pq)mockDetailSave(l0,l0.pq.map((x,i)=>Object.assign({},x,{a:((mock.items[i]||{}).a||x.a||"").slice(0,3000)})),D);
     toast("자세한 피드백을 넣었어요");render()}
   catch(e){btn.disabled=false;btn.textContent="자세한 피드백 받기";toast("만들지 못했어요: "+errMsg(e))}}
