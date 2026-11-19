@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261118-235041-4385ff">
+<html lang="ko" data-build="20261119-224354-866ffd">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1102,7 +1102,9 @@ const AUD={tags:{m:"남성 · Andrew",f:"여성 · Ava"},man:{},tag:"m",el:null,
 try{const t=localStorage.getItem("opic30_aud");if(t)AUD.tag=t}catch(e){}
 function audEl(){if(!AUD.el){AUD.el=new Audio();AUD.el.preload="auto";
     // a pause the app did not ask for = the system interrupted (notification, call, Siri, another app)
-    AUD.el.addEventListener("pause",()=>{const a=AUD.el,src=a.src;setTimeout(()=>{if(!player.on||player.paused||player.sys||!a.paused||a.ended||a.src!==src||!src||Date.now()-(AUD.own||0)<600)return;sysPaused()},300)});
+    AUD.el.addEventListener("pause",()=>{const a=AUD.el,src=a.src;const cb=audCb;
+      if(!player.on&&cb&&src&&!a.ended){setTimeout(()=>{if(audCb!==cb||a.src!==src||!a.paused||a.ended)return;a._rs=(a._rsSrc===src?a._rs||0:0)+1;a._rsSrc=src;if(a._rs>3)return;audLog.push("재생이 끊김(통화 모드 전환 등) → 이어서 재생");a.play().catch(()=>{})},450);return}
+      setTimeout(()=>{if(!player.on||player.paused||player.sys||!a.paused||a.ended||a.src!==src||!src||Date.now()-(AUD.own||0)<600)return;sysPaused()},300)});
     AUD.el.addEventListener("timeupdate",()=>{const a=AUD.el;if(player.on&&a.src&&!/silence_/.test(a.src)&&a.currentTime>0){player.lastT=a.currentTime;player.lastSi=player.si;player.lastI=player.i}});
     AUD.el.addEventListener("playing",()=>{if(player.sys){player.sys=false;clearInterval(player.sysT);mediaSession()}})}
   return AUD.el}
@@ -1847,11 +1849,15 @@ function vMock(m){
   const ta=h("textarea",{id:"mock_"+mock.i,placeholder:"받아쓰기로 답변 입력"});ta.value=it.a;ta.addEventListener("input",()=>{it.a=ta.value});
   const reb=()=>{if(timerBind(tEl,bar.firstChild)){ta._timed=true;setTimeout(()=>{if(typeof sb!=="undefined"&&sb)sb.textContent="답변 끝"},0)}};
   const nav=h("div",{class:"mocknav"},...mock.items.map((x,i)=>h("i",{class:i<mock.i?"done":i===mock.i?"cur":""})));
-  const next=async()=>{if(timer.on){it.secs=timerStop()||it.secs;sb.textContent="다시 시작"}if(mic&&mic._isOn&&mic._isOn())await mic._finish();it.a=ta.value.trim();if(mock.i<n-1){mock.i++;render()}else{mock.result="pending";render()}};
+  const next=async e=>{const nb=e&&e.currentTarget;if(next.busy)return;next.busy=1;if(timer.on){it.secs=timerStop()||it.secs;sb.textContent="다시 시작"}const used=!!(mic&&(mic._isOn&&mic._isOn()||MIC.stream||!!ta.value.trim()));
+    if(mic&&mic._isOn&&mic._isOn())await mic._finish();it.a=ta.value.trim();
+    if(used&&mock.i<n-1&&mock.listen){if(nb){nb.disabled=true;nb.textContent="다음 문항 준비 중…"}try{if(mic&&mic._kill)await mic._kill()}catch(x){}if(!MIC.active)micRelease();
+      audLog.push("모의시험: 마이크 닫고 통화 모드 해제 대기");await new Promise(r=>setTimeout(r,DESK?300:1500))}
+    next.busy=0;if(mock.i<n-1){mock.i++;mock.fromMic=used;render()}else{mock.result="pending";render()}};
   let plays=0;const qText=h("p",{class:"q grow",style:"margin-top:10px"},it.q);const hid=h("div",{class:"hidden-q",style:"margin-top:10px"},"질문을 듣고 답하세요. 실제 시험처럼 재생은 2번까지 가능해요.");
   const reveal=h("button",{class:"btn sm ghost",onclick:()=>{hid.hidden=true;qText.hidden=false;reveal.hidden=true}},"질문 텍스트 보기");
   const replay=h("button",{class:"btn sm",onclick:()=>{if(plays>=2){toast("실제 시험에서는 2번까지만 들을 수 있어요");return}plays++;speak(it.q,{key:it.key});replay.textContent="다시 듣기 ("+(2-plays)+"회 남음)"}},"질문 듣기 (2회)");
-  if(mock.listen){qText.hidden=true;setTimeout(()=>{plays=1;speak(it.q,{key:it.key});replay.textContent="다시 듣기 (1회 남음)"},300)}else{hid.hidden=true;reveal.hidden=true}
+  if(mock.listen){qText.hidden=true;const wait=mock.fromMic&&!DESK?600:300;mock.fromMic=false;setTimeout(()=>{if(!qText.isConnected)return;plays=1;speak(it.q,{key:it.key});replay.textContent="다시 듣기 (1회 남음)"},wait)}else{hid.hidden=true;reveal.hidden=true}
   // "답변 끝" stops the clock AND the recording; starting either one starts the other
   const micOn=()=>!!(mic&&mic._isOn&&mic._isOn());
   const stopAll=async()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}if(micOn())await mic._finish()};
