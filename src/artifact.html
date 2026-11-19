@@ -561,10 +561,11 @@ let pendingSync=null;
 let syncClose=false;
 let syncReady=false; // true once this page knows whether it is signed in (or runs without an account)
 function syncNote(msg){try{audLog.push("통합: "+msg)}catch(e){}try{localStorage.setItem("oss_lastsync",Date.now()+"|"+msg)}catch(e){}}
-(async()=>{const m=location.hash.match(/^#([sx])_(.+)$/);if(!m)return;syncClose=m[1]==="x";syncNote("링크 받음 ("+Math.round(m[2].length/1024)+"KB)");
+let syncListen=false;
+(async()=>{const m=location.hash.match(/^#([sxl])_(.+)$/);if(!m)return;syncClose=m[1]==="x";syncListen=m[1]==="l";syncNote("링크 받음 ("+Math.round(m[2].length/1024)+"KB)");
   try{pendingSync=await unpackState(m[2]);history.replaceState(null,"",location.pathname+location.search);syncNote("기록 "+((pendingSync.log||[]).length)+"건 읽음"+(syncReady?" → 바로 합치기":" → 로그인 확인 대기"));if(syncReady)applyPendingSync()}
   catch(e){syncNote("링크 해독 실패: "+(e.message||e)+" — 링크가 잘렸을 수 있어요");toast("가져온 기록을 읽을 수 없어요 (링크가 잘렸을 수 있어요). Claude에서 다시 눌러 주세요")}})();
-function applyPendingSync(){syncReady=true;if(!pendingSync)return;const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;syncNote("기록 "+n+"건 합침"+(cloud.user?" · 계정에 저장 중":" · 이 기기에만 (로그인 안 됨)"));toast((window.claude?.use?"웹 계정 기록":"Claude 기록")+" "+n+"건을 합쳤어요");syncRender();if(syncClose)syncDone(n);setTimeout(()=>clipSync(false),2000)}
+function applyPendingSync(){syncReady=true;if(!pendingSync)return;const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;syncNote("기록 "+n+"건 합침"+(cloud.user?" · 계정에 저장 중":" · 이 기기에만 (로그인 안 됨)"));toast((window.claude?.use?"웹 계정 기록":"Claude 기록")+" "+n+"건을 합쳤어요");syncRender();if(syncClose)syncDone(n);if(syncListen){syncListen=false;player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}go("listen")}setTimeout(()=>clipSync(false),2000)}
 async function syncDone(n){const ov=h("div",{style:"position:fixed;left:0;top:0;width:100%;height:100%;margin:0;padding:24px;box-sizing:border-box;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center"},h("div",{class:"card",style:"text-align:center"},h("h3",{},"통합 중…"),h("p",{class:"muted small",id:"sdmsg"},"계정에 저장하고 있어요")));document.body.append(ov);
   const msg=t=>{const el=$("#sdmsg");if(el)el.textContent=t};
   try{if(cloud.ref)await cloudPush(true);syncNote(cloud.ref?"계정 저장 완료":"이 브라우저에만 저장 (로그인 안 됨)");ov.querySelector("h3").textContent="통합 완료 ✓";msg(cloud.ref?"기록 "+n+"건이 "+(cloud.user?.email||"계정")+"에 저장됐어요. 홈 화면의 OSS 앱을 열면 반영되어 있어요. 이 화면은 그냥 두고 Claude 앱으로 돌아가면 됩니다.":"이 기기(브라우저)에만 저장됐어요. 홈 화면 앱에 반영하려면 로그인이 필요해요.")}catch(e){syncNote("계정 저장 실패: "+(e.code||e.message));ov.querySelector("h3").textContent="저장 실패";msg((e.code||e.message||String(e))+" — 기록은 이 브라우저에 남아 있어요. 네트워크를 확인하고 아래 '다시 저장'을 눌러 주세요.");ov.querySelector(".card").append(h("button",{class:"btn primary",style:"margin-top:10px",onclick:()=>{ov.remove();syncDone(n)}},"다시 저장"));return}
@@ -1983,14 +1984,17 @@ Reply with ONLY JSON: {"title":"짧은 강의 제목","sections":[{"title":"섹�
   try{const r=await aiRetry(()=>sample.json(prompt,{cache:false}),"음성 강의");const secs=(r&&r.sections||[]).map(x=>({title:String(x.title||""),parts:(x.parts||[]).map(p=>p&&p.rep?{rep:String(p.rep),ko:String(p.ko||"")}:p&&p.en?{en:String(p.en)}:p&&p.ko?{ko:String(p.ko)}:null).filter(Boolean)})).filter(x=>x.parts.length);
     if(!secs.length)throw new Error("빈 대본");l0.lec={ts:Date.now(),title:String(r.title||"모의시험 음성 강의"),secs};l0.detAt=Date.now();save();toast("음성 강의를 만들었어요 — '강의 듣기'를 누르세요");render()}
   catch(e){btn.disabled=false;btn.textContent=t0;toast("강의를 만들지 못했어요: "+errMsg(e))}}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&player.on&&player.paused&&player.hidPause){player.hidPause=false;player.paused=false;/* the line spoken when the screen went off was cut: say it again */for(let k=player.si-1;k>=0;k--){const x=player.segs[k];if(x&&(x.t==="ko"||x.t==="en")){player.si=k;break}}keepAlive(true);playerStep();mediaSession();renderMini();toast("강의를 이어서 재생해요")}});
 function lectureMins(lec){let n=0;for(const x of lec.secs)for(const p of x.parts)n+=p.rep?String(p.rep).split(/\s+/).length*2.2+3:p.en?String(p.en).split(/\s+/).length*0.45:String(p.ko||"").length*0.16;return Math.max(1,Math.round(n/60))}
-function lecturePlay(l0,from=0){const lec=l0.lec;if(!lec)return;if(!tts.ok&&!Object.keys(AUD.man).length){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
+async function lecturePrefetch(lec){if(!WEB||!TTS_URL||!navigator.onLine)return;const jobs=[];for(const x of lec.secs)for(const p of x.parts){if(p.rep)jobs.push(()=>natUrl(p.rep));else if(p.en)jobs.push(()=>natUrl(p.en));else if(p.ko)for(const k of splitKo(p.ko))jobs.push(()=>natFetch(k,"ko"))}
+  let i=0,ok=0;const run=async()=>{while(i<jobs.length){const j=jobs[i++];try{if(await j())ok++}catch(e){}}};await Promise.all([run(),run(),run()]);audLog.push("강의 음성 미리 받기 "+ok+"/"+jobs.length)}
+function lecturePlay(l0,from=0){const lec=l0.lec;if(!lec)return;lecturePrefetch(lec);if(!tts.ok&&!Object.keys(AUD.man).length){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
   if(player.on)playerStop();player.items=lec.secs.slice(from).map((x,i)=>({kind:"L",label:"🎧 "+(x.title||("파트 "+(from+i+1))),en:"",ko:"",parts:x.parts}));player.lecture=lec.title;if(player.opts.mode!=="lecture"){player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}}
   player.loop=0;player.busy=false;player.on=true;player.paused=false;player.i=0;player.segs=[];player.si=0;ttsStop();wakeLock(true);keepAlive(true);playerStep();mediaSession();renderMini();toast("강의 재생: "+lec.title);if(view==="listen")render()}
 function lectureBox(l0){if(!l0||l0.kind!=="mock"||!(l0.pq||[]).length)return null;const lec=l0.lec;
   if(!lec)return null;
   return h("div",{class:"card"},h("h3",{},"🎧 "+lec.title),h("p",{class:"muted small"},"약 "+lectureMins(lec)+"분 · "+lec.secs.length+"개 파트 · 화면을 꺼도 이어서 재생돼요 (웹)"),
-    h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>lecturePlay(l0)},"▶ 강의 듣기"),null),
+    h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>lecturePlay(l0)},"▶ 강의 듣기"),window.claude?.use?webLink("웹 앱에서 듣기 →","btn","l"):null,null),
     h("details",{},h("summary",{class:"small"},"대본 보기"),...lec.secs.map((x,i)=>h("div",{style:"margin-top:8px"},h("p",{class:"small",style:"font-weight:600"},h("button",{class:"btn sm ghost",onclick:()=>lecturePlay(l0,i)},"▶"),(i+1)+". "+x.title),
       ...x.parts.map(p=>p.rep?h("p",{class:"small",style:"color:var(--accent)"},"🗣 "+p.rep+(p.ko?" — "+p.ko:"")):p.en?h("p",{class:"small mono"},p.en):h("p",{class:"small"},p.ko))))))}
 async function vMockResult(m){
@@ -2199,6 +2203,8 @@ function playerStep(){if(!player.on||player.paused)return;const it=player.items[
     // English sentences without a recording: fetch them all first. If they cannot be made, then in the background (no device voice there)
     // skip the whole item instead of stuttering or playing only its Korean; in the foreground the device voice reads them.
     const need=(WEB&&TTS_URL&&AUD.tag!=="off")?[...new Set(player.segs.filter(x=>x.t==="en"&&!x.noUp&&/[a-z]/i.test(x.text||"")&&!txtSrc(x.text)&&!natHas(x.text)).map(x=>x.text))]:[];
+    if(it.kind==="L"&&WEB&&TTS_URL&&navigator.onLine){const ks=[...new Set(player.segs.filter(x=>x.t==="ko"&&x.text&&!slow(x.text)).map(x=>x.text))];if(ks.length&&!it._koReady){const tok=player.tok=(player.tok||0)+1;player.busy=true;
+      fillWait(Promise.all(ks.map(k=>natFetch(k,"ko").catch(()=>null))),tok,15000).then(()=>{player.busy=false;it._koReady=true;if(!player.on||player.paused||tok!==player.tok)return;player.segs=[];playerStep()});return}}
     if(need.length){const tok=player.tok=(player.tok||0)+1;
       const fail=()=>{need.forEach(t=>{if(!natHas(t))SLOW[t]=SLOW[t]||Date.now()});if(!clipJob.on&&(!clipJob.retryAt||Date.now()>clipJob.retryAt))setTimeout(()=>clipSync(false),500);
         // keep trying to make them in the background; when they arrive the item is played again a few items later
@@ -2229,6 +2235,7 @@ function playerStep(){if(!player.on||player.paused)return;const it=player.items[
     {const nx=player.segs[player.si+1];if(nx&&nx.t==="en"&&nx.text&&!nx.noUp)natUrl(nx.text)}return}
   if(seg.t==="ko"&&!seg.noUp&&!slow(seg.text)&&WEB&&TTS_URL&&navigator.onLine&&seg.text){player.segs.slice(player.si+1,player.si+4).forEach(x=>{if(x.t==="ko"&&x.text&&!slow(x.text))natFetch(x.text,"ko").catch(()=>{});else if(x.t==="en"&&x.text&&!x.noUp)natUrl(x.text).catch(()=>{})});player.busy=true;fillWait(natFetch(seg.text,"ko"),tok,9000,seg.text).then(u=>{player.busy=false;if(!player.on||player.paused||tok!==player.tok)return;if(!u){seg.noUp=true;playerStep();return}
       audPlay(u,{rate:koR(),onend:after,onerror:()=>{if(!player.on||tok!==player.tok)return;seg.noUp=true;playerStep()}})});return}
+  if(document.hidden&&player.lecture&&tts.ok){player.paused=true;player.hidPause=true;audLog.push("백그라운드: 기기 음성은 재생 불가 → 강의 일시정지");try{navigator.mediaSession.playbackState="paused"}catch(e){}return}
   if(!tts.ok||document.hidden){after();return}
   const u=new SpeechSynthesisUtterance(seg.t==="ko"?seg.text:ttsText(seg.text));
   if(seg.t==="ko"){const kv=koVoice();u.lang="ko-KR";if(kv)u.voice=kv;u.rate=koR()}else{u.lang=tts.voice?.lang||"en-US";if(tts.voice)u.voice=tts.voice;u.rate=tts.rate}u.pitch=1;
@@ -2330,6 +2337,7 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
     noL.length?h("div",{},h("p",{class:"eyebrow",style:"margin-top:10px"},"강의가 없는 모의시험"),...noL.map(l=>h("div",{class:"row",style:"margin-top:6px"},h("span",{class:"grow small"},l.date+" · "+(l.title||"모의시험")+(l.lvRaw||l.level?" · "+(l.lvRaw||l.level):"")),
       CLAUDE_ONLY()?h("button",{class:"btn sm",onclick:e=>{const x=S.log.find(y=>y.ts===l.ts)||l;mockDetail(x,x,e.currentTarget)}},"피드백 + 강의 만들기"):null))):null,
     CLAUDE_ONLY()?null:h("p",{class:"muted small"},"강의 만들기는 Claude 앱에서만 돼요. 만든 강의는 '웹으로 통합'하면 여기서도 들을 수 있어요."),
+    WEB?null:h("div",{class:"note",style:"flex-direction:column;align-items:stretch;gap:6px"},h("span",{},"Claude 앱 안에서는 휴대폰 기본 음성으로 읽어서, 화면이 꺼지거나 다른 앱으로 가면 멈춰요(돌아오면 이어서 재생). 일하면서 들으려면 웹 앱에서 들으세요 — 기록과 강의가 같이 넘어가요."),window.claude?.use?webLink("웹 앱에서 듣기 →","btn primary","l"):null),
     h("div",{class:"note"},"한국어 설명 → 영어 → 따라 말할 시간 순서로 나와요. 한 번 끝까지 재생되면 멈춰요. 웹에서는 화면을 꺼도 이어서 재생되고, 잠금화면에서 다음 파트로 넘길 수 있어요.")];
   const lecMode=o.mode==="lecture";
   const box=h("div",{class:"card"},h("div",{class:"hdr"},h("div",{},h("h3",{},lecMode?"음성 강의":"무한 재생"),h("p",{class:"muted small"},lecMode?"모의시험 피드백을 강의처럼 듣기. 목록에서 골라 재생하세요.":"업무 중 배경으로 계속 듣기. 끝나면 처음부터 다시 반복합니다.")),rateCtl()),
