@@ -453,9 +453,9 @@ const DEF={profile:{target:"IM3",name:"",age:"",job:"회사원 (직장인)",jobD
 let S=structuredClone(DEF);
 let db=null, uid=null, sample=null, docRef=null;
 const todayStr=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
-function loadLocal(){try{const r=localStorage.getItem("opic30");if(r)S=Object.assign(structuredClone(DEF),JSON.parse(r))}catch(e){}}
-let stVer=0;
-function save(){stVer++;S.updatedAt=Date.now();setTimeout(prepSyncCode,50);try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}
+function loadLocal(){try{const r=localStorage.getItem("opic30");if(r)S=Object.assign(structuredClone(DEF),JSON.parse(r))}catch(e){}try{profSnap=JSON.stringify(S.profile||{})}catch(e){}}
+let stVer=0;let profSnap=null;
+function save(){stVer++;S.updatedAt=Date.now();try{const j=JSON.stringify(S.profile||{});if(profSnap!==null&&j!==profSnap)S.profileAt=Date.now();profSnap=j}catch(e){}setTimeout(prepSyncCode,50);try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}
   if(docRef)claudePush();
   if(cloud.ref)cloudPush(false)}
 // Claude account store: three documents (256 KiB cap per document) under the viewer's private path
@@ -488,9 +488,13 @@ function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;mergeUsage(o.
   const stamp=x=>x?(x.ts||(x.date?Date.parse(x.date):0)||0):0;const newer=(v,cur)=>!cur||stamp(v)>stamp(cur)||(!fromCloud&&stamp(v)===stamp(cur)&&JSON.stringify(v)!==JSON.stringify(cur));
   for(const [k,v] of Object.entries(o.scripts||{}))if(newer(v,S.scripts[k]))S.scripts[k]=v;
   S.samples=S.samples||{};for(const [k,v] of Object.entries(o.samples||{}))if(newer(v,S.samples[k]))S.samples[k]=v;
-  Object.assign(S.models=S.models||{},o.models||{});Object.assign(S.trans=S.trans||{},o.trans||{});if((o.transVer||0)>(S.transVer||0))S.transVer=o.transVer;if((o.transAllAt||0)>(S.transAllAt||0))S.transAllAt=o.transAllAt;Object.assign(S.cards,o.cards||{});
-  for(const c of (o.custom||[])){const cur=S.custom.find(x=>x.en===c.en);if(!cur)S.custom.push(c);else if(c.ko&&(!cur.ko||(cur.koSrc==="mt"&&c.koSrc!=="mt"))){cur.ko=c.ko;if(c.koSrc)cur.koSrc=c.koSrc;else delete cur.koSrc}}for(const t of (o.texts||[]))if(!S.texts.some(x=>x.id===t.id||x.text===t.text))S.texts.push(t);
-  if(o.profile){const newer=(o.updatedAt||0)>(S.updatedAt||0);for(const [k,v] of Object.entries(o.profile)){const cur=S.profile[k];const empty=cur==null||cur===""||(Array.isArray(cur)&&!cur.length);if(newer||empty||(k==="survey"&&!fromCloud&&Array.isArray(v)&&v.length))S.profile[k]=v}}if(o.analysis&&(o.analysis.ts||0)>(S.analysis?.ts||0))S.analysis=o.analysis;if(o.drill&&o.drill.p){S.drill=S.drill&&S.drill.p?S.drill:{p:{}};for(const [k,v] of Object.entries(o.drill.p)){const cur=S.drill.p[k];if(!cur||(v&&(v.at||0)>(cur.at||0)))S.drill.p[k]=v}}if(o.today&&o.today.date===todayStr()){for(const k of ["cards","script","practice","drill"])S.today[k]=Math.max(S.today[k]||0,o.today[k]||0)}if((o.updatedAt||0)>(S.updatedAt||0))S.updatedAt=o.updatedAt;if(!fromCloud)save();else{stVer++;setTimeout(prepSyncCode,50);try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}
+  S.models=S.models||{};S.modelsAt=S.modelsAt||{};for(const [q,m] of Object.entries(o.models||{})){const t=(o.modelsAt||{})[q]||0;if(!S.models[q]||t>(S.modelsAt[q]||0)||(!t&&!S.modelsAt[q])){S.models[q]=m;if(t)S.modelsAt[q]=t}}Object.assign(S.trans=S.trans||{},o.trans||{});if((o.transVer||0)>(S.transVer||0))S.transVer=o.transVer;if((o.transAllAt||0)>(S.transAllAt||0))S.transAllAt=o.transAllAt;S.cardsAt=S.cardsAt||{};for(const [k,v] of Object.entries(o.cards||{})){const t=(o.cardsAt||{})[k]||0;if(S.cards[k]==null||t>(S.cardsAt[k]||0)||(!t&&!S.cardsAt[k])){S.cards[k]=v;if(t)S.cardsAt[k]=t}}
+  if(Array.isArray(o.delC)&&o.delC.length){const local=new Set((S.custom||[]).filter(c=>(c.addedAt||0)>(o.updatedAt||0)).map(c=>c.en));S.delC=[...new Set([...(S.delC||[]),...o.delC.filter(e=>!local.has(e))])].slice(-1000)}
+  const delC=new Set(S.delC||[]);if(delC.size)S.custom=S.custom.filter(c=>!delC.has(c.en));
+  for(const c of (o.custom||[])){if(delC.has(c.en))continue;const cur=S.custom.find(x=>x.en===c.en);if(!cur){S.custom.push(c);continue}if(c.ko&&(!cur.ko||(cur.koSrc==="mt"&&c.koSrc!=="mt"))){cur.ko=c.ko;if(c.koSrc)cur.koSrc=c.koSrc;else delete cur.koSrc}
+    for(const f of ["ex","exko","why"])if(c[f]&&!cur[f])cur[f]=c[f]}for(const t of (o.texts||[]))if(!S.texts.some(x=>x.id===t.id||x.text===t.text))S.texts.push(t);
+  if(o.profile&&(o.profileAt||S.profileAt)){if((o.profileAt||0)>(S.profileAt||0)){S.profile=Object.assign({},S.profile,o.profile);S.profileAt=o.profileAt}else for(const [k,v] of Object.entries(o.profile)){const cur=S.profile[k];if(cur==null||cur===""||(Array.isArray(cur)&&!cur.length))S.profile[k]=v}profSnap=JSON.stringify(S.profile)}
+  else if(o.profile){const newer=(o.updatedAt||0)>(S.updatedAt||0);for(const [k,v] of Object.entries(o.profile)){const cur=S.profile[k];const empty=cur==null||cur===""||(Array.isArray(cur)&&!cur.length);if(newer||empty||(k==="survey"&&!fromCloud&&Array.isArray(v)&&v.length))S.profile[k]=v}profSnap=JSON.stringify(S.profile)}if(o.analysis&&(o.analysis.ts||0)>(S.analysis?.ts||0))S.analysis=o.analysis;if(o.drill&&o.drill.p){S.drill=S.drill&&S.drill.p?S.drill:{p:{}};for(const [k,v] of Object.entries(o.drill.p)){const cur=S.drill.p[k];if(!cur||(v&&(v.at||0)>(cur.at||0)))S.drill.p[k]=v}}if(o.today&&o.today.date===todayStr()){for(const k of ["cards","script","practice","drill"])S.today[k]=Math.max(S.today[k]||0,o.today[k]||0)}if((o.updatedAt||0)>(S.updatedAt||0))S.updatedAt=o.updatedAt;if(!fromCloud)save();else{stVer++;setTimeout(prepSyncCode,50);try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}
 function ensureToday(){if(S.today.date!==todayStr()){S.today={date:todayStr(),cards:0,script:0,practice:0}}}
 
 /* ============ CLAUDE → WEB SYNC (state carried in the web URL hash) ============ */
@@ -504,8 +508,8 @@ function syncPayload(){if(!S.syncedAt||S.syncFull)return fullPayload();
   let trans={};if((S.transAllAt||0)>since)trans=S.trans||{};else{const sents=new Set();const add=t=>splitSent(t).forEach(x=>sents.add(x));
     for(const sc of [...Object.values(scripts),...Object.values(samples)])for(const x of (sc.scripts||[]))add(x&&x.answer);for(const m of Object.values(models))add(m);
     for(const x of sents)if(S.trans[x])trans[x]=S.trans[x]}
-  return {delta:true,del:S.del||[],log:S.log.filter(l=>Math.max(l.ts||Date.parse(l.date)||0,l.detAt||0)>since),scripts,samples,models,trans,custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,usage:S.usage||{},transVer:S.transVer||1,transAllAt:S.transAllAt||0,drill:S.drill||{p:{}},updatedAt:S.updatedAt}}
-function fullPayload(){return {del:S.del||[],log:S.log,scripts:S.scripts,samples:S.samples||{},models:S.models||{},trans:S.trans||{},custom:S.custom,texts:S.texts||[],cards:S.cards,profile:S.profile,today:S.today,analysis:S.analysis||null,usage:S.usage||{},transVer:S.transVer||1,transAllAt:S.transAllAt||0,drill:S.drill||{p:{}},updatedAt:S.updatedAt}}
+  return {delta:true,del:S.del||[],log:S.log.filter(l=>Math.max(l.ts||Date.parse(l.date)||0,l.detAt||0)>since),scripts,samples,models,modelsAt:S.modelsAt||{},trans,custom:S.custom,delC:S.delC||[],texts:S.texts||[],cards:S.cards,cardsAt:S.cardsAt||{},profile:S.profile,profileAt:S.profileAt||0,today:S.today,analysis:S.analysis||null,usage:S.usage||{},transVer:S.transVer||1,transAllAt:S.transAllAt||0,drill:S.drill||{p:{}},updatedAt:S.updatedAt}}
+function fullPayload(){return {del:S.del||[],log:S.log,scripts:S.scripts,samples:S.samples||{},models:S.models||{},modelsAt:S.modelsAt||{},trans:S.trans||{},custom:S.custom,delC:S.delC||[],texts:S.texts||[],cards:S.cards,cardsAt:S.cardsAt||{},profile:S.profile,profileAt:S.profileAt||0,today:S.today,analysis:S.analysis||null,usage:S.usage||{},transVer:S.transVer||1,transAllAt:S.transAllAt||0,drill:S.drill||{p:{}},updatedAt:S.updatedAt}}
 function packStateSync(){return "r"+b64u(new TextEncoder().encode(JSON.stringify(syncPayload())).buffer)}
 const SYNC_LIM=180000;
 async function packJSON(obj){const bytes=new TextEncoder().encode(JSON.stringify(obj));
@@ -1508,7 +1512,7 @@ function renderFeedback(box0,r,q,a){const box={replaceChildren:(...k)=>box0.repl
 }
 function copy(t){navigator.clipboard?.writeText(t||"").then(()=>toast("복사했어요")).catch(()=>toast("복사가 막혀 있어요. 직접 선택해 복사해 주세요"))}
 function kxRow(x){return h("div",{},h("span",{class:"en"},x.en),h("span",{class:"ko"},x.ko),x.ex?h("span",{class:"ex"},"예) "+x.ex,x.exko?h("span",{class:"muted"},x.exko):null):null)}
-function addCards(list,src){let n=0;for(const x of list){if(!x?.en)continue;if(S.custom.some(c=>c.en===x.en))continue;S.custom.push({id:"u"+Date.now()+"_"+n,c:"custom",en:x.en,ko:x.ko||"",...(x.ex?{ex:String(x.ex)}:{}),...(x.exko?{exko:String(x.exko)}:{}),...(x.why?{why:x.why}:{}),src:(src||"").slice(0,60)});n++}save();if(n){setTimeout(()=>fillCardKo().then(fillCardEx).then(()=>clipSync(false)),1500)}toast(n?n+"장 추가했어요":"이미 있는 표현이에요")}
+function addCards(list,src){let n=0;for(const x of list){if(!x?.en)continue;if(S.delC&&S.delC.includes(x.en))S.delC=S.delC.filter(e=>e!==x.en);if(S.custom.some(c=>c.en===x.en))continue;S.custom.push({id:"u"+Date.now()+"_"+n,c:"custom",addedAt:Date.now(),en:x.en,ko:x.ko||"",...(x.ex?{ex:String(x.ex)}:{}),...(x.exko?{exko:String(x.exko)}:{}),...(x.why?{why:x.why}:{}),src:(src||"").slice(0,60)});n++}save();if(n){setTimeout(()=>fillCardKo().then(fillCardEx).then(()=>clipSync(false)),1500)}toast(n?n+"장 추가했어요":"이미 있는 표현이에요")}
 
 /* ---- ANALYSIS (예상 등급·추세) ---- */
 const QTN={desc:"묘사",routine:"습관·루틴",exp:"경험",compare:"비교·변화",rp:"롤플레이",adv:"고난도",intro:"자기소개",chat:"AI 대화",mock:"모의시험"};
@@ -2285,13 +2289,13 @@ function vCards(m){
   const fl=h("div",{class:"flash"+(deck.flip?" flip":""),onclick:()=>{deck.flip=!deck.flip;fl.classList.toggle("flip",deck.flip)}},h("div",{class:"in"},
     h("div",{class:"face"},h("span",{class:"eyebrow"},CAT[card?.c]||"추가 표현"),h("span",{class:"big"},card?.en||"—"),card?.ex?h("div",{class:"exb"},h("span",{class:"e"},"예) "+card.ex)):null,h("span",{class:"muted small"},"탭해서 뜻 보기")),
     h("div",{class:"face back"},h("span",{class:"big"},card?.ko||"—"),card?.ex?h("div",{class:"exb"},h("span",{class:"e"},"예) "+card.ex),card.exko?h("span",{class:"muted"},card.exko):null):null,card?.src?h("span",{class:"muted small"},"출처: "+card.src):null,h("span",{class:"muted small"},"소리 내어 3번 말해 보세요"))));
-  const mark=v=>{if(!card)return;S.cards[card.id]=v;S.today.cards++;save();deck.i=(deck.i+1)%deck.order.length;deck.flip=false;render()};
+  const mark=v=>{if(!card)return;S.cards[card.id]=v;(S.cardsAt=S.cardsAt||{})[card.id]=Date.now();S.today.cards++;save();deck.i=(deck.i+1)%deck.order.length;deck.flip=false;render()};
   put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},"Expression cards · 외운 표현 "+known),h("h1",{},"표현카드")),h("div",{style:"min-width:170px"},sel)),
     h("p",{class:"muted small mono"},(deck.i+1)+" / "+deck.order.length+(card&&S.cards[card.id]==="known"?" · 외움":card&&S.cards[card.id]==="again"?" · 다시":"")),
     fl,
     h("div",{class:"row"},spkBtn(card?.en||"",null,card?.id),h("button",{class:"btn grow",onclick:()=>mark("again")},"다시 볼래요"),h("button",{class:"btn primary grow",onclick:()=>mark("known")},"외웠어요")),
     h("div",{class:"note"},"카드 앞면을 보고 먼저 입으로 말한 다음 뒤집어 확인하세요. AI 피드백에서 '표현카드에 추가'를 누르면 내 표현이 여기 쌓입니다."),
-    S.custom.length?h("details",{class:"card"},h("summary",{},"내가 추가한 표현 ("+S.custom.length+")"),h("div",{class:"kx",style:"margin-top:8px"},...S.custom.map(c=>h("div",{},h("span",{class:"en"},c.en),h("span",{class:"ko"},c.ko),c.ex?h("span",{class:"ex"},"예) "+c.ex):null,h("button",{class:"btn sm ghost",onclick:()=>{S.custom=S.custom.filter(x=>x.id!==c.id);deck.order=[];save();render()}},"삭제"))))):null);
+    S.custom.length?h("details",{class:"card"},h("summary",{},"내가 추가한 표현 ("+S.custom.length+")"),h("div",{class:"kx",style:"margin-top:8px"},...S.custom.map(c=>h("div",{},h("span",{class:"en"},c.en),h("span",{class:"ko"},c.ko),c.ex?h("span",{class:"ex"},"예) "+c.ex):null,h("button",{class:"btn sm ghost",onclick:()=>{S.custom=S.custom.filter(x=>x.id!==c.id);S.delC=[...new Set([...(S.delC||[]),c.en])].slice(-1000);deck.order=[];save();render()}},"삭제"))))):null);
 }
 
 /* ---- WEAK-POINT DRILL (약점 훈련) ----
@@ -2774,7 +2778,7 @@ loadLocal();cloudInit();render();setTimeout(prepSyncCode,500);setTimeout(()=>{if
     try{window.__oss_notOwner=!(await u.isOwner());const cw=await u.can?.("data.write");if(cw===false){claudeCanWrite=false}}catch(e){}
     const remote=await claudeLoad(col);const m={exists:!!remote};
     if(remote){/* db data is frozen: claudeLoad returns a plain copy */
-      if((remote.updatedAt||0)>(S.updatedAt||0)){S=Object.assign(structuredClone(DEF),remote);try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}else if((S.updatedAt||0)>(remote.updatedAt||0)){mergeState(remote,true)}
+      if((remote.updatedAt||0)>(S.updatedAt||0)){S=Object.assign(structuredClone(DEF),remote);profSnap=JSON.stringify(S.profile||{});try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}else if((S.updatedAt||0)>(remote.updatedAt||0)){mergeState(remote,true)}
       claudeSavedAt=remote.updatedAt||0}
     docRef=col;if(!m.exists&&S.updatedAt)claudePush()}catch(e){docRef=null;toast("Claude 계정 저장소 연결 실패: "+(e.code||e.message||e))}}
   render();setTimeout(applyPendingSync,300);setTimeout(()=>fillCardKo().then(fillCardEx).then(()=>fillTrans()),5000);
