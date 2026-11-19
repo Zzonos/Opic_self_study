@@ -2155,7 +2155,7 @@ function playerNext(){player.loop=0;if(!player.on)return;clearTimeout(player.t);
 function silenceSegs(sec){const out=[];let left=Math.floor(sec+0.001);for(const d of [20,10,5,3,2,1]){while(left>=d){out.push({t:"file",src:"audio/silence_"+d+".mp3",rate:1});left-=d}}const frac=Math.round((sec-Math.floor(sec+0.001))*1000);if(frac>=100)out.push({t:"wait",ms:frac});return out}
 const koR=()=>Math.min(1.5,Math.max(0.8,+player.opts.koRate||1.2));
 function buildSegs(it){const o=player.opts;const segs=[];
-  if(it.kind==="L"){for(const p of it.parts||[]){if(p.rep){segs.push(...silenceSegs(0.6),{t:"en",text:p.rep,ko:p.ko||""},...silenceSegs(Math.min(9,2+String(p.rep).split(/\s+/).length/2.2)))}else if(p.en)segs.push({t:"en",text:p.en,ko:""},...silenceSegs(0.5));else if(p.ko)for(const k of splitKo(p.ko))segs.push({t:"ko",text:k})}segs.push(...silenceSegs(1.5));return segs}const src=audSrc(it.key);const sents=splitSent(it.en);const inf=(+o.repeat)===0;const ko=o.ko!=="off"&&!(inf&&player.loop>0);const n=inf?1:Math.max(1,o.repeat|0);const pause=Math.max(0,+o.pause||0);
+  if(it.kind==="L"){for(const p of it.parts||[]){if(p.rep){segs.push(...silenceSegs(1),{t:"en",text:p.rep,ko:p.ko||""},...silenceSegs(Math.min(9,Math.round(2+String(p.rep).split(/\s+/).length/2.2))))}else if(p.en)segs.push({t:"en",text:p.en,ko:""},...silenceSegs(1));else if(p.ko)for(const k of splitKo(p.ko))segs.push({t:"ko",text:k})}segs.push(...silenceSegs(2));return segs}const src=audSrc(it.key);const sents=splitSent(it.en);const inf=(+o.repeat)===0;const ko=o.ko!=="off"&&!(inf&&player.loop>0);const n=inf?1:Math.max(1,o.repeat|0);const pause=Math.max(0,+o.pause||0);
   // where the translation goes: after the first repetition (default) or right before the last one
   const late=o.koAt==="last"&&n>=2;const koBefore=r=>ko&&late&&r===n-1;const koAfter=r=>ko&&!late&&r===0;
   const koSeg=(text,key)=>{const f=koSrc(key);return f?{t:"file",src:f,rate:koR(),text:"",ko:text}:{t:"ko",text,en:key?undefined:it.en}};
@@ -2226,7 +2226,7 @@ function playerStep(){if(!player.on||player.paused)return;const it=player.items[
     player.segs.slice(player.si+1,player.si+6).forEach(x=>{if(x.t==="file"&&/^fs:/.test(x.src)){const [t2,h2]=x.src.slice(3).split("/");clipUrl(t2,h2)}});return}
   if(seg.t==="file"){const m=/silence_(\d+)/.exec(seg.src||"");if(m){const want=+m[1]*1000;const t0=Date.now();audPlay(seg.src,{rate:1,onend:()=>{const left=want-(Date.now()-t0);if(left>150){audLog.push("silence short by "+(left/1000).toFixed(1)+"s → 타이머 보정");player.t=setTimeout(()=>{player.t=null;after()},left)}else after()}});return}
     audPlay(seg.src,{rate:seg.rate,onend:after});return}
-  if(seg.t==="wait"){player.t=setTimeout(()=>{player.t=null;after()},seg.ms);return}
+  if(seg.t==="wait"){if(document.hidden){audPlay("audio/silence_1.mp3",{rate:1,onend:after,onerror:after});return}player.t=setTimeout(()=>{player.t=null;after()},seg.ms);return}
   // speech synthesis segments (fallback / Korean): cannot run while the page is in the background on iPhone → skip
   {const up=seg.noUp?null:seg.t==="en"&&seg.text?txtSrc(seg.text):seg.t==="ko"&&seg.en?txtSrc(seg.en,"ko"):null;if(up){const isKo=seg.t==="ko";if(isKo){seg.ko=seg.text;seg.text=""}seg.t="file";seg.src=up;seg.rate=isKo?koR():tts.rate;playerStep();return}}
   // English without a recording: synthesize it on demand with the natural voice (web), device voice only as a last resort
