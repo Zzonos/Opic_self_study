@@ -537,17 +537,22 @@ function webLink(label,cls,mode="s"){const url=webUrl(mode);if(!url){prepSyncCod
 function syncToWeb(){try{const url=webUrl();if(!url){toast("기록이 너무 커서 링크로 못 보내요. 설정의 기록 코드를 사용해 주세요");return}
   const w=window.open(url,"_blank","noopener");S.syncedAt=Date.now();save();toast(w?"웹 앱이 열리면 로그인 후 자동으로 통합돼요":"팝업이 차단됐어요. 브라우저에서 팝업을 허용해 주세요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
 function unsyncedCount(){const t=S.syncedAt||0;return S.log.filter(l=>(l.ts||0)>t||(!l.ts&&t===0)).length}
+function lastSyncLine(){let v="";try{v=localStorage.getItem("oss_lastsync")||""}catch(e){}if(!v)return null;const [t,...m]=v.split("|");return h("p",{class:"muted small"},"마지막 Claude 통합: "+new Date(+t).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})+" · "+m.join("|"))}
 function syncCard(){if(window.claude?.use===undefined)return null;const n=unsyncedCount();
   return h("div",{class:"card"},h("h3",{},"웹으로 통합"),h("p",{class:"muted small"},"여기(Claude)가 기본 저장소예요. '웹으로 통합'은 웹 계정에 저장만 하고 완료 화면을 띄우고(처음 한 번은 로그인 필요), '통합하고 웹 열기'는 저장 후 웹 앱에 머물러요. 웹 → Claude 방향은 Claude가 링크 데이터를 전달하지 않아 아래 '기록 코드'로만 가능해요."),
     h("div",{class:"row"},webLink("웹으로 통합"+(n?" (새 기록 "+n+"건)":""),"btn primary","x"),webLink("통합하고 웹 열기 →","btn","s"),h("button",{class:"btn sm ghost",onclick:()=>{S.syncFull=true;save();toast("다음 '웹으로 통합'은 전체 기록을 보내요 (링크가 길어져요)");render()}},S.syncFull?"전체 보내기 예약됨":"전체 기록 보내기"),S.syncedAt?h("span",{class:"muted small"},"마지막 전송 "+new Date(S.syncedAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})):null))}
 // web side: pick up a payload from the URL hash and merge it once signed in (or right away without an account)
 let pendingSync=null;
 let syncClose=false;
-(async()=>{const m=location.hash.match(/^#([sx])_(.+)$/);if(!m)return;syncClose=m[1]==="x";try{pendingSync=await unpackState(m[2]);history.replaceState(null,"",location.pathname+location.search)}catch(e){toast("가져온 기록을 읽을 수 없어요")}})();
-function applyPendingSync(){if(!pendingSync)return;const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;toast((window.claude?.use?"웹 계정 기록":"Claude 기록")+" "+n+"건을 합쳤어요");syncRender();if(syncClose)syncDone(n);setTimeout(()=>clipSync(false),2000)}
+let syncReady=false; // true once this page knows whether it is signed in (or runs without an account)
+function syncNote(msg){try{audLog.push("통합: "+msg)}catch(e){}try{localStorage.setItem("oss_lastsync",Date.now()+"|"+msg)}catch(e){}}
+(async()=>{const m=location.hash.match(/^#([sx])_(.+)$/);if(!m)return;syncClose=m[1]==="x";syncNote("링크 받음 ("+Math.round(m[2].length/1024)+"KB)");
+  try{pendingSync=await unpackState(m[2]);history.replaceState(null,"",location.pathname+location.search);syncNote("기록 "+((pendingSync.log||[]).length)+"건 읽음"+(syncReady?" → 바로 합치기":" → 로그인 확인 대기"));if(syncReady)applyPendingSync()}
+  catch(e){syncNote("링크 해독 실패: "+(e.message||e)+" — 링크가 잘렸을 수 있어요");toast("가져온 기록을 읽을 수 없어요 (링크가 잘렸을 수 있어요). Claude에서 다시 눌러 주세요")}})();
+function applyPendingSync(){syncReady=true;if(!pendingSync)return;const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;syncNote("기록 "+n+"건 합침"+(cloud.user?" · 계정에 저장 중":" · 이 기기에만 (로그인 안 됨)"));toast((window.claude?.use?"웹 계정 기록":"Claude 기록")+" "+n+"건을 합쳤어요");syncRender();if(syncClose)syncDone(n);setTimeout(()=>clipSync(false),2000)}
 async function syncDone(n){const ov=h("div",{style:"position:fixed;left:0;top:0;width:100%;height:100%;margin:0;padding:24px;box-sizing:border-box;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center"},h("div",{class:"card",style:"text-align:center"},h("h3",{},"통합 중…"),h("p",{class:"muted small",id:"sdmsg"},"계정에 저장하고 있어요")));document.body.append(ov);
   const msg=t=>{const el=$("#sdmsg");if(el)el.textContent=t};
-  try{if(cloud.ref)await cloudPush(true);ov.querySelector("h3").textContent="통합 완료 ✓";msg(cloud.ref?"기록 "+n+"건이 "+(cloud.user?.email||"계정")+"에 저장됐어요. 홈 화면의 OSS 앱을 열면 반영되어 있어요. 이 화면은 그냥 두고 Claude 앱으로 돌아가면 됩니다.":"이 기기(브라우저)에만 저장됐어요. 홈 화면 앱에 반영하려면 로그인이 필요해요.")}catch(e){ov.querySelector("h3").textContent="저장 실패";msg(e.code||e.message||String(e));return}
+  try{if(cloud.ref)await cloudPush(true);syncNote(cloud.ref?"계정 저장 완료":"이 브라우저에만 저장 (로그인 안 됨)");ov.querySelector("h3").textContent="통합 완료 ✓";msg(cloud.ref?"기록 "+n+"건이 "+(cloud.user?.email||"계정")+"에 저장됐어요. 홈 화면의 OSS 앱을 열면 반영되어 있어요. 이 화면은 그냥 두고 Claude 앱으로 돌아가면 됩니다.":"이 기기(브라우저)에만 저장됐어요. 홈 화면 앱에 반영하려면 로그인이 필요해요.")}catch(e){syncNote("계정 저장 실패: "+(e.code||e.message));ov.querySelector("h3").textContent="저장 실패";msg((e.code||e.message||String(e))+" — 기록은 이 브라우저에 남아 있어요. 네트워크를 확인하고 아래 '다시 저장'을 눌러 주세요.");ov.querySelector(".card").append(h("button",{class:"btn primary",style:"margin-top:10px",onclick:()=>{ov.remove();syncDone(n)}},"다시 저장"));return}
   ov.querySelector(".card").append(h("div",{class:"row",style:"justify-content:center;margin-top:10px"},h("a",{class:"btn primary",href:ART_URL,style:"text-decoration:none"},"Claude 앱으로 돌아가기"),h("button",{class:"btn ghost",onclick:()=>ov.remove()},"웹 앱 계속 보기")))}
 // web → Claude: copy a packed code (and try the URL hash), then open the artifact
 let syncCode=null,syncCodeAt=0,syncVer=-1;
@@ -588,7 +593,7 @@ try{cloud.skip=localStorage.getItem("oss_skiplogin")==="1"}catch(e){}
 function cloudInit(){if(!window.firebase?.initializeApp||!window.firebase?.auth)return;try{firebase.initializeApp(FB_CONFIG);cloud.ok=true;const auth=firebase.auth();auth.useDeviceLanguage();
   auth.onAuthStateChanged(async u=>{cloud.ready=true;if(cloud.unsub){cloud.unsub();cloud.unsub=null}cloud.user=u;cloud.ref=null;
     if(u&&cloud.signingUp){return} // signup writes the first document itself (with the invite code), then calls cloudAttach
-    if(u)await cloudAttach(u);apiApply();render()})}catch(e){cloud.ok=false}}
+    if(u)await cloudAttach(u);else if(pendingSync&&!cloud.skip){syncNote("로그인 안 됨 → 로그인하면 합쳐요");toast("Claude 기록을 받았어요. 로그인하면 계정에 합쳐져요")}apiApply();render()})}catch(e){cloud.ok=false}}
 async function cloudAttach(u){cloud.user=u;cloud.ref=firebase.firestore().collection("users").doc(u.uid);try{await cloudPull(true)}catch(e){toast("클라우드 기록을 불러오지 못했어요: "+(e.code||e.message))}clipIdxLoad();
   setTimeout(applyPendingSync,300);
   if(cloud.unsub)cloud.unsub();cloud.unsub=cloud.ref.onSnapshot(snap=>{if(!snap.exists||snap.metadata.hasPendingWrites)return;cloudApply(snap.data())});}
@@ -608,10 +613,10 @@ async function cloudPull(first){if(!cloud.ref)return;const snap=await cloud.ref.
 const HIST={};const hasDet=l=>!!(l&&(l.a||l.model||(l.pq&&l.pq.length)));
 async function histArchive(){if(!cloud.ref)return;for(const l of S.log){if(!l.ts||l.ar||!hasDet(l))continue;try{await cloud.ref.collection("meta").doc("h_"+l.ts).set({l:JSON.stringify(l),t:l.ts});l.ar=true;HIST[l.ts]=l}catch(e){break}}}
 function histLoad(ts){if(HIST[ts]||!cloud.ref)return Promise.resolve(HIST[ts]||null);return cloud.ref.collection("meta").doc("h_"+ts).get().then(d=>{if(!d.exists)return null;const l=JSON.parse(d.data().l||"null");HIST[ts]=l;return l}).catch(()=>null)}
-function cloudState(){const o=Object.assign({},S);const keep=S.log.length-40;o.log=S.log.map((l,i)=>i<keep&&l.ar&&hasDet(l)?(()=>{const c=Object.assign({},l);delete c.a;delete c.model;delete c.pq;delete c.str;return c})():l);return JSON.stringify(o)}
+function cloudState(){let j="";for(const n of [40,15,5]){const o=Object.assign({},S);const keep=S.log.length-n;o.log=S.log.map((l,i)=>i<keep&&l.ar&&hasDet(l)?(()=>{const c=Object.assign({},l);delete c.a;delete c.model;delete c.pq;delete c.str;delete c.lec;return c})():l);j=JSON.stringify(o);if(j.length<900000)break;audLog.push("계정 저장 크기 "+Math.round(j.length/1024)+"KB → 오래된 기록 상세 줄임")}return j}
 async function cloudPush(now){if(!cloud.ref)return;clearTimeout(cloud.pushT);const doIt=async()=>{try{/* merge what another device saved first, so this push never overwrites it */try{const snap=await cloud.ref.get({source:"server"});if(snap.exists){const d=snap.data();if(d.updatedAt&&d.updatedAt!==cloud.lastPush&&d.state)mergeState(JSON.parse(d.state),true)}}catch(e){}
-    cloud.lastPush=S.updatedAt||Date.now();await histArchive();await cloud.ref.set({state:cloudState(),updatedAt:cloud.lastPush,email:cloud.user?.email||""},{merge:true});statsPush();const el=$("#syncst");if(el)el.textContent="동기화됨 "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}catch(e){const el=$("#syncst");if(el)el.textContent="동기화 실패: "+(e.code||e.message)}};
-  if(now)await doIt();else cloud.pushT=setTimeout(doIt,1500)}
+    cloud.lastPush=S.updatedAt||Date.now();await histArchive();await cloud.ref.set({state:cloudState(),updatedAt:cloud.lastPush,email:cloud.user?.email||""},{merge:true});statsPush();cloud.lastErr=null;const el=$("#syncst");if(el)el.textContent="동기화됨 "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}catch(e){cloud.lastErr=e;audLog.push("계정 저장 실패: "+(e.code||e.message));const el=$("#syncst");if(el)el.textContent="동기화 실패: "+(e.code||e.message)}};
+  if(now){await doIt();if(cloud.lastErr)throw cloud.lastErr}else cloud.pushT=setTimeout(doIt,1500)}
 // per-account usage summary (each user writes only their own; the owner account can read all — see firestore.rules)
 const ADMIN_EMAIL="zzono717@gmail.com";
 function usageStats(){const L=S.log||[];const by=k=>L.filter(l=>l.kind===k).length;const u=S.usage||{};
@@ -1413,9 +1418,9 @@ function vHistory(m){const KIND={practice:"연습",mock:"모의시험",chat:"대
       l.model?h("div",{},h("p",{class:"eyebrow"},"모범답안"+(l.modelLatest?" · 이 질문의 최근 모범답안":"")),h("div",{class:"model"},l.model),h("div",{class:"row",style:"margin-top:6px"},spkBtn(l.model),h("button",{class:"btn sm",onclick:()=>go("listen",{text:l.model,title:l.title})},"쉐도잉"))):null,
       l.kind==="mock"&&(l.pq||[]).length?lectureBox(l0):null,
       l.kind==="mock"&&(l.pq||[]).length?h("div",{},
-        mockOld?h("p",{class:"muted small"},"이 모의시험은 예전 방식으로 채점돼 틀린 표현·팁이 없어요. '자세한 피드백 받기'로 저장된 답변에 대한 피드백을 받을 수 있어요 (레벨·점수는 그대로)."):null,
+        mockOld&&CLAUDE_ONLY()?h("p",{class:"muted small"},"이 모의시험은 예전 방식으로 채점돼 틀린 표현·팁이 없어요. '자세한 피드백 받기'로 저장된 답변에 대한 피드백과 음성 강의를 받을 수 있어요 (레벨·점수는 그대로)."):null,
         l.lvPrev?h("p",{class:"muted small"},"다시 채점됨 · 처음 판정 "+l.lvPrev):null,
-        h("div",{class:"row"},h("button",{class:"btn primary sm",onclick:e=>mockDetail(l0,l,e.currentTarget)},mockOld?"자세한 피드백 받기":"자세한 피드백 다시 받기"),h("button",{class:"btn sm",onclick:e=>mockRegrade(l0,l,e.currentTarget)},"다시 채점")),
+        h("div",{class:"row"},CLAUDE_ONLY()?h("button",{class:"btn primary sm",onclick:e=>mockDetail(l0,l,e.currentTarget)},mockOld?"자세한 피드백 받기":"자세한 피드백 다시 받기"):null,h("button",{class:"btn sm",onclick:e=>mockRegrade(l0,l,e.currentTarget)},"다시 채점")),CLAUDE_ONLY()?null:claudeOnlyNote(),
         h("p",{class:"muted small"},"저장된 답변으로 다시 분석해요. 설정의 '채점·분석 모델'"+(S.profile.aiTier==="complex"?" (지금: 최고 성능)":" (지금: 기본)")+"을 써요."+((l.pq||[]).some(x=>x&&x.a&&x.a.length===600)?" 이 시험은 답변이 600자까지만 저장돼 긴 답변은 뒷부분이 빠진 채로 분석돼요.":""))):null,
       (l.pq||[]).length?h("details",{open:!!(l.pq||[]).some(x=>x&&x.fx)},h("summary",{},"문항별 피드백 ("+l.pq.length+")"),mockPatterns(l.pat),...l.pq.map((x,i)=>h("div",{style:"margin-top:10px;display:flex;flex-direction:column;gap:4px"},h("p",{class:"small",style:"font-weight:600"},(i+1)+". "+(x.q||"")+(x.l?" · "+x.l:"")),x.a?h("p",{class:"muted small"},x.a):null,x.pr&&x.pr.pron!=null?h("p",{class:"muted small"},"🎙 Azure 발음 "+x.pr.pron+" · 정확도 "+x.pr.acc+" · 유창성 "+x.pr.flu+(x.pr.pros!=null?" · 억양 "+x.pr.pros:"")+(x.s?" · "+fmt(x.s):"")):null,x.c?h("p",{class:"small"},x.c):null,x.g?h("p",{class:"small",style:"color:var(--good)"},"👍 "+x.g):null,mockFixList(x.fx),mockClosing(x.cl),x.t?h("p",{class:"small"},h("b",{},"💡 다음에는 "),x.t):null,x.b?h("p",{class:"small",style:"color:var(--accent)"},"→ "+x.b):null))):null,
       l.recovered&&!l.a?h("p",{class:"muted small"},"예전 기록이라 내 답변·총평은 저장돼 있지 않아요."):!hasDet(l)&&!fx.length?h("p",{class:"muted small"},HIST["_"+l0.ts]&&!HIST[l0.ts]&&cloud.ref?"세부 내용을 불러오는 중이거나, 세부 내용이 저장되기 전에 만든 기록이에요.":"세부 내용이 저장되기 전에 만든 기록이라 점수만 남아 있어요."):null,
@@ -1887,6 +1892,10 @@ function mockQCard(p,it){const fx=(p.fixes||[]).filter(f=>f&&f.original&&f.bette
     p.better?h("div",{},h("p",{class:"eyebrow"},"이렇게 말해 보세요"),h("p",{class:"small",style:"color:var(--accent)"},p.better),h("div",{class:"row",style:"margin-top:4px"},spkBtn(p.better),save)):save)}
 // an earlier mock test (before detailed feedback): grade its saved answers again for corrections, tips and repeated mistakes.
 // The level and score stay as they were — only the detail is added.
+const CLAUDE_ONLY=()=>!!window.claude?.use;
+const claudeOnlyNote=()=>h("p",{class:"muted small"},"자세한 피드백과 음성 강의는 Claude 앱에서 만들 수 있어요. Claude에서 만든 뒤 '웹으로 통합'하면 여기서도 보고 들을 수 있어요.");
+// after the detail is saved, the lecture is made from it right away
+async function detailThenLecture(l0,btn){if(!l0)return;const b=btn||document.createElement("button");b.disabled=true;b.textContent="음성 강의 만드는 중… (1–2분)";toast("자세한 피드백 완료 — 이어서 음성 강의를 만들어요");await lectureMake(l0,b)}
 async function mockDetailAI(pq,lvl){const body=pq.map((x,i)=>`Q${i+1}: ${x.q||""}\nA${i+1}${x.s?" ("+x.s+"s)":""}: ${x.a||"(no answer)"}${prLine(x.pr||x.pron)}`).join("\n\n");
   const prompt=`You are an experienced OPIc rater and speaking coach for a Korean learner (target ${tgt()}). Below are the questions and the learner's answers (voice-dictated) from a mock test that was already rated ${lvl||"?"} overall. Do NOT re-rate; give feedback the learner can act on.
 - "fixes": up to 3 real mistakes per answer, most important first. "original" = the learner's exact words copied from the answer (short span), "better" = the natural corrected version, "why" = 한국어 한 줄. Grammar, wrong word, Korean-style phrasing, tense etc. Skip misheard names and fillers. No fixes for a solid answer.
@@ -1907,14 +1916,14 @@ function mockDetailSave(l0,pq,D){l0.pq=pq.map((x,i)=>{const d=D.at(i);return Obj
   l0.pat=D.patterns;l0.fixes=[...l0.pq.flatMap(x=>x.fx),...(l0.fixes||[]).filter(f=>!f.o)];l0.detAt=Date.now();save()}
 // history: a saved mock test (answers kept up to 600 characters each)
 async function mockDetail(l0,l,btn){if(!sample){toast(ERR.not_granted);return}const pq=(l.pq||[]).filter(x=>x);if(!pq.length)return;btn.disabled=true;btn.textContent="자세한 피드백 만드는 중… (30–60초)";
-  try{const D=await mockDetailAI(pq,l.lvRaw||l.level);if(l0.a==null&&l.a)l0.a=l.a;mockDetailSave(l0,pq,D);toast("자세한 피드백을 넣었어요");render()}
+  try{const D=await mockDetailAI(pq,l.lvRaw||l.level);if(l0.a==null&&l.a)l0.a=l.a;mockDetailSave(l0,pq,D);render();await detailThenLecture(l0)}
   catch(e){btn.disabled=false;btn.textContent="자세한 피드백 받기";toast("만들지 못했어요: "+errMsg(e))}}
 // result screen: the test just taken (full answers)
 async function mockDetailNow(r,btn){if(!sample){toast(ERR.not_granted);return}btn.disabled=true;btn.textContent="자세한 피드백 만드는 중… (30–60초)";
   try{const D=await mockDetailAI(mock.items.map(it=>({q:it.q,a:it.a,s:it.secs,pron:it.pron})),r.level);
     (r.per_question||[]).forEach((p,k)=>{const d=D.at((p.n||k+1)-1);p.comment=d.comment||p.comment;p.good=d.good||"";p.tip=d.tip||"";p.better=d.better||p.better;p.fixes=fxOf(d);p.closing=clOf(d)});r.patterns=D.patterns;r._detail=true;
     const l0=S.log.find(x=>x.kind==="mock"&&x.ts===r._ts);if(l0&&l0.pq)mockDetailSave(l0,l0.pq.map((x,i)=>Object.assign({},x,{a:((mock.items[i]||{}).a||x.a||"").slice(0,3000)})),D);
-    toast("자세한 피드백을 넣었어요");render()}
+    render();await detailThenLecture(l0)}
   catch(e){btn.disabled=false;btn.textContent="자세한 피드백 받기";toast("만들지 못했어요: "+errMsg(e))}}
 async function mockRegrade(l0,l,btn){if(!sample){toast(ERR.not_granted);return}const pq=(l.pq||[]).filter(x=>x);if(!pq.length)return;
   btn.disabled=true;const t0=btn.textContent;btn.textContent="다시 채점 중… (30–90초)";
@@ -1965,9 +1974,9 @@ function lecturePlay(l0,from=0){const lec=l0.lec;if(!lec)return;if(!tts.ok&&!Obj
   player.loop=0;player.busy=false;player.on=true;player.paused=false;player.i=0;player.segs=[];player.si=0;ttsStop();wakeLock(true);keepAlive(true);playerStep();mediaSession();renderMini();toast("강의 재생: "+lec.title);if(view==="listen")render()}
 function lectureBox(l0){if(!l0||l0.kind!=="mock"||!(l0.pq||[]).length)return null;const lec=l0.lec;
   if(!lec)return h("div",{class:"card"},h("h3",{},"🎧 음성 강의"),h("p",{class:"muted small"},"이 시험의 피드백을 일하면서 들을 수 있는 한국어 음성 강의로 만들어요. 틀린 표현을 짚어 주고, 고친 영어 문장은 따라 말할 시간을 줘요. (AI가 대본을 한 번 만들고, 듣는 건 무료예요. 자세한 피드백을 먼저 받으면 더 구체적이에요.)"),
-    h("button",{class:"btn primary",onclick:e=>lectureMake(l0,e.currentTarget)},"🎧 음성 강의 만들기"));
+    CLAUDE_ONLY()?h("button",{class:"btn primary",onclick:e=>lectureMake(l0,e.currentTarget)},"🎧 음성 강의 만들기"):claudeOnlyNote());
   return h("div",{class:"card"},h("h3",{},"🎧 "+lec.title),h("p",{class:"muted small"},"약 "+lectureMins(lec)+"분 · "+lec.secs.length+"개 파트 · 화면을 꺼도 이어서 재생돼요 (웹)"),
-    h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>lecturePlay(l0)},"▶ 강의 듣기"),h("button",{class:"btn sm ghost",onclick:e=>{if(confirm("강의 대본을 다시 만들까요?"))lectureMake(l0,e.currentTarget)}},"다시 만들기")),
+    h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>lecturePlay(l0)},"▶ 강의 듣기"),CLAUDE_ONLY()?h("button",{class:"btn sm ghost",onclick:e=>{if(confirm("강의 대본을 다시 만들까요?"))lectureMake(l0,e.currentTarget)}},"다시 만들기"):null),
     h("details",{},h("summary",{class:"small"},"대본 보기"),...lec.secs.map((x,i)=>h("div",{style:"margin-top:8px"},h("p",{class:"small",style:"font-weight:600"},h("button",{class:"btn sm ghost",onclick:()=>lecturePlay(l0,i)},"▶"),(i+1)+". "+x.title),
       ...x.parts.map(p=>p.rep?h("p",{class:"small",style:"color:var(--accent)"},"🗣 "+p.rep+(p.ko?" — "+p.ko:"")):p.en?h("p",{class:"small mono"},p.en):h("p",{class:"small"},p.ko))))))}
 async function vMockResult(m){
@@ -1981,7 +1990,7 @@ async function vMockResult(m){
   put(m,h("div",{},h("p",{class:"eyebrow"},"Mock result"),h("h1",{},"모의시험 결과")),
     h("div",{class:"card"},h("div",{class:"lvl"},h("b",{},r.level),h("span",{class:"muted mono"},(r.score??"")+" / 100"),lvIdx(r.level)>=tgtIdx()?h("span",{class:"chip good"},"목표 달성"):h("span",{class:"chip warn"},"목표 "+tgt())),h("p",{},r.summary||""),rehWarn(r),tierLine(r._tier),nameNote(r._nfix),
       r.top_fixes?.length?h("div",{},h("p",{class:"eyebrow"},"가장 먼저 고칠 것"),h("ol",{style:"margin:4px 0 0;padding-left:18px"},...r.top_fixes.map(s=>h("li",{},s)))):null),
-    r._detail?mockPatterns(r.patterns):h("div",{class:"card"},h("h3",{},"자세한 피드백"),h("p",{class:"muted small"},"문항마다 틀린 표현 → 고친 표현과 이유, 잘한 점, 다음에 어떻게 말하면 좋을지, 여러 문항에서 반복된 실수를 정리해 줘요. (30–60초)"),h("button",{class:"btn primary",onclick:e=>mockDetailNow(r,e.currentTarget)},"자세한 피드백 받기")),
+    r._detail?mockPatterns(r.patterns):h("div",{class:"card"},h("h3",{},"자세한 피드백 + 음성 강의"),h("p",{class:"muted small"},"문항마다 틀린 표현 → 고친 표현과 이유, 잘한 점, 마무리, 다음에 어떻게 말하면 좋을지, 반복된 실수를 정리하고, 이어서 그 내용으로 일하면서 들을 음성 강의를 만들어요. (2–3분)"),CLAUDE_ONLY()?h("button",{class:"btn primary",onclick:e=>mockDetailNow(r,e.currentTarget)},"자세한 피드백 받기"):claudeOnlyNote()),
     h("h3",{style:"margin:6px 2px 0"},"문항별 피드백"),
     ...(r.per_question||[]).map(p=>mockQCard(p,mock.items[(p.n||1)-1]||{})),
     r._prev?h("p",{class:"muted small"},"다시 채점됨 · 처음 판정 "+r._prev):null,
@@ -2305,8 +2314,8 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
   const lectureOpts=[h("p",{class:"eyebrow"},"모의시험 음성 강의 "+withL.length+"개"),
     withL.length?h("div",{class:"list"},...withL.map(lecRow)):h("p",{class:"muted small"},"아직 만든 강의가 없어요. 아래 모의시험에서 만들거나, 모의시험 결과·기록 화면의 '🎧 음성 강의 만들기'를 누르세요."),
     noL.length?h("div",{},h("p",{class:"eyebrow",style:"margin-top:10px"},"강의가 없는 모의시험"),...noL.map(l=>h("div",{class:"row",style:"margin-top:6px"},h("span",{class:"grow small"},l.date+" · "+(l.title||"모의시험")+(l.lvRaw||l.level?" · "+(l.lvRaw||l.level):"")),
-      h("button",{class:"btn sm",disabled:!sample,onclick:e=>lectureMake(S.log.find(x=>x.ts===l.ts)||l,e.currentTarget)},"강의 만들기")))):null,
-    sample?null:h("p",{class:"muted small"},"강의 만들기는 AI가 연결됐을 때(Claude 앱 또는 API 모드)만 돼요. 만든 강의는 어디서나 들을 수 있어요."),
+      CLAUDE_ONLY()?h("button",{class:"btn sm",onclick:e=>lectureMake(S.log.find(x=>x.ts===l.ts)||l,e.currentTarget)},"강의 만들기"):null))):null,
+    CLAUDE_ONLY()?null:h("p",{class:"muted small"},"강의 만들기는 Claude 앱에서만 돼요. 만든 강의는 '웹으로 통합'하면 여기서도 들을 수 있어요."),
     h("div",{class:"note"},"한국어 설명 → 영어 → 따라 말할 시간 순서로 나와요. 한 번 끝까지 재생되면 멈춰요. 웹에서는 화면을 꺼도 이어서 재생되고, 잠금화면에서 다음 파트로 넘길 수 있어요.")];
   const lecMode=o.mode==="lecture";
   const box=h("div",{class:"card"},h("div",{class:"hdr"},h("div",{},h("h3",{},lecMode?"음성 강의":"무한 재생"),h("p",{class:"muted small"},lecMode?"모의시험 피드백을 강의처럼 듣기. 목록에서 골라 재생하세요.":"업무 중 배경으로 계속 듣기. 끝나면 처음부터 다시 반복합니다.")),rateCtl()),
@@ -2729,7 +2738,7 @@ function vSettings(m){
     h("div",{class:"card"},h("h3",{},"서베이 선택 주제"),h("p",{class:"muted small"},spec().strategy),cks),
     h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{for(const k in F)p[k]=F[k].value.trim();const oldT=tgt();p.target=tsel.value;p.job=job.value;p.home=home.value;if(oldT!==p.target)setTimeout(()=>toast("목표를 "+p.target+"로 바꿨어요. 스크립트·예시는 다시 만들면 새 목표 기준으로 나와요"),400);p.survey=survey.filter(t=>cks.querySelector("#sv_"+t.id).checked).map(t=>t.id);p.workOff=employed()&&!p.survey.includes("work");save();toast("저장했어요")}},"저장")),
     tts.ok?voiceCard():null,
-    syncCard(),webImportCard(),
+    syncCard(),webImportCard(),window.claude?.use?null:(()=>{const l=lastSyncLine();return l?h("div",{class:"note"},l):null})(),
     h("div",{class:"card"},h("h3",{},"기록 옮기기 (웹 ↔ Claude)"),h("p",{class:"muted small"},"학습 기록·스크립트·내 표현·해석·프로필을 코드로 복사해 다른 곳에서 붙여넣으면 합쳐져요. 양쪽 기록이 모두 남습니다."),
       h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{const code=curSyncCode();const box=$("#expbox");box.hidden=false;box.value=code;let p=copyNow(code)?Promise.resolve():null;if(!p){try{p=navigator.clipboard.writeText(code)}catch(e){}}
         const fail=()=>{box.focus();box.select();toast("자동 복사가 막혔어요. 아래 칸을 길게 눌러 전체 선택 → 복사하세요")};if(p&&p.then)p.then(()=>toast("기록 코드를 복사했어요 ("+Math.round(code.length/1024)+"KB). 안 되면 아래 칸에서 직접 복사하세요"),fail);else fail()}},"기록 코드 복사"),h("button",{class:"btn sm ghost",onclick:()=>{const b=$("#expbox");if(b.hidden||!b.value){toast("먼저 '기록 코드 복사'를 누르세요");return}b.focus();b.select();b.setSelectionRange(0,b.value.length);toast("전체 선택됨 — 복사하세요")}},"전체 선택")),
