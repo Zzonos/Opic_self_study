@@ -483,7 +483,7 @@ function mergeUsage(u){if(!u||typeof u!=="object")return;S.usage=S.usage||{};con
 function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;mergeUsage(o.usage);const key=logKey;
   if(Array.isArray(o.del)&&o.del.length){const d=new Set(S.del||[]);o.del.forEach(k=>d.add(k));S.del=[...d].slice(-3000)}const dead=new Set(S.del||[]);if(dead.size)S.log=S.log.filter(l=>!logDead(dead,l));
   const seen=new Set([...S.log.map(key),...dead]);const byKey=new Map(S.log.map(l=>[key(l),l]));
-  for(const l of (o.log||[])){if(logDead(dead,l))continue;const k=key(l);if(!seen.has(k)){S.log.push(l);seen.add(k);continue}const cur=byKey.get(k);if(cur&&(l.detAt||0)>(cur.detAt||0)){for(const f of ["pq","pat","fixes","detAt"])if(l[f]!=null)cur[f]=l[f];if(l.a&&(!cur.a||l.a.length>cur.a.length))cur.a=l.a}}S.log.sort((a,b)=>a.date<b.date?-1:1);
+  for(const l of (o.log||[])){if(logDead(dead,l))continue;const k=key(l);if(!seen.has(k)){S.log.push(l);seen.add(k);continue}const cur=byKey.get(k);const hasDet2=x=>!!(x&&(x.pq||[]).some(q=>q&&(q.fx||q.t)));if(cur&&((l.detAt||0)>(cur.detAt||0)||hasDet2(l)&&!hasDet2(cur))){for(const f of ["pq","pat","fixes","detAt"])if(l[f]!=null)cur[f]=l[f];if(l.a&&(!cur.a||l.a.length>cur.a.length))cur.a=l.a}}S.log.sort((a,b)=>a.date<b.date?-1:1);
   // newer wins (exact time when known); a record sent from Claude also wins a tie, since scripts are made there
   const stamp=x=>x?(x.ts||(x.date?Date.parse(x.date):0)||0):0;const newer=(v,cur)=>!cur||stamp(v)>stamp(cur)||(!fromCloud&&stamp(v)===stamp(cur)&&JSON.stringify(v)!==JSON.stringify(cur));
   for(const [k,v] of Object.entries(o.scripts||{}))if(newer(v,S.scripts[k]))S.scripts[k]=v;
