@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261119-231344-00b986">
+<html lang="ko" data-build="20261119-231838-c1186c">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -2655,7 +2655,7 @@ function vSettings(m){
   const fields=PF.map(([k,l,ph])=>{if(k==="jobDetail")return [h("label",{class:"f"},"직업",job),fld(k,"하는 일 (한 줄)",ph)];if(k==="city")return [fld(k,l,ph),h("label",{class:"f"},"거주 형태",home)];return fld(k,l,ph,["company","hobby","fav","memory","extra"].includes(k))}).flat();
   const cks=h("div",{class:"cks"},...survey.map(t=>h("label",{},h("input",{type:"checkbox",id:"sv_"+t.id,checked:mySurvey().includes(t.id)}),t.ko+(t.job?" (직장인)":""))));
   put(m,h("div",{},h("p",{class:"eyebrow"},"Profile & survey"),h("h1",{},"설정")),
-    accountCard(),apiCard(),
+    accountCard(),apiCard(),tierCard(),
     (()=>{const form=h("div",{style:"display:contents"},h("label",{class:"f"},"목표 레벨",tsel),h("p",{class:"muted small"},"목표에 따라 모범답안·스크립트·예시의 분량과 난이도, 대화 상대의 질문 수준, 분석의 목표선이 바뀌어요. 목표를 바꾸면 이미 만든 스크립트·예시는 그대로 남고, 다시 만들면 새 목표 기준으로 나옵니다."),h("p",{class:"muted small"},"한국어로 편하게 적으면 돼요. 많이 채울수록 예시 스크립트·모범답안이 실제 내 이야기처럼 나오고, 시험장에서 외운 내용을 그대로 쓸 수 있어요. ("+profileFill()+"/"+(PF.length-1)+" 입력)"),...fields);
       if(window.claude?.use||sample)return h("div",{class:"card"},h("h3",{},"내 프로필"),h("p",{class:"muted small"},"계정별로 저장되며 AI 평가·예시 스크립트·모범답안·대화에 모두 쓰입니다."),form);
       form.hidden=true;const summary=h("p",{class:"small"},"목표 "+tgt()+(profileFill()?" · "+profileText():" · 아직 입력된 프로필이 없어요."));
@@ -2712,9 +2712,17 @@ function parseReply(t){const tryP=x=>{try{return {ok:true,v:JSON.parse(x)}}catch
   const i=String(t).search(/[\[{]/),j=Math.max(String(t).lastIndexOf("}"),String(t).lastIndexOf("]"));if(i>=0&&j>i){r=tryP(String(t).slice(i,j+1));if(r.ok)return r.v}
   const e=new Error("invalid_json");e.code="invalid_json";e.text=t;throw e}
 const TIER_KO={default:"기본 모델(균형형)",quick:"빠른 모델",complex:"최고 성능 모델"};
+function tierCard(){if(!sample&&!window.claude?.use)return null;const cur=S.profile.aiTier==="complex"?"complex":"default";
+  const opt=(v,t,d)=>h("label",{class:"row",style:"cursor:pointer;gap:8px;align-items:flex-start"},h("input",{type:"radio",name:"aitier",checked:cur===v,onchange:()=>{S.profile.aiTier=v;save();toast(v==="complex"?"채점·분석을 최고 성능 모델로 해요":"채점·분석을 기본 모델로 해요");render()}}),h("span",{},h("b",{},t),h("br"),h("span",{class:"muted small"},d)));
+  return h("div",{class:"card"},h("h3",{},"채점·분석 모델"),
+    opt("default","기본 모델 (균형형)","빠르고 사용량을 적게 써요. "+(WEB&&API.on?"API: Sonnet":"")),
+    opt("complex","최고 성능 모델",WEB&&API.on?"API: Opus. 더 꼼꼼하지만 느리고 비용이 약 5배예요.":"Claude 앱의 가장 높은 모델로 요청해요. 요금제에 따라 다른 모델로 바뀔 수 있고, 결과 아래 '분석 모델' 줄에 실제로 쓴 모델이 나와요. 느리고 사용량을 더 써요."),
+    h("p",{class:"muted small"},"연습 평가, 모의시험 채점, 모의시험 자세한 피드백, AI 코치에 적용돼요. 대화·스크립트·해석은 그대로예요."))}
 function tierLine(t){if(!t||!t.applied)return null;if(/^api:/.test(t.applied)){const m=t.applied.slice(4);return h("p",{class:"muted small",style:"margin:6px 0 0"},"🤖 분석 모델: "+(API_MODEL_KO[m]||m)+" (API)")}const low=t.req&&t.applied!==t.req;return h("p",{class:"muted small",style:"margin:6px 0 0"},"🤖 분석 모델: "+(TIER_KO[t.applied]||t.applied)+(low?" — 요청한 "+(TIER_KO[t.req]||t.req)+" 대신 요금제에 맞춰 대체됨":""))}
 function tierCount(req,applied){try{if(/^api:/.test(applied||""))req=applied;S.usage=S.usage||{};const m=S.usage.tier=S.usage.tier||{};const k=(req||"default")+">"+(applied||req||"default");m[k]=(m[k]||0)+1}catch(e){}}
-function wrapSample(s){const w=(...a)=>s(...a);w.json=async(input,opt)=>{aiCount(input);
+const BEST_KINDS=["eval","mock","coach"];
+const bestTier=(input,opt)=>(!opt||!opt.modelTier)&&S.profile&&S.profile.aiTier==="complex"&&BEST_KINDS.includes(aiKind(input))?Object.assign({},opt||{},{modelTier:"complex"}):opt;
+function wrapSample(s){const w=(...a)=>s(...a);w.json=async(input,opt)=>{opt=bestTier(input,opt);aiCount(input);
     // use the plain call so we learn which model tier actually answered (json() does not report it)
     const want=(opt&&opt.modelTier)||"default";const r=await s(input,opt);tierCount(want,r&&r.modelTierApplied);
     if(r&&r.truncated){const fx=jsonRepair(r.text);if(!(fx&&fx.v&&typeof fx.v==="object")){const e=new Error("invalid_json");e.code="invalid_json";e.text=r.text;throw e}audLog.push("응답 길이 한도 → 잘린 끝 버리고 복구");const out=JSON.parse(JSON.stringify(fx.v));out._cut=true;return out}
