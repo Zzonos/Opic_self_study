@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261119-232122-a23e35">
+<html lang="ko" data-build="20261119-232649-3ba34d">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1932,7 +1932,7 @@ async function mockDetailNow(r,btn){if(!sample){toast(ERR.not_granted);return}bt
   catch(e){btn.disabled=false;btn.textContent="자세한 피드백 받기";toast("만들지 못했어요: "+errMsg(e))}}
 async function mockRegrade(l0,l,btn){if(!sample){toast(ERR.not_granted);return}const pq=(l.pq||[]).filter(x=>x);if(!pq.length)return;
   btn.disabled=true;const t0=btn.textContent;btn.textContent="다시 채점 중… (30–90초)";
-  try{const items=pq.map((x,i)=>({q:x.q,a:x.a,kind:((l.perq||[])[i]||{}).kind||"",secs:0}));const r=await aiRetry(()=>evalMock(items,null,l.diff),"모의시험 채점");
+  try{const items=pq.map((x,i)=>({q:x.q,a:x.a,kind:((l.perq||[])[i]||{}).kind||"",secs:x.s||0}));const r=await aiRetry(()=>evalMock(items,null,l.diff),"모의시험 채점");
     if(!r||!r.level)throw new Error("빈 응답");
     l0.lvPrev=l0.lvPrev||(l.lvRaw||l.level);l0.level=lvNorm(r.level)||r.level;l0.lvRaw=r.level;l0.score=r.score;l0.sum=r.summary||l0.sum;l0.tier=r._tier;l0.regAt=Date.now();
     l0.pq=pq.map((x,i)=>{const d=(r.per_question||[]).find(p=>+p.n===i+1)||(r.per_question||[])[i]||{};return Object.assign({},x,{l:d.level||x.l,c:d.comment||x.c,b:d.better||x.b})});
@@ -1940,11 +1940,20 @@ async function mockRegrade(l0,l,btn){if(!sample){toast(ERR.not_granted);return}c
     l0.fixes=[...(l0.fixes||l.fixes||[]).filter(f=>f.o),...(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)}))];l0.detAt=Date.now();
     save();toast("다시 채점했어요: "+(l0.lvPrev&&l0.lvPrev!==r.level?l0.lvPrev+" → ":"")+r.level);render()}
   catch(e){btn.disabled=false;btn.textContent=t0;toast("채점하지 못했어요: "+errMsg(e))}}
+async function mockRegradeNow(btn){if(!sample){toast(ERR.not_granted);return}const r0=mock.result;btn.disabled=true;const t0=btn.textContent;btn.textContent="다시 채점 중… (30–90초)";
+  try{const r=await aiRetry(()=>evalMock(mock.items,null),"모의시험 채점");if(!r||!r.level)throw new Error("빈 응답");
+    r._ts=r0._ts;r._prev=r0._prev||r0.level;mock.result=r;
+    const l0=S.log.find(x=>x.kind==="mock"&&x.ts===r0._ts);
+    if(l0){l0.lvPrev=l0.lvPrev||(l0.lvRaw||l0.level);l0.level=lvNorm(r.level)||r.level;l0.lvRaw=r.level;l0.score=r.score;l0.sum=r.summary||l0.sum;l0.tier=r._tier;l0.regAt=Date.now();
+      l0.pq=(r.per_question||[]).map((x,i)=>({q:(mock.items[i]||{}).q||"",a:((mock.items[i]||{}).a||"").slice(0,3000),s:(mock.items[i]||{}).secs||0,l:x.level,c:x.comment,b:x.better}));
+      l0.perq=(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}));delete l0.pat;l0.fixes=(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)}));l0.detAt=Date.now();save()}
+    toast("다시 채점했어요: "+(r._prev!==r.level?r._prev+" → ":"")+r.level);render()}
+  catch(e){btn.disabled=false;btn.textContent=t0;toast("채점하지 못했어요: "+errMsg(e))}}
 async function vMockResult(m){
   if(mock.result==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"15문항 채점 중… (30–90초)")));
     put(m,h("h1",{},"채점 중"),box);
     if(!sample){box.replaceChildren(h("p",{},ERR.not_granted),h("button",{class:"btn",onclick:()=>{mock=null;render()}},"닫기"));return}
-    try{const r=await evalMock(mock.items,null);{const ap=new Set();for(const it of mock.items){const nf=fixNames(it.a,r.name_fixes);if(nf.applied.length){it.a=nf.text;nf.applied.forEach(x=>ap.add(x))}}r._nfix=[...ap]}mock.result=r;r._ts=Date.now();S.log.push({date:todayStr(),ts:r._ts,kind:"mock",tier:r._tier,qt:"mock",sum:r.summary||"",pq:(r.per_question||[]).map((x,i)=>({q:(mock.items[i]||{}).q||"",a:((mock.items[i]||{}).a||"").slice(0,3000),l:x.level,c:x.comment,b:x.better,g:x.good||"",t:x.tip||"",fx:(x.fixes||[]).filter(f=>f&&f.original&&f.better).slice(0,3).map(f=>({o:f.original,b:f.better,w:f.why||""}))})),pat:(r.patterns||[]).slice(0,3),title:"모의시험 "+mock.items.length+"문항 · 난이도 "+mockDiffLabel(),diff:mockDiffLabel(),level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0),fixes:[...(r.per_question||[]).flatMap(x=>(x.fixes||[]).filter(f=>f&&f.original&&f.better).map(f=>({o:f.original,b:f.better,w:f.why||""}))),...(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)}))],perq:(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}))});save();render()}
+    try{const r=await evalMock(mock.items,null);{const ap=new Set();for(const it of mock.items){const nf=fixNames(it.a,r.name_fixes);if(nf.applied.length){it.a=nf.text;nf.applied.forEach(x=>ap.add(x))}}r._nfix=[...ap]}mock.result=r;r._ts=Date.now();S.log.push({date:todayStr(),ts:r._ts,kind:"mock",tier:r._tier,qt:"mock",sum:r.summary||"",pq:(r.per_question||[]).map((x,i)=>({q:(mock.items[i]||{}).q||"",a:((mock.items[i]||{}).a||"").slice(0,3000),s:(mock.items[i]||{}).secs||0,l:x.level,c:x.comment,b:x.better,g:x.good||"",t:x.tip||"",fx:(x.fixes||[]).filter(f=>f&&f.original&&f.better).slice(0,3).map(f=>({o:f.original,b:f.better,w:f.why||""}))})),pat:(r.patterns||[]).slice(0,3),title:"모의시험 "+mock.items.length+"문항 · 난이도 "+mockDiffLabel(),diff:mockDiffLabel(),level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0),fixes:[...(r.per_question||[]).flatMap(x=>(x.fixes||[]).filter(f=>f&&f.original&&f.better).map(f=>({o:f.original,b:f.better,w:f.why||""}))),...(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)}))],perq:(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}))});save();render()}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{render()}},"다시 시도"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"닫기")))}
     return}
   const r=mock.result;
@@ -1954,7 +1963,8 @@ async function vMockResult(m){
     r._detail?mockPatterns(r.patterns):h("div",{class:"card"},h("h3",{},"자세한 피드백"),h("p",{class:"muted small"},"문항마다 틀린 표현 → 고친 표현과 이유, 잘한 점, 다음에 어떻게 말하면 좋을지, 여러 문항에서 반복된 실수를 정리해 줘요. (30–60초)"),h("button",{class:"btn primary",onclick:e=>mockDetailNow(r,e.currentTarget)},"자세한 피드백 받기")),
     h("h3",{style:"margin:6px 2px 0"},"문항별 피드백"),
     ...(r.per_question||[]).map(p=>mockQCard(p,mock.items[(p.n||1)-1]||{})),
-    h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{mock=null;render()}},"닫기")));
+    r._prev?h("p",{class:"muted small"},"다시 채점됨 · 처음 판정 "+r._prev):null,
+    h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{mock=null;render()}},"닫기"),h("button",{class:"btn ghost",onclick:e=>mockRegradeNow(e.currentTarget)},"다시 채점 (전체 답변·시간)")));
 }
 
 /* ---- SCRIPTS ---- */
