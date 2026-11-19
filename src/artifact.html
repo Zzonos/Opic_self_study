@@ -1961,7 +1961,7 @@ Reply with ONLY JSON: {"title":"짧은 강의 제목","sections":[{"title":"섹�
   catch(e){btn.disabled=false;btn.textContent=t0;toast("강의를 만들지 못했어요: "+errMsg(e))}}
 function lectureMins(lec){let n=0;for(const x of lec.secs)for(const p of x.parts)n+=p.rep?String(p.rep).split(/\s+/).length*2.2+3:p.en?String(p.en).split(/\s+/).length*0.45:String(p.ko||"").length*0.16;return Math.max(1,Math.round(n/60))}
 function lecturePlay(l0,from=0){const lec=l0.lec;if(!lec)return;if(!tts.ok&&!Object.keys(AUD.man).length){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
-  if(player.on)playerStop();player.items=lec.secs.slice(from).map((x,i)=>({kind:"L",label:"🎧 "+(x.title||("파트 "+(from+i+1))),en:"",ko:"",parts:x.parts}));player.lecture=lec.title;
+  if(player.on)playerStop();player.items=lec.secs.slice(from).map((x,i)=>({kind:"L",label:"🎧 "+(x.title||("파트 "+(from+i+1))),en:"",ko:"",parts:x.parts}));player.lecture=lec.title;if(player.opts.mode!=="lecture"){player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}}
   player.loop=0;player.busy=false;player.on=true;player.paused=false;player.i=0;player.segs=[];player.si=0;ttsStop();wakeLock(true);keepAlive(true);playerStep();mediaSession();renderMini();toast("강의 재생: "+lec.title);if(view==="listen")render()}
 function lectureBox(l0){if(!l0||l0.kind!=="mock"||!(l0.pq||[]).length)return null;const lec=l0.lec;
   if(!lec)return h("div",{class:"card"},h("h3",{},"🎧 음성 강의"),h("p",{class:"muted small"},"이 시험의 피드백을 일하면서 들을 수 있는 한국어 음성 강의로 만들어요. 틀린 표현을 짚어 주고, 고친 영어 문장은 따라 말할 시간을 줘요. (AI가 대본을 한 번 만들고, 듣는 건 무료예요. 자세한 피드백을 먼저 받으면 더 구체적이에요.)"),
@@ -2232,6 +2232,11 @@ function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[pla
   const en=(seg.t==="file"&&seg.text)||seg.t==="en"?(seg.text||it.en):it.en;const ko=seg.t==="ko"?seg.text:(seg.ko||it.ko||"");
   const silent=seg.t==="wait"||(seg.t==="file"&&/silence_/.test(seg.src||""));const pauseLeft=silent?player.segs.slice(player.si).reduce((a,x)=>(x.t==="wait")?a+x.ms/1000:(x.t==="file"&&/silence_/.test(x.src))?a+(+x.src.match(/_(\d+)/)[1]):a,0):0;
   const head=h("span",{class:"eyebrow"},({Q:"질문",A:"답변",C:"표현",T:"내 자료"}[it.kind]||"")+" · "+(it.label||"")+" · "+(player.i+1)+"/"+player.items.length+(audSrc(it.key)||(seg.t==="file"&&!/silence_/.test(seg.src||""))?" · 🎧":""));
+  if(it.kind==="L"){const lh=h("span",{class:"eyebrow"},"🎧 "+(player.lecture||"음성 강의")+" · "+(player.i+1)+"/"+player.items.length+" "+(it.label||"").replace(/^🎧 /,""));
+    const rep=seg.t==="en"&&(it.parts||[]).find(p=>p.rep===seg.text);
+    b.replaceChildren(lh,silent?h("p",{class:"muted small",style:"margin:4px 0 0"},pauseLeft>=2?"🗣 따라 말해 보세요 · "+pauseLeft.toFixed(0)+"초":"…"):
+      seg.t==="ko"?h("p",{style:"font-size:16px;line-height:1.55;margin:4px 0 0"},seg.text):
+      h("div",{},h("p",{class:"en",style:"font-size:17px;line-height:1.5;margin:4px 0 0"+(rep?";color:var(--accent);font-weight:600":"")},(rep?"🗣 ":"")+(seg.text||"")),rep&&rep.ko?h("p",{class:"muted small",style:"margin:2px 0 0"},rep.ko):null));return}
   if(it.kind==="A"){// scripts: show the whole text, highlight the sentence being read; translations below, current one highlighted
     const sents=splitSent(it.en);const curEn=(seg.t==="en"||(seg.t==="file"&&seg.text))?seg.text:null;const curKo=seg.t==="ko"?seg.text:(seg.t==="file"&&!seg.text&&seg.ko)?seg.ko:null;
     const enP=h("p",{class:"en",style:"font-size:16px;line-height:1.5;margin:0"},...sents.map((sn,i)=>h("span",{style:curEn===sn?"background:rgba(15,118,110,.18);border-radius:4px;padding:0 2px":"",class:curEn===sn?"":"muted"},sn+(i<sents.length-1?" ":""))));
@@ -2250,8 +2255,8 @@ function transBtn(){const all=[...new Set(transSources().flatMap(g=>g.sents))];c
   return out}
 function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{try{localStorage.setItem("opic30_player",JSON.stringify(o))}catch(e){}};
   const ck=(k,l)=>h("label",{},h("input",{type:"checkbox",id:"pl_"+k,checked:o[k],onchange:e=>{o[k]=e.target.checked;saveO()}}),l);
-  const setMode=m=>{if(o.mode===m)return;o.mode=m;saveO();if(player.on){player.items=buildPlaylist();player.i=0;player.segs=[];player.si=0;audStop();if(tts.ok)speechSynthesis.cancel();if(!player.items.length){playerStop();toast("재생할 항목이 없어요")}else{clearTimeout(player.t);player.t=null;playerStep()}}render()};
-  const tabs=h("div",{class:"segs"},...[["sent","짧은 문장"],["sample","예시"],["script","내 스크립트"],["model","내 모범답안"]].map(([v,l])=>h("button",{class:"seg"+(o.mode===v?" on":""),style:"white-space:nowrap;font-size:13px;padding-left:4px;padding-right:4px;min-width:0",onclick:()=>setMode(v)},l)));
+  const setMode=m=>{if(o.mode===m)return;o.mode=m;saveO();if(m==="lecture"||player.lecture){render();return}if(player.on){player.items=buildPlaylist();player.i=0;player.segs=[];player.si=0;audStop();if(tts.ok)speechSynthesis.cancel();if(!player.items.length){playerStop();toast("재생할 항목이 없어요")}else{clearTimeout(player.t);player.t=null;playerStep()}}render()};
+  const tabs=h("div",{class:"segs"},...[["sent","짧은 문장"],["sample","예시"],["script","내 스크립트"],["model","모범답안"],["lecture","음성 강의"]].map(([v,l])=>h("button",{class:"seg"+(o.mode===v?" on":""),style:"white-space:nowrap;font-size:13px;padding-left:4px;padding-right:4px;min-width:0",onclick:()=>setMode(v)},l)));
   const now=h("div",{class:"nowbox",id:"nowbox"},h("span",{class:"muted small"},"재생을 누르면 여기에 지금 나오는 문장이 표시돼요."));
   const sts=scriptTopics();const nScripts=sts.reduce((a,t)=>a+(S.scripts[t.id].scripts||[]).length,0);
   const pickTopics=(list,key,label)=>h("div",{class:"cks"},...list.map(t=>h("label",{},h("input",{type:"checkbox",checked:!o[key].length||o[key].includes(t.id),onchange:e=>{const all=list.map(x=>x.id);let cur=o[key].length?o[key].slice():all.slice();cur=e.target.checked?[...new Set([...cur,t.id])]:cur.filter(x=>x!==t.id);o[key]=cur.length===all.length?[]:cur;saveO();if(player.on){player.items=buildPlaylist();player.i=Math.min(player.i,Math.max(0,player.items.length-1))}}}),label(t))));
@@ -2291,10 +2296,23 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
     h("div",{class:"cks"},ck("withQ","질문도 같이 듣기"),ck("shuffle","섞기")),
     ...common,
     h("div",{class:"note"},"연습에서 AI 평가를 받을 때 내가 말한 이야기를 목표 레벨로 다듬어 준 모범답안이에요. 질문마다 가장 최근 것만 들어가고, 같은 질문을 다시 연습하면 새 모범답안으로 바뀝니다.")];
-  const box=h("div",{class:"card"},h("div",{class:"hdr"},h("div",{},h("h3",{},"무한 재생"),h("p",{class:"muted small"},"업무 중 배경으로 계속 듣기. 끝나면 처음부터 다시 반복합니다.")),rateCtl()),
-    tabs,clipLine,now,
-    h("div",{class:"row"},player.on?h("button",{class:"btn primary",onclick:playerPause},player.paused?"▶ 이어서":"⏸ 일시정지"):(()=>{const p=savedPos();return p?h("span",{class:"row"},h("button",{class:"btn primary",onclick:()=>playerStart(true)},"▶ 이어서 재생 ("+(p.i+1)+"/"+p.items.length+")"),h("button",{class:"btn",onclick:()=>playerStart(false)},"처음부터")):h("button",{class:"btn primary",onclick:()=>playerStart(false)},"▶ 무한 재생 시작")})(),player.on?h("button",{class:"btn",onclick:playerPrev},"◀◀ 이전"):null,player.on?h("button",{class:"btn",onclick:playerNext},"다음 ▶▶"):null,player.on?h("button",{class:"btn ghost",onclick:playerStop},"■ 끄기"):null),
-    ...(o.mode==="script"?scriptOpts:o.mode==="sample"?sampleOpts:o.mode==="model"?modelOpts:sentOpts));
+  // 음성 강의: every mock test that has a lecture, newest first; pick one to play. Tests without one can get one here.
+  const mocks=S.log.filter(l=>l.kind==="mock"&&(l.pq||[]).length).slice().reverse();const withL=mocks.filter(l=>l.lec),noL=mocks.filter(l=>!l.lec).slice(0,5);
+  const lecRow=l=>{const playing=player.on&&player.lecture===l.lec.title;return h("div",{class:"li",style:"flex-direction:column;align-items:stretch;gap:4px"+(playing?";border-color:var(--accent)":"")},
+    h("div",{class:"row"},h("button",{class:"btn sm "+(playing?"":"primary"),onclick:()=>{if(playing)playerPause();else lecturePlay(l)}},playing?(player.paused?"▶":"⏸"):"▶"),h("span",{class:"grow small",style:"font-weight:600"},l.lec.title),h("span",{class:"muted small"},"약 "+lectureMins(l.lec)+"분")),
+    h("span",{class:"muted small"},l.date+" · "+(l.title||"모의시험")+(l.lvRaw||l.level?" · "+(l.lvRaw||l.level):"")),
+    h("details",{},h("summary",{class:"small"},"파트 고르기 · 대본"),...l.lec.secs.map((x,i)=>h("div",{class:"row",style:"margin-top:6px"},h("button",{class:"btn sm ghost",onclick:()=>lecturePlay(l,i)},"▶"),h("span",{class:"small"},(i+1)+". "+x.title)))))};
+  const lectureOpts=[h("p",{class:"eyebrow"},"모의시험 음성 강의 "+withL.length+"개"),
+    withL.length?h("div",{class:"list"},...withL.map(lecRow)):h("p",{class:"muted small"},"아직 만든 강의가 없어요. 아래 모의시험에서 만들거나, 모의시험 결과·기록 화면의 '🎧 음성 강의 만들기'를 누르세요."),
+    noL.length?h("div",{},h("p",{class:"eyebrow",style:"margin-top:10px"},"강의가 없는 모의시험"),...noL.map(l=>h("div",{class:"row",style:"margin-top:6px"},h("span",{class:"grow small"},l.date+" · "+(l.title||"모의시험")+(l.lvRaw||l.level?" · "+(l.lvRaw||l.level):"")),
+      h("button",{class:"btn sm",disabled:!sample,onclick:e=>lectureMake(S.log.find(x=>x.ts===l.ts)||l,e.currentTarget)},"강의 만들기")))):null,
+    sample?null:h("p",{class:"muted small"},"강의 만들기는 AI가 연결됐을 때(Claude 앱 또는 API 모드)만 돼요. 만든 강의는 어디서나 들을 수 있어요."),
+    h("div",{class:"note"},"한국어 설명 → 영어 → 따라 말할 시간 순서로 나와요. 한 번 끝까지 재생되면 멈춰요. 웹에서는 화면을 꺼도 이어서 재생되고, 잠금화면에서 다음 파트로 넘길 수 있어요.")];
+  const lecMode=o.mode==="lecture";
+  const box=h("div",{class:"card"},h("div",{class:"hdr"},h("div",{},h("h3",{},lecMode?"음성 강의":"무한 재생"),h("p",{class:"muted small"},lecMode?"모의시험 피드백을 강의처럼 듣기. 목록에서 골라 재생하세요.":"업무 중 배경으로 계속 듣기. 끝나면 처음부터 다시 반복합니다.")),rateCtl()),
+    tabs,lecMode?null:clipLine,now,
+    lecMode&&!player.on?null:h("div",{class:"row"},player.on?h("button",{class:"btn primary",onclick:playerPause},player.paused?"▶ 이어서":"⏸ 일시정지"):(()=>{const p=savedPos();return p?h("span",{class:"row"},h("button",{class:"btn primary",onclick:()=>playerStart(true)},"▶ 이어서 재생 ("+(p.i+1)+"/"+p.items.length+")"),h("button",{class:"btn",onclick:()=>playerStart(false)},"처음부터")):h("button",{class:"btn primary",onclick:()=>playerStart(false)},"▶ 무한 재생 시작")})(),player.on?h("button",{class:"btn",onclick:playerPrev},"◀◀ 이전"):null,player.on?h("button",{class:"btn",onclick:playerNext},"다음 ▶▶"):null,player.on?h("button",{class:"btn ghost",onclick:playerStop},"■ 끄기"):null),
+    ...(lecMode?lectureOpts:o.mode==="script"?scriptOpts:o.mode==="sample"?sampleOpts:o.mode==="model"?modelOpts:sentOpts));
   if(player.on)setTimeout(updateNow,0);return box}
 
 /* ---- LISTEN ---- */
@@ -2309,10 +2327,8 @@ function vListen(m){
   const it=ld.q;const guess=h("textarea",{id:"ld_guess",style:"min-height:80px",placeholder:"들은 질문을 영어로 받아 적거나, 핵심(주제·시제·무엇을 묻는지)을 한국어로 메모하세요"});
   const ans=h("div",{},h("p",{class:"q"},it.q),h("p",{class:"muted small",style:"margin-top:6px"},it.topic.en+" · "+it.kind+" — "+({"묘사":"현재시제로 장소·사물·사람을 그리듯 설명","습관·루틴":"현재시제 + 빈도 표현(usually, every weekend)","경험":"과거시제로 이야기: when/where/who/what happened/how I felt","비교·변화":"과거 vs 현재 대조: back then / these days","롤플레이":"질문 3-4개 또는 해결책 2-3개를 제안","고난도":"의견 + 이유 2개 + 예시"}[it.kind]||"")));ans.hidden=!ld.revealed;
   const playBtn=h("button",{class:"btn primary",onclick:()=>{ld.plays++;speak(it.q.q,{key:qKey(it.topic,it.q,it)});cnt.textContent=ld.plays+"회 들음"}},"▶ 질문 듣기");const cnt=h("span",{class:"muted small mono"},ld.plays?ld.plays+"회 들음":"");
-  const lecs=S.log.filter(l=>l.kind==="mock"&&l.lec).slice(-5).reverse();
   put(m,h("div",{},h("p",{class:"eyebrow"},"Listening"),h("h1",{},"듣기")),
     webNote(),
-    lecs.length?h("div",{class:"card"},h("h3",{},"🎧 모의시험 음성 강의"),...lecs.map(l=>h("div",{class:"row"},h("button",{class:"btn sm primary",onclick:()=>lecturePlay(l)},"▶"),h("span",{class:"grow small"},l.lec.title),h("span",{class:"muted small"},l.date+" · 약 "+lectureMins(l.lec)+"분")))):null,
     vPlayer(),
     offlineCard(),
     voiceCard(),
