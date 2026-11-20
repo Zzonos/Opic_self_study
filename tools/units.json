@@ -1,0 +1,552 @@
+[
+{
+"id": "w1",
+"title": "there · home 앞에는 to 없이",
+"core": "I went there. / I go home.",
+"ko": "거기에 갔어요. 집에 가요. there와 home 앞에는 to를 붙이지 않아요.",
+"rx": "\\bto (uh, )?(there|home|a home)\\b",
+"apps": [
+[
+"After work, I usually go home around seven.",
+"퇴근하고 보통 일곱 시쯤 집에 가요."
+],
+[
+"My kids love Suji Sports Park, so we went there again last weekend.",
+"아이들이 수지체육공원을 정말 좋아해서 지난 주말에 거기 또 갔어요."
+],
+[
+"Back then, I went there by bus, but these days I just walk there.",
+"예전에는 거기 버스 타고 갔는데, 요즘은 그냥 걸어가요."
+]
+],
+"mini": [
+"There's a running track right next to my apartment. I go there every Sunday evening. Last week, I went there with my son, and he ran the whole lap with me. After that, we went home and had dinner together.",
+"우리 아파트 바로 옆에 러닝 트랙이 있어요. 일요일 저녁마다 거기에 가요. 지난주에는 아들이랑 같이 갔는데, 한 바퀴를 끝까지 같이 뛰었어요. 그러고 나서 집에 가서 같이 저녁을 먹었어요."
+]
+},
+{
+"id": "w2",
+"title": "과거 이야기는 끝까지 과거형",
+"core": "We went to the beach, swam all day, and had a great time.",
+"ko": "해변에 가서 하루 종일 수영하고 즐거운 시간을 보냈어요. 과거 이야기는 첫 문장부터 끝까지 동사를 과거형으로 맞춰요.",
+"rx": "\\b(we|i|they) (just )?(go|swim|eat|play|enjoy|stay|spend)\\b|\\bswim together\\b|\\bI catch\\b|it's my first trip in|enjoy the uh, together|\\bi was live\\b",
+"apps": [
+[
+"Last summer, we stayed in Jeju for three days.",
+"지난여름에 제주도에서 사흘 동안 지냈어요."
+],
+[
+"In the morning we swam at the beach, and in the afternoon we built a sandcastle.",
+"아침에는 해변에서 수영하고, 오후에는 모래성을 만들었어요."
+],
+[
+"I planned everything in advance because it was our first trip with the kids.",
+"아이들과 처음 가는 여행이라 모든 걸 미리 계획했어요."
+]
+],
+"mini": [
+"Last summer, my family took a trip to Jeju Island. We stayed at a hotel near the beach. The kids swam all day and built a huge sandcastle. We were exhausted, but it was a perfect family trip.",
+"지난여름에 가족과 제주도 여행을 갔어요. 해변 근처 호텔에 묵었어요. 아이들은 하루 종일 수영하고 커다란 모래성을 만들었어요. 다들 녹초가 됐지만 완벽한 가족 여행이었어요."
+]
+},
+{
+"id": "w3",
+"title": "과거에 해야 했던 일은 had to",
+"core": "I had to wait.",
+"ko": "기다려야 했어요. 과거에 어쩔 수 없이 해야 했던 일은 should가 아니라 had to로 말해요.",
+"rx": "\\b(should|have to)\\b",
+"apps": [
+[
+"On weekdays, I have to wake up at six to get to work on time.",
+"평일에는 회사에 늦지 않으려고 여섯 시에 일어나야 해요."
+],
+[
+"The restaurant was full, so we had to wait for thirty minutes.",
+"식당이 꽉 차서 삼십 분을 기다려야 했어요."
+],
+[
+"In the past, we had to check a paper map, but now we just use our phones.",
+"예전에는 종이 지도를 봐야 했는데, 지금은 그냥 휴대폰을 써요."
+]
+],
+"mini": [
+"On my honeymoon, we had a problem at Honolulu airport. Our first flight was delayed, so we couldn't catch our connecting flight. We had to wait for five hours. It was exhausting, but the airline gave us meal coupons, so it wasn't that bad.",
+"신혼여행 때 호놀룰루 공항에서 문제가 있었어요. 첫 비행기가 지연돼서 연결편을 못 탔어요. 다섯 시간을 기다려야 했어요. 진이 빠졌지만 항공사에서 식사 쿠폰을 줘서 그렇게 나쁘진 않았어요."
+]
+},
+{
+"id": "w4",
+"title": "call me back 순서",
+"core": "Could you call me back?",
+"ko": "다시 전화해 주실 수 있나요? me는 call과 back 사이에 넣어요.",
+"rx": "call back me|call me back later\\?",
+"apps": [
+[
+"If you're busy right now, could you call me back later?",
+"지금 바쁘시면 나중에 다시 전화해 주실 수 있나요?"
+],
+[
+"I left a message yesterday, but nobody called me back.",
+"어제 메시지를 남겼는데 아무도 다시 전화를 안 줬어요."
+],
+[
+"Please call me back at this number when the tickets are available.",
+"표가 생기면 이 번호로 다시 전화 주세요."
+]
+],
+"mini": [
+"Hi, I'm calling about my reservation for this Saturday. Something came up, so I need to change the date. Could you check the available dates and call me back? You can reach me at this number. Thank you so much.",
+"안녕하세요, 이번 주 토요일 예약 때문에 전화했어요. 일이 생겨서 날짜를 바꿔야 해요. 가능한 날짜를 확인하시고 다시 전화 주실 수 있나요? 이 번호로 연락 주시면 돼요. 정말 감사합니다."
+]
+},
+{
+"id": "w5",
+"title": "하나일 때 a / an",
+"core": "I live in an apartment with my family.",
+"ko": "저는 가족과 아파트에 살아요. 셀 수 있는 명사 하나 앞에는 a나 an을 붙여요.",
+"rx": "in,? (uh,? )?apartment|really good place|was first time|(am|i'm),? (uh, )?(plan|planned|plant) person|have a unhappy|ask you the some",
+"apps": [
+[
+"It's a really good place for kids to play.",
+"아이들이 놀기에 정말 좋은 곳이에요."
+],
+[
+"It was the first time I traveled abroad.",
+"그게 제가 처음으로 해외여행을 간 거였어요."
+],
+[
+"I'm a planner, so I always make a detailed plan before a trip.",
+"저는 계획형이라 여행 전에 항상 자세한 계획을 세워요."
+]
+],
+"mini": [
+"I live in an apartment in Suji with my wife and our twins. It's not a big place, but it's a really good place for kids. There's a big sports park nearby, and there's a running track right next to our building. That's why we really like living here.",
+"저는 수지에 있는 아파트에서 아내, 쌍둥이와 살아요. 큰 집은 아니지만 아이들한테 정말 좋은 곳이에요. 근처에 큰 체육공원이 있고, 우리 동 바로 옆에 러닝 트랙이 있어요. 그래서 여기 사는 게 정말 좋아요."
+]
+},
+{
+"id": "w6",
+"title": "여러 개일 때 복수형",
+"core": "I design electronic circuits.",
+"ko": "저는 전자 회로를 설계해요. 여러 개를 말할 때는 명사에 s를 붙여요.",
+"rx": "circuit\\b|computer game\\b|play game\\b|\\b5 kilometer\\b|catch a crab|so many information|so many the facility|some problem in",
+"apps": [
+[
+"My son loves playing computer games on weekends.",
+"아들은 주말에 컴퓨터 게임 하는 걸 정말 좋아해요."
+],
+[
+"Last Sunday, I ran five kilometers in thirty minutes.",
+"지난 일요일에 오 킬로미터를 삼십 분에 뛰었어요."
+],
+[
+"There are many more convenient facilities than before.",
+"예전보다 편리한 시설이 훨씬 많아요."
+]
+],
+"mini": [
+"I'm a hardware engineer at an auto parts company. I design electronic circuits for car lamps. These days, I'm busy writing reports and testing new boards. It can be stressful, but I really like solving problems.",
+"저는 자동차 부품 회사의 하드웨어 엔지니어예요. 자동차 램프에 들어가는 전자 회로를 설계해요. 요즘은 보고서 쓰고 새 보드를 테스트하느라 바빠요. 스트레스를 받을 때도 있지만 문제를 해결하는 게 정말 좋아요."
+]
+},
+{
+"id": "w7",
+"title": "습관은 현재형으로",
+"core": "Every Sunday night, I go to Suji Sports Park.",
+"ko": "일요일 밤마다 수지체육공원에 가요. 늘 하는 일은 be going to가 아니라 현재형으로 말해요.",
+"rx": "\\b(am|are) going to\\b|\\bwhen I was busy\\b",
+"apps": [
+[
+"I usually go to the gym after the kids go to bed.",
+"저는 보통 아이들이 자고 나면 헬스장에 가요."
+],
+[
+"A few years ago, I went jogging only once a month.",
+"몇 년 전에는 한 달에 한 번만 조깅을 했어요."
+],
+[
+"These days, I run more often than I used to.",
+"요즘은 예전보다 더 자주 뛰어요."
+]
+],
+"mini": [
+"I usually work out every night after my kids fall asleep. On Sunday evenings, I go to the track near my apartment and run about five kilometers. It only takes a minute to get there on foot. It helps me clear my head before a busy week.",
+"저는 보통 아이들이 잠들고 나면 매일 밤 운동해요. 일요일 저녁에는 아파트 근처 트랙에 가서 오 킬로미터 정도 뛰어요. 걸어서 일 분이면 가요. 바쁜 한 주를 시작하기 전에 머리를 비우는 데 도움이 돼요."
+]
+},
+{
+"id": "w8",
+"title": "trip은 명사, travel은 동사",
+"core": "I traveled abroad. / I took a trip to Hawaii.",
+"ko": "해외여행을 갔어요. 하와이로 여행을 갔어요. trip은 명사라서 take a trip, 동사로는 travel을 써요.",
+"rx": "go trip|\\bto (uh, )?trip\\b|trip in abroad|trip in domestic|trip, uh, ourselves|go to (uh, )?trip",
+"apps": [
+[
+"I travel abroad about once a year with my family.",
+"가족이랑 일 년에 한 번 정도 해외여행을 가요."
+],
+[
+"My wife had never traveled abroad before our honeymoon.",
+"아내는 신혼여행 전에는 해외에 나가 본 적이 없었어요."
+],
+[
+"These days, it's much easier to plan a trip on our own.",
+"요즘은 우리끼리 여행을 계획하기가 훨씬 쉬워요."
+]
+],
+"mini": [
+"My first trip abroad was my honeymoon in Hawaii. Neither my wife nor I had traveled abroad before, so we were really excited. We planned the whole trip on our own instead of using a travel agency. It was a little stressful, but it was totally worth it.",
+"제 첫 해외여행은 하와이 신혼여행이었어요. 아내도 저도 해외에 나가 본 적이 없어서 정말 설렜어요. 여행사 대신 우리끼리 여행 전체를 계획했어요. 조금 스트레스였지만 충분히 그럴 가치가 있었어요."
+]
+},
+{
+"id": "w9",
+"title": "변화는 has changed a lot",
+"core": "Domestic travel has changed a lot.",
+"ko": "국내 여행은 정말 많이 바뀌었어요. 예전과 지금이 달라졌다고 할 때는 has changed를 써요.",
+"rx": "between (fast|past) and now|\\bis different\\b|technology developed",
+"apps": [
+[
+"My neighborhood has changed a lot over the past ten years.",
+"우리 동네는 지난 십 년 동안 많이 바뀌었어요."
+],
+[
+"Back then, there weren't enough highways, so it took forever to get anywhere.",
+"그때는 고속도로가 충분하지 않아서 어디 가든 한참 걸렸어요."
+],
+[
+"These days, traveling is much more convenient than it used to be.",
+"요즘은 여행이 예전보다 훨씬 편해요."
+]
+],
+"mini": [
+"Domestic travel has changed a lot since I was young. In the past, we had to check a paper map, and there weren't enough highways. These days, we just use a navigation app, and the roads are much better. So traveling has become much faster and easier.",
+"제가 어렸을 때에 비해 국내 여행은 많이 바뀌었어요. 예전에는 종이 지도를 봐야 했고 고속도로도 부족했어요. 요즘은 그냥 내비게이션 앱을 쓰고 길도 훨씬 좋아졌어요. 그래서 여행이 훨씬 빠르고 쉬워졌어요."
+]
+},
+{
+"id": "w10",
+"title": "있다 · 없다는 there is / there was",
+"core": "There weren't enough seats.",
+"ko": "자리가 충분하지 않았어요. 있다, 없다를 말할 때는 there is, there was로 시작해요.",
+"rx": "was not enough|there has a|there was not (uh, )?online|there are so many information|there are so many the",
+"apps": [
+[
+"There's a soft-surface track near my apartment.",
+"우리 아파트 근처에 바닥이 푹신한 트랙이 있어요."
+],
+[
+"When I got there, there weren't enough seats, so I had to stand.",
+"도착했더니 자리가 모자라서 서 있어야 했어요."
+],
+[
+"There was no online shopping back then, but now there's so much information online.",
+"그때는 온라인 쇼핑이 없었는데, 지금은 인터넷에 정보가 정말 많아요."
+]
+],
+"mini": [
+"When I was a kid, there was no online shopping. We had to go to a market to buy what we needed. Now there's so much information online, and I can buy what I need in only ten minutes. It's really convenient for busy parents like me.",
+"제가 어렸을 때는 온라인 쇼핑이 없었어요. 필요한 걸 사려면 시장에 가야 했어요. 지금은 인터넷에 정보가 정말 많아서 필요한 걸 십 분이면 살 수 있어요. 저처럼 바쁜 부모한테는 정말 편해요."
+]
+},
+{
+"id": "w11",
+"title": "전화 첫마디: Is this the ~?",
+"core": "Hi, is this the gym? I'd like to ask you something.",
+"ko": "안녕하세요, 헬스장 맞나요? 뭐 좀 여쭤보고 싶어요. 전화를 걸었을 때는 is there가 아니라 is this the로 확인해요.",
+"rx": "is there a (gym|travel agency)|ask something to you|ask you the some|how much, uh, membership",
+"apps": [
+[
+"Hello, is this the travel agency? I have a few questions about the tour.",
+"여보세요, 여행사 맞나요? 투어에 대해 몇 가지 여쭤볼 게 있어요."
+],
+[
+"I'd like to ask you something about the membership.",
+"회원권에 대해 여쭤볼 게 있어요."
+],
+[
+"Could you tell me how much a membership costs?",
+"회원권이 얼마인지 알려주실 수 있나요?"
+]
+],
+"mini": [
+"Hi, is this the fitness center? I'm thinking about signing up, so I'd like to ask you a few questions. First, how much does a monthly membership cost? Is a locker included? And could you tell me how crowded it gets in the evening?",
+"안녕하세요, 피트니스 센터 맞나요? 등록하려고 하는데 몇 가지 여쭤보고 싶어요. 먼저 한 달 회원권은 얼마인가요? 사물함도 포함인가요? 그리고 저녁에는 얼마나 붐비는지 알려주실 수 있나요?"
+]
+},
+{
+"id": "w12",
+"title": "예약 · 변경 · 환불",
+"core": "I'd like to change the date of my reservation.",
+"ko": "예약 날짜를 바꾸고 싶어요. 예약은 make a reservation, 날짜 변경은 change the date, 환불은 get a refund예요.",
+"rx": "refund, uh|can you refund|change a day|do reservation|is it include\\b",
+"apps": [
+[
+"I'd like to make a reservation for two people this Saturday.",
+"이번 주 토요일에 두 명 예약하고 싶어요."
+],
+[
+"I booked a room last week, but I need to change the date.",
+"지난주에 방을 예약했는데 날짜를 바꿔야 해요."
+],
+[
+"If that's not possible, can I get a refund instead?",
+"그게 안 되면 대신 환불받을 수 있을까요?"
+]
+],
+"mini": [
+"Hi, I made a reservation for this Friday, but something came up at work. I'm afraid I need to change the date. Would it be possible to move it to next Friday instead? If that doesn't work, can I get a refund?",
+"안녕하세요, 이번 주 금요일로 예약했는데 회사에 일이 생겼어요. 아무래도 날짜를 바꿔야 할 것 같아요. 다음 주 금요일로 옮기는 게 가능할까요? 그게 안 되면 환불받을 수 있을까요?"
+]
+},
+{
+"id": "w13",
+"title": "가장 기억에 남는 · 처음으로",
+"core": "My most memorable trip was our family trip to Jeju.",
+"ko": "가장 기억에 남는 여행은 제주도 가족 여행이었어요. 가장은 the most, 처음은 the first time이에요.",
+"rx": "memorable trip in|memory trip|was first time|memorable meals|good memorial",
+"apps": [
+[
+"My most memorable meal was a seaweed soup my mom made for my birthday.",
+"가장 기억에 남는 식사는 엄마가 생일에 끓여 주신 미역국이에요."
+],
+[
+"It was the first time I went camping with my kids.",
+"아이들이랑 처음으로 캠핑을 간 거였어요."
+],
+[
+"It was a great memory for all of us.",
+"우리 모두에게 좋은 추억이었어요."
+]
+],
+"mini": [
+"My most memorable domestic trip was last summer in Jeju. It was the first time we traveled with the twins for more than two days. The kids swam at the beach all day and didn't want to leave. It was a great memory for our whole family.",
+"가장 기억에 남는 국내 여행은 지난여름 제주도예요. 쌍둥이를 데리고 이틀 넘게 여행한 건 그때가 처음이었어요. 아이들은 하루 종일 해변에서 수영하고 떠나기 싫어했어요. 우리 가족 모두에게 좋은 추억이었어요."
+]
+},
+{
+"id": "w14",
+"title": "helps me + 동사원형 · to + 동사",
+"core": "It helps me relax.",
+"ko": "그게 긴장을 푸는 데 도움이 돼요. help me 뒤에는 동사원형, 목적은 to와 동사원형으로 말해요.",
+"rx": "helps me the|for,? (uh, )?cool down|helps me to the",
+"apps": [
+[
+"Listening to ballads helps me calm down after a long day.",
+"발라드를 들으면 긴 하루 끝에 마음이 차분해져요."
+],
+[
+"Running on Sunday evenings helped me lose weight.",
+"일요일 저녁 러닝이 살 빼는 데 도움이 됐어요."
+],
+[
+"After I run, I stretch for five minutes to cool down.",
+"뛰고 나면 몸을 식히려고 오 분 정도 스트레칭해요."
+]
+],
+"mini": [
+"Running is really good for me. It helps me relax and clear my head after a busy week. Before I run, I walk for a few minutes to get my body ready, and afterwards I stretch to cool down. Thanks to this routine, I've lost some weight, too.",
+"저한테 러닝은 정말 좋아요. 바쁜 한 주 뒤에 긴장을 풀고 머리를 비우는 데 도움이 돼요. 뛰기 전에는 몸을 풀려고 몇 분 걷고, 다 뛰고 나서는 몸을 식히려고 스트레칭해요. 이 루틴 덕분에 살도 좀 빠졌어요."
+]
+},
+{
+"id": "w15",
+"title": "살 빼다 · 찌다 · decided to",
+"core": "I decided to lose weight.",
+"ko": "살을 빼기로 했어요. 살이 쪘다는 gained weight, decided to와 planned to 뒤에는 동사원형이에요.",
+"rx": "got a fat|losing my weight|decided to,? (uh, )?losing|planned,? (uh, )?go\\b|body was going to",
+"apps": [
+[
+"I'm trying to lose weight, so I work out every night.",
+"살을 빼려고 매일 밤 운동해요."
+],
+[
+"A few years ago, I gained a lot of weight because of stress.",
+"몇 년 전에 스트레스 때문에 살이 많이 쪘어요."
+],
+[
+"I planned to go jogging, but it started raining.",
+"조깅하러 가려고 했는데 비가 오기 시작했어요."
+]
+],
+"mini": [
+"A few years ago, I gained a lot of weight because I was too busy at work. So I decided to lose weight and started jogging. At first, I was out of breath after just one kilometer. But I didn't give up, and these days I can run ten kilometers.",
+"몇 년 전에 회사 일이 너무 바빠서 살이 많이 쪘어요. 그래서 살을 빼기로 하고 조깅을 시작했어요. 처음에는 일 킬로미터만 뛰어도 숨이 찼어요. 하지만 포기하지 않았고, 요즘은 십 킬로미터를 뛸 수 있어요."
+]
+},
+{
+"id": "w16",
+"title": "걸어서 ~분 거리",
+"core": "It's only a five-minute walk from my place.",
+"ko": "우리 집에서 걸어서 오 분밖에 안 걸려요. a five-minute walk처럼 minute에 s를 붙이지 않고 한 덩어리로 말해요.",
+"rx": "\\d+ minute,? (uh, )?walking|minutes? walking from|only a half days|minute, uh, walking",
+"apps": [
+[
+"The track is only a one-minute walk from my apartment.",
+"트랙은 우리 아파트에서 걸어서 일 분 거리예요."
+],
+[
+"Our hotel was a ten-minute walk from the beach.",
+"호텔은 해변에서 걸어서 십 분 거리였어요."
+],
+[
+"My office is about a thirty-minute drive from home.",
+"회사는 집에서 차로 삼십 분쯤 걸려요."
+]
+],
+"mini": [
+"My favorite place to shop is a big supermarket near my apartment. It's only a five-minute walk from my place. I can buy what I need in only ten minutes. That's why I go there almost every weekend.",
+"제가 제일 좋아하는 쇼핑 장소는 아파트 근처 큰 마트예요. 우리 집에서 걸어서 오 분밖에 안 걸려요. 필요한 걸 십 분이면 살 수 있어요. 그래서 거의 주말마다 거기 가요."
+]
+},
+{
+"id": "w17",
+"title": "갑자기 비가 오기 시작했어요",
+"core": "Suddenly, it started raining.",
+"ko": "갑자기 비가 오기 시작했어요. 날씨는 it으로 시작하고, 시작했다는 started -ing로 말해요.",
+"rx": "the rain was|wave was|waves was",
+"apps": [
+[
+"It usually rains a lot in July, so we don't plan trips then.",
+"칠월에는 보통 비가 많이 와서 그때는 여행 계획을 안 잡아요."
+],
+[
+"We were on the beach when it suddenly started raining.",
+"해변에 있는데 갑자기 비가 오기 시작했어요."
+],
+[
+"The waves were really high, so we couldn't swim.",
+"파도가 너무 높아서 수영을 못 했어요."
+]
+],
+"mini": [
+"One day in Jeju, we were building a sandcastle when it suddenly started raining. The waves were getting higher, so we ran back to the hotel. We were soaking wet, but the kids couldn't stop laughing. Looking back, it was one of the funniest moments of the trip.",
+"제주도에서 어느 날 모래성을 만들고 있는데 갑자기 비가 오기 시작했어요. 파도가 점점 높아져서 호텔로 뛰어 돌아갔어요. 다 흠뻑 젖었는데 아이들은 웃음을 멈추지 못했어요. 돌이켜보면 여행에서 제일 웃긴 순간 중 하나였어요."
+]
+},
+{
+"id": "w18",
+"title": "주어에 맞는 동사 (were · likes)",
+"core": "My son really likes going to the movies.",
+"ko": "아들은 영화 보러 가는 걸 정말 좋아해요. 한 사람이면 likes, 여러 명이면 were처럼 주어에 동사를 맞춰요.",
+"rx": "they was|fireworks was|my son really like\\b|government check\\b|everyone in my family,? (uh, )?meet|i am really like|we surprised",
+"apps": [
+[
+"My daughter likes drawing, and my son likes playing soccer.",
+"딸은 그림 그리는 걸 좋아하고, 아들은 축구하는 걸 좋아해요."
+],
+[
+"The fireworks were really beautiful, and the kids were so happy.",
+"불꽃놀이가 정말 예뻤고 아이들이 정말 좋아했어요."
+],
+[
+"On holidays, everyone in my family meets at my parents' home.",
+"명절에는 가족 모두가 부모님 댁에 모여요."
+]
+],
+"mini": [
+"My son really likes going to the movies. Last month, I suggested that we go see an animated movie together. He was so excited, and we got popcorn and cola. We really enjoyed it together, and now he asks me to go every weekend.",
+"아들은 영화 보러 가는 걸 정말 좋아해요. 지난달에 같이 애니메이션 영화를 보러 가자고 했어요. 아들이 엄청 신나 했고, 우리는 팝콘이랑 콜라를 샀어요. 같이 정말 재밌게 봤고, 이제는 주말마다 가자고 해요."
+]
+},
+{
+"id": "w19",
+"title": "문제 이야기는 결말까지",
+"core": "In the end, the noise stopped.",
+"ko": "결국 소음이 멈췄어요. 문제가 있었던 이야기는 in the end로 어떻게 해결됐는지까지 말하고 끝내요.",
+"rx": "",
+"apps": [
+[
+"In the end, we got a full refund.",
+"결국 전액 환불을 받았어요."
+],
+[
+"Luckily, the staff found us a table in ten minutes.",
+"다행히 직원이 십 분 만에 자리를 찾아 줬어요."
+],
+[
+"So that's how I solved the noise problem.",
+"그렇게 해서 소음 문제를 해결했어요."
+]
+],
+"mini": [
+"Last year, our upstairs neighbors were really noisy at night. At first, I just waited, but it didn't stop. So I left a polite note on their door. In the end, the noise stopped, and we even became friendly neighbors. So that's how I solved the problem.",
+"작년에 윗집이 밤에 정말 시끄러웠어요. 처음에는 그냥 기다렸는데 멈추지 않았어요. 그래서 그 집 문에 정중하게 쪽지를 남겼어요. 결국 소음이 멈췄고, 오히려 친한 이웃이 됐어요. 그렇게 해서 문제를 해결했어요."
+]
+},
+{
+"id": "w20",
+"title": "막히면 because로 문장 완성",
+"core": "I like it because it's close and quiet.",
+"ko": "가깝고 조용해서 좋아요. 말이 막히면 처음부터 다시 하지 말고 because와 주어, 동사로 문장을 끝까지 완성해요.",
+"rx": "",
+"apps": [
+[
+"I go to that gym because it's close to my apartment.",
+"아파트에서 가까워서 그 헬스장에 다녀요."
+],
+[
+"I couldn't sleep well because the neighbors were noisy.",
+"이웃이 시끄러워서 잠을 잘 못 잤어요."
+],
+[
+"I use the subway more now because it's always on time.",
+"지하철은 늘 제시간에 와서 요즘은 더 자주 타요."
+]
+],
+"mini": [
+"I like my neighborhood because it's quiet and safe. There's a big sports park nearby, so I can go jogging whenever I want. My kids like it too, because they can ride their bikes there. That's why I don't want to move.",
+"우리 동네는 조용하고 안전해서 좋아요. 근처에 큰 체육공원이 있어서 언제든 조깅을 할 수 있어요. 아이들도 거기서 자전거를 탈 수 있어서 좋아해요. 그래서 이사 가고 싶지 않아요."
+]
+},
+{
+"id": "w21",
+"title": "구경하다: window shopping · walk around",
+"core": "We walked around the department store.",
+"ko": "백화점을 둘러봤어요. 아이쇼핑은 window shopping, 둘러보다는 walk around예요.",
+"rx": "eye shopping|walk to around|walk, walk to",
+"apps": [
+[
+"On weekends, I sometimes go window shopping with my wife.",
+"주말에 가끔 아내랑 아이쇼핑을 가요."
+],
+[
+"We walked around the mall for two hours.",
+"쇼핑몰을 두 시간 동안 돌아다녔어요."
+],
+[
+"These days, I shop online more than I go to stores.",
+"요즘은 매장에 가는 것보다 온라인으로 더 많이 사요."
+]
+],
+"mini": [
+"On our honeymoon in Hawaii, we went to a big shopping mall. We didn't buy much, but we really enjoyed window shopping. We walked around the department store and tried some local snacks. It was a relaxing afternoon.",
+"하와이 신혼여행 때 큰 쇼핑몰에 갔어요. 많이 사진 않았지만 아이쇼핑을 정말 즐겼어요. 백화점을 둘러보고 현지 간식도 먹어 봤어요. 여유로운 오후였어요."
+]
+},
+{
+"id": "w22",
+"title": "the subway · during rush hour",
+"core": "The subway is always on time.",
+"ko": "지하철은 항상 제시간에 와요. 교통수단은 the subway, 출퇴근 시간은 during rush hour라고 말해요.",
+"rx": "use subway|a rush hour|keep (a|uh,? the|the)? ?time|take a subway|keep a time",
+"apps": [
+[
+"I usually take the subway when I go to Seoul.",
+"서울 갈 때는 보통 지하철을 타요."
+],
+[
+"The subway was really crowded during rush hour.",
+"출퇴근 시간에 지하철이 정말 붐볐어요."
+],
+[
+"Compared to buses, the subway is much more reliable.",
+"버스에 비해 지하철이 훨씬 믿을 만해요."
+]
+],
+"mini": [
+"Many people in Korea use the subway because it's always on time. The only problem is that it's really crowded during rush hour. So if you're not in a hurry, you shouldn't take the subway between eight and nine in the morning.",
+"한국에서는 지하철이 항상 제시간에 와서 많은 사람이 이용해요. 유일한 문제는 출퇴근 시간에 정말 붐빈다는 거예요. 그래서 급하지 않다면 아침 여덟 시에서 아홉 시 사이에는 지하철을 타지 않는 게 좋아요."
+]
+}
+]

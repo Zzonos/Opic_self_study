@@ -3,6 +3,9 @@
 import pathlib, hashlib, json, time
 root = pathlib.Path(__file__).resolve().parents[1]
 body = (root / "src/artifact.html").read_text(encoding="utf-8")
+# base listening units (내 표현 듣기) live in tools/units.json
+units = json.dumps(json.loads((root / "tools/units.json").read_text(encoding="utf-8")), ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+body = body.replace("/*UNITS_JSON*/[]", units)
 head = """<!doctype html>
 <html lang="ko" data-build="BUILD_ID" data-rel="REL_NO">
 <head>
