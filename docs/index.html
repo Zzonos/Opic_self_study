@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261120-092749-1719d1">
+<html lang="ko" data-build="20261120-100443-330fba">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -2019,14 +2019,16 @@ async function lectureFile(lec,onProg){const key="/lec/"+lec.ts+"_v1";if(LECF[ke
   const plan=[];const chapters=[];for(const x of lec.secs){chapters.push({title:x.title,i:plan.length});
     for(const p of x.parts){if(p.rep){plan.push({sil:1},{en:p.rep,show:p.rep,ko:p.ko||""},{sil:Math.min(9,Math.round(2+String(p.rep).split(/\s+/).length/2.2))})}else if(p.en)plan.push({en:p.en,show:p.en},{sil:1});else if(p.ko)for(const k of splitKo(p.ko))plan.push({ko:k,show:k})}plan.push({sil:2})}
   if(cache){try{const hit=await cache.match(key);const meta=await cache.match(key+"_m");if(hit&&meta){const m=await meta.json();const r={url:URL.createObjectURL(await hit.blob()),...m};LECF[key]=r;return r}}catch(e){}}
-  const parts=new Array(plan.length);let done=0,miss=0;const jobs=plan.map((x,i)=>async()=>{if(x.sil){parts[i]=mp3Silence(x.sil)}else{
-      let u=null;try{u=x.ko?await natFetch(x.ko,"ko"):await natUrl(x.en)}catch(e){}
-      if(!u){try{u=x.ko?await natFetch(x.ko,"ko"):await natUrl(x.en)}catch(e){}}
-      let f=null;if(u){try{f=mp3Frames(await (await fetch(u)).arrayBuffer())}catch(e){}}
-      if(!f){miss++;parts[i]=mp3Silence(0.5)}else parts[i]=f}
-    done++;if(onProg)onProg(done,plan.length)});
-  let k=0;const run=async()=>{while(k<jobs.length){const j=jobs[k++];await j()}};await Promise.all([run(),run(),run(),run()]);
-  const voiced=plan.filter(x=>!x.sil).length;if(miss>Math.max(2,voiced*0.1))throw new Error("음성 "+miss+"/"+voiced+"개를 받지 못했어요");
+  const parts=new Array(plan.length);let done=0;const W=ms=>new Promise(r=>setTimeout(r,ms));
+  const get1=async x=>{for(const wait of [0,700,2000,4500]){if(wait)await W(wait);let u=null;try{u=x.ko?await natFetch(x.ko,"ko"):await natUrl(x.en)}catch(e){}
+      if(u){try{const f=mp3Frames(await (await fetch(u)).arrayBuffer());if(f&&f.length>MP3F*4)return f}catch(e){}}
+      // a failed clip is remembered by the fetcher for a while — forget it so the next try really asks again
+      try{const t=x.ko||x.en;delete SLOW[t];for(const k of Object.keys(NAT.urls))if(k.endsWith(x.ko?"/k"+koHash(t):"/"+txtHash(t)))delete NAT.urls[k]}catch(e){}}return null};
+  const pass=async idx=>{let k=0;const run=async()=>{while(k<idx.length){const i=idx[k++];const x=plan[i];parts[i]=x.sil?mp3Silence(x.sil):await get1(x);done++;if(onProg)onProg(Math.min(done,plan.length),plan.length)}};await Promise.all([run(),run()])};
+  await pass(plan.map((_,i)=>i));let left=plan.map((_,i)=>i).filter(i=>!parts[i]);if(left.length){audLog.push("강의 음성 "+left.length+"개 다시 받기");await W(3000);await pass(left)}
+  left=plan.map((_,i)=>i).filter(i=>!parts[i]);const miss=left.length;const voiced=plan.filter(x=>!x.sil).length;
+  if(miss){audLog.push("강의에서 못 받은 문장: "+left.map(i=>(plan[i].ko||plan[i].en).slice(0,40)).join(" / "));if(miss>Math.max(2,voiced*0.1))throw new Error("음성 "+miss+"/"+voiced+"개를 받지 못했어요")}
+  left.forEach(i=>parts[i]=mp3Silence(0.5));
   // where each part and line starts, from the frame counts
   let t=0;const starts=parts.map(b=>{const s0=t;t+=b.length/MP3F*MP3S;return s0});
   const r={dur:t,chapters:chapters.map(c=>({title:c.title,t:starts[c.i]})),lines:plan.map((x,i)=>x.sil?null:{t:starts[i],s:x.show,ko:x.ko||"",rep:!!(x.en&&x.ko!==undefined&&plan[i+1]&&plan[i+1].sil>1)}).filter(Boolean),miss};
@@ -2042,7 +2044,7 @@ async function lecturePlay(l0,from=0){const lec=l0.lec;if(!lec)return;
     try{const f=await lectureFile(lec,prog);clearTimeout(tt);
       player.items=[{kind:"LF",label:"🎧 "+lec.title,en:"",ko:"",src:f.url,chapters:f.chapters,lines:f.lines,dur:f.dur,start:(f.chapters[from]||{}).t||0}];player.lecture=lec.title;
       if(player.opts.mode!=="lecture"){player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}}
-      player.loop=0;player.busy=false;player.on=true;player.paused=false;player.i=0;player.segs=[];player.si=0;ttsStop();wakeLock(true);keepAlive(false);playerStep();mediaSession();renderMini();toast((f.miss?"일부 문장 없이 ":"")+"강의 재생: "+lec.title);if(view==="listen")render();return}
+      player.loop=0;player.busy=false;player.on=true;player.paused=false;player.i=0;player.segs=[];player.si=0;ttsStop();wakeLock(true);keepAlive(false);playerStep();mediaSession();renderMini();toast(f.miss?"⚠️ 음성을 받지 못한 문장 "+f.miss+"개는 빠진 채 재생해요 (다음 재생 때 다시 받아요)":"강의 재생: "+lec.title);if(view==="listen")render();return}
     catch(e){clearTimeout(tt);audLog.push("강의 파일 만들기 실패 → 문장별 재생: "+(e.message||e));toast("강의 파일을 만들지 못해 문장별로 재생해요")}}
   lecturePrefetch(lec);if(!tts.ok&&!Object.keys(AUD.man).length){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
   if(player.on)playerStop();player.items=lec.secs.slice(from).map((x,i)=>({kind:"L",label:"🎧 "+(x.title||("파트 "+(from+i+1))),en:"",ko:"",parts:x.parts}));player.lecture=lec.title;if(player.opts.mode!=="lecture"){player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}}
