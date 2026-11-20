@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261120-134948-e51209" data-rel="257">
+<html lang="ko" data-build="20261120-143254-f7ab4b" data-rel="258">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -2044,7 +2044,15 @@ async function lectureFile(lec,onProg){const key="/lec/"+lec.ts+"_v4_"+lecKo()+"
   const r={dur:t,chapters:chapters.map(c=>({title:c.title,t:starts[c.i]})),lines:plan.map((x,i)=>x.sil?null:{t:starts[i],s:x.show,ko:x.mean||"",rep:x.mean!==undefined}).filter(Boolean),miss};
   const blob=new Blob(parts,{type:"audio/mpeg"});r.url=URL.createObjectURL(blob);
   if(cache&&!miss){try{await cache.put(key,new Response(blob,{headers:{"Content-Type":"audio/mpeg"}}));await cache.put(key+"_m",new Response(JSON.stringify({dur:r.dur,chapters:r.chapters,lines:r.lines,miss:0})))}catch(e){}}
-  LEC_DIAG=lec.title+" · "+Math.round(blob.size/1024)+"KB · "+Math.round(t/60)+"분 · 문장 "+voiced+"개 중 빠짐 "+miss+(miss?" ("+left.map(i=>(plan[i].ko||plan[i].en).slice(0,30)).join(" / ")+")":"");audLog.push("강의 파일 "+LEC_DIAG);LECF[key]=r;return r}
+  LEC_DIAG=lec.title+" · "+Math.round(blob.size/1024)+"KB · "+Math.round(t/60)+"분 · 문장 "+voiced+"개 중 빠짐 "+miss+(miss?" ("+left.map(i=>(plan[i].ko||plan[i].en).slice(0,30)).join(" / ")+")":"");audLog.push("강의 파일 "+LEC_DIAG);if(!miss)LECF[key]=r;else lecRetryMiss(lec,left.map(i=>plan[i]));return r}
+// sentences the voice server refused: keep trying in the background (each success is cached), so the next play has them
+function lecRetryMiss(lec,items){const id=lec.ts+"_"+lecKo()+"_"+lecEn();if(lecRetryMiss.on===id)return;lecRetryMiss.on=id;let left=items.slice();const W=ms=>new Promise(r=>setTimeout(r,ms));
+  (async()=>{for(const wait of [20e3,60e3,180e3,420e3]){await W(wait);if(lecRetryMiss.on!==id)return;const still=[];
+      for(const x of left){try{const u8=x.ko?await lecClip(x.ko,"ko",lecKo()):await lecClip(x.en,"en",lecEn());if(!u8||u8.length<500)still.push(x)}catch(e){still.push(x)}}
+      audLog.push("빠진 강의 음성 다시 받기: "+(left.length-still.length)+"/"+left.length+" 성공");left=still;
+      const ms=LEC_MISS[lec.ts];if(ms){for(const x of items)if(!left.includes(x))ms.delete(x.ko||x.en)}
+      if(!left.length){lecRetryMiss.on=null;toast("빠졌던 강의 문장을 모두 받았어요 · 다음에 ▶를 누르면 들어가요 (들은 곳부터 이어서)");if(view==="listen")render();return}}
+    lecRetryMiss.on=null})()}
 const lecRate=()=>1;
 function lecMark(jump){const it=player.items[player.i];if(!player.on||!it||it.kind!=="LF")return;const a=AUD.el;const t=a&&a.currentTime||0;let k=-1;(it.lines||[]).forEach((x,i)=>{if(x.t<=t+0.2)k=i});
   for(const box of document.querySelectorAll('.lecscript[data-ts="'+player.lecTs+'"]')){const prev=box.querySelector(".lsl.cur");const cur=box.querySelector('.lsl[data-li="'+k+'"]');if(prev===cur&&!jump)continue;
@@ -2069,7 +2077,7 @@ async function lecturePlay(l0,from){const lec=l0.lec;if(!lec)return;const fromLi
       player.lecTs=lec.ts;const saved=fromList?lecPosGet(lec.ts):0;const resume=saved&&saved<(f.dur||0)-8?Math.max(0,saved-2):0;
       player.items=[{kind:"LF",label:"🎧 "+lec.title,en:"",ko:"",src:f.url,chapters:f.chapters,lines:f.lines,dur:f.dur,start:resume||(f.chapters[from]||{}).t||0}];player.lecture=lec.title;
       if(player.opts.mode!=="lecture"){player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}}
-      player.loop=0;player.busy=false;player.on=true;player.paused=false;player.i=0;player.segs=[];player.si=0;ttsStop();wakeLock(true);keepAlive(false);playerStep();mediaSession();renderMini();toast(f.miss?"⚠️ 음성을 받지 못한 문장 "+f.miss+"개는 빠진 채 재생해요 (다음 재생 때 다시 받아요)":resume?"지난번 들은 곳부터 이어서 재생 ("+Math.floor(resume/60)+":"+String(Math.floor(resume%60)).padStart(2,"0")+") · 처음부터는 파트 1의 ▶":"강의 재생: "+lec.title);if(view==="listen")render();return}
+      player.loop=0;player.busy=false;player.on=true;player.paused=false;player.i=0;player.segs=[];player.si=0;ttsStop();wakeLock(true);keepAlive(false);playerStep();mediaSession();renderMini();toast(f.miss?"⚠️ 음성을 받지 못한 문장 "+f.miss+"개는 빠진 채 재생해요 · 뒤에서 계속 다시 받아요":resume?"지난번 들은 곳부터 이어서 재생 ("+Math.floor(resume/60)+":"+String(Math.floor(resume%60)).padStart(2,"0")+") · 처음부터는 파트 1의 ▶":"강의 재생: "+lec.title);if(view==="listen")render();return}
     catch(e){clearTimeout(tt);audLog.push("강의 파일 만들기 실패 → 문장별 재생: "+(e.message||e));toast("강의 파일을 만들지 못해 문장별로 재생해요")}}
   lecturePrefetch(lec);if(!tts.ok&&!Object.keys(AUD.man).length){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
   if(player.on)playerStop();player.items=lec.secs.slice(from).map((x,i)=>({kind:"L",label:"🎧 "+(x.title||("파트 "+(from+i+1))),en:"",ko:"",parts:x.parts}));player.lecture=lec.title;if(player.opts.mode!=="lecture"){player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}}
