@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261120-104247-cf764f" data-rel="255">
+<html lang="ko" data-build="20261120-131456-0068b9" data-rel="256">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -2018,13 +2018,14 @@ function mp3Frames(buf){let b=new Uint8Array(buf);let i=0;if(b[0]===0x49&&b[1]==
   while(i<b.length-3&&!(b[i]===0xFF&&b[i+1]===0xF3&&b[i+2]===0x64))i++;if(i>=b.length-3)return null;return b.subarray(i)}
 const LECF={};let LEC_DIAG="";const LEC_MISS={};
 const lecKo=()=>Math.min(1.5,Math.max(0.8,+player.opts.lecKo||1.1)),lecEn=()=>Math.min(1.3,Math.max(0.7,+player.opts.lecEn||1));
-const pct=x=>(x>=1?"+":"")+Math.round((x-1)*100)+"%";
-async function lecClip(text,lang,speed){const tag=lang==="ko"?"ko":AUD.tag==="f"?"f":"m";const rate=pct(speed);const k="/lect/"+tag+"/"+rate+"/"+(lang==="ko"?"k"+koHash(text):txtHash(text));
+// lecture speed is relative to the app's normal voice speed (English -8%, Korean -5% on the voice server), so 1x sounds like the rest of the app
+const LEC_BASE={ko:0.95,en:0.92};const pct=(x,base)=>{const v=Math.round((x*(base||1)-1)*100);return (v>=0?"+":"")+v+"%"};
+async function lecClip(text,lang,speed){const tag=lang==="ko"?"ko":AUD.tag==="f"?"f":"m";const rate=pct(speed,lang==="ko"?LEC_BASE.ko:LEC_BASE.en);const k="/lect/"+tag+"/"+rate+"/"+(lang==="ko"?"k"+koHash(text):txtHash(text));
   const cache=await (self.caches?caches.open("oss-clips").catch(()=>null):null);if(cache){try{const hit=await cache.match(k);if(hit)return new Uint8Array(await hit.arrayBuffer())}catch(e){}}
   const body=tag==="f"?{text,tag,voice:"en-US-EmmaMultilingualNeural",rate}:{text,tag,rate};
   const r=await fetch(TTS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(!r.ok)throw new Error("tts "+r.status);
   const u8=new Uint8Array(await r.arrayBuffer());if(!isMp3(u8))throw new Error("tts 응답이 mp3가 아님");if(cache)cache.put(k,new Response(u8)).catch(()=>{});return u8}
-async function lectureFile(lec,onProg){const key="/lec/"+lec.ts+"_v3_"+lecKo()+"_"+lecEn()+"_"+(AUD.tag==="f"?"f":"m");if(LECF[key])return LECF[key];
+async function lectureFile(lec,onProg){const key="/lec/"+lec.ts+"_v4_"+lecKo()+"_"+lecEn()+"_"+(AUD.tag==="f"?"f":"m");if(LECF[key])return LECF[key];
   const cache=await (self.caches?caches.open("oss-clips").catch(()=>null):null);
   const plan=[];const chapters=[];for(const x of lec.secs){chapters.push({title:x.title,i:plan.length});
     for(const p of x.parts){if(p.rep){plan.push({sil:1},{en:p.rep,show:p.rep,mean:p.ko||""},{sil:Math.min(9,Math.round(2+String(p.rep).split(/\s+/).length/2.2))})}else if(p.en)plan.push({en:p.en,show:p.en},{sil:1});else if(p.ko)for(const k of splitKo(p.ko))plan.push({ko:k,show:k})}plan.push({sil:2})}
@@ -2429,7 +2430,7 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
     WEB?null:h("div",{class:"note",style:"flex-direction:column;align-items:stretch;gap:6px"},h("span",{},"Claude 앱 안에서는 휴대폰 기본 음성으로 읽어서, 화면이 꺼지거나 다른 앱으로 가면 멈춰요(돌아오면 이어서 재생). 일하면서 들으려면 웹 앱에서 들으세요 — 기록과 강의가 같이 넘어가요."),window.claude?.use?webLink("웹 앱에서 듣기 →","btn primary","l"):null),
     h("div",{class:"note"},"한국어 설명 → 영어 → 따라 말할 시간 순서로 나와요. 한 번 끝까지 재생되면 멈춰요. 웹에서는 화면을 꺼도 이어서 재생되고, 잠금화면에서 다음 파트로 넘길 수 있어요.")];
   const lecMode=o.mode==="lecture";if(lecMode&&player.lecTs)setTimeout(()=>lecMark(true),80);
-  const box=h("div",{class:"card"},h("div",{class:"hdr"},h("div",{},h("h3",{},lecMode?"음성 강의":"무한 재생"),h("p",{class:"muted small"},lecMode?"모의시험 피드백을 강의처럼 듣기. 목록에서 골라 재생하세요.":"업무 중 배경으로 계속 듣기. 끝나면 처음부터 다시 반복합니다.")),rateCtl()),
+  const box=h("div",{class:"card"},h("div",{class:"hdr"},h("div",{},h("h3",{},lecMode?"음성 강의":"무한 재생"),h("p",{class:"muted small"},lecMode?"모의시험 피드백을 강의처럼 듣기. 목록에서 골라 재생하세요.":"업무 중 배경으로 계속 듣기. 끝나면 처음부터 다시 반복합니다.")),lecMode?null:rateCtl()),
     tabs,lecMode?null:clipLine,now,
     lecMode&&!player.on?null:h("div",{class:"row"},player.on?h("button",{class:"btn primary",onclick:playerPause},player.paused?"▶ 이어서":"⏸ 일시정지"):(()=>{const p=savedPos();return p?h("span",{class:"row"},h("button",{class:"btn primary",onclick:()=>playerStart(true)},"▶ 이어서 재생 ("+(p.i+1)+"/"+p.items.length+")"),h("button",{class:"btn",onclick:()=>playerStart(false)},"처음부터")):h("button",{class:"btn primary",onclick:()=>playerStart(false)},"▶ 무한 재생 시작")})(),player.on?h("button",{class:"btn",onclick:playerPrev},"◀◀ 이전"):null,player.on?h("button",{class:"btn",onclick:playerNext},"다음 ▶▶"):null,player.on?h("button",{class:"btn ghost",onclick:playerStop},"■ 끄기"):null),
     ...(lecMode?lectureOpts:o.mode==="script"?scriptOpts:o.mode==="sample"?sampleOpts:o.mode==="model"?modelOpts:sentOpts));
