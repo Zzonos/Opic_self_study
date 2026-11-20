@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261120-103331-e913de" data-rel="253">
+<html lang="ko" data-build="20261120-103912-db13bb" data-rel="254">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -2045,7 +2045,15 @@ async function lectureFile(lec,onProg){const key="/lec/"+lec.ts+"_v3_"+lecKo()+"
 const lecRate=()=>1;
 function lecMark(jump){const it=player.items[player.i];if(!player.on||!it||it.kind!=="LF")return;const a=AUD.el;const t=a&&a.currentTime||0;let k=-1;(it.lines||[]).forEach((x,i)=>{if(x.t<=t+0.2)k=i});
   for(const box of document.querySelectorAll('.lecscript[data-ts="'+player.lecTs+'"]')){const prev=box.querySelector(".lsl.cur");const cur=box.querySelector('.lsl[data-li="'+k+'"]');if(prev===cur&&!jump)continue;
-    if(prev){prev.classList.remove("cur");prev.style.background=""}if(cur){cur.classList.add("cur");cur.style.background="rgba(15,118,110,.16)";if(box.offsetParent)box.scrollTop=Math.max(0,cur.offsetTop-box.offsetTop-box.clientHeight/3)}}}
+    if(prev){prev.classList.remove("cur");prev.style.background=""}if(cur){cur.classList.add("cur");cur.style.background="rgba(15,118,110,.16)";if(box.offsetParent){const d=cur.getBoundingClientRect().top-box.getBoundingClientRect().top;box.scrollTop=Math.max(0,box.scrollTop+d-box.clientHeight/3)}}}}
+// lecture script shown inside the green now-playing box: one scrolling list, the line being heard is marked and kept in view
+function lecScriptBox(l){const miss=LEC_MISS[l.lec.ts];let li=0;
+  const row=(t,el)=>h("div",{class:"lsl","data-li":li++,style:"padding:3px 6px;border-radius:6px"+(miss&&miss.has(t)?";border-left:3px solid var(--bad)":"")},el,miss&&miss.has(t)?h("span",{class:"small",style:"color:var(--bad)"},"⚠️ 이 문장은 음성을 받지 못해 빠졌어요"):null);
+  return h("div",{class:"lecscript","data-ts":String(l.lec.ts),style:"position:relative;max-height:42vh;overflow-y:auto;-webkit-overflow-scrolling:touch;border-top:1px solid rgba(15,118,110,.25);padding:6px 0 2px;margin-top:8px;display:flex;flex-direction:column;gap:2px"},
+    ...l.lec.secs.flatMap((x,i)=>[h("div",{class:"row",style:"margin:8px 2px 2px"},h("button",{class:"btn sm ghost",onclick:()=>lecturePlay(l,i)},"▶"),h("span",{class:"small",style:"font-weight:700"},(i+1)+". "+x.title)),
+      ...x.parts.flatMap(p=>p.rep?[row(p.rep,h("div",{},h("p",{class:"en",style:"margin:0;font-size:15px;color:var(--accent);font-weight:600"},"🗣 "+p.rep),p.ko?h("p",{class:"muted small",style:"margin:0"},p.ko):null))]
+        :p.en?[row(p.en,h("p",{class:"en",style:"margin:0;font-size:15px"},"🔊 "+p.en))]
+        :splitKo(p.ko).map(k=>row(k,h("p",{style:"margin:0;font-size:15px;line-height:1.5"},k))))]))}
 function lecChapter(it,t){let c=0;(it.chapters||[]).forEach((x,i)=>{if(t>=x.t-0.3)c=i});return c}
 function lecSeek(d){const it=player.items[player.i];const a=AUD.el;if(!it||it.kind!=="LF"||!a)return;const t=a.currentTime||0;const c=lecChapter(it,t);
   let to=c+d;if(d<0&&t-it.chapters[c].t>3)to=c;to=Math.max(0,Math.min(it.chapters.length-1,to));a.currentTime=it.chapters[to].t+0.01;if(player.paused)playerPause();else if(a.paused)a.play().catch(()=>{});mediaSession();updateNow();renderMini();setTimeout(()=>lecMark(true),300)}
@@ -2327,14 +2335,17 @@ setInterval(()=>{if(!player.on||player.paused||player.t||player.busy)return;if(a
 const MI={prev:'<svg viewBox="0 0 24 24"><path d="M6 5v14"/><path d="M19 5 9 12l10 7z" fill="currentColor"/></svg>',next:'<svg viewBox="0 0 24 24"><path d="M18 5v14"/><path d="M5 5l10 7-10 7z" fill="currentColor"/></svg>',play:'<svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg>',pause:'<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>',stop:'<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>'};
 function renderMini(){const m=$("#mini");if(!player.on){m.hidden=true;return}m.hidden=false;const it=player.items[player.i]||{};
   m.replaceChildren(h("span",{class:"now"},(player.paused?"⏸ ":"▶ ")+(it.label||"")+" — "+(it.en||"")),h("button",{onclick:playerPrev,"aria-label":"이전",title:"이전",html:MI.prev}),h("button",{onclick:playerPause,"aria-label":player.paused?"재생":"일시정지",title:player.paused?"재생":"일시정지",html:player.paused?MI.play:MI.pause}),h("button",{onclick:playerNext,"aria-label":"다음",title:"다음",html:MI.next}),h("button",{onclick:playerStop,"aria-label":"끄기",title:"끄기",html:MI.stop}))}
-function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[player.i]||{};const seg=player.cur||{};
+function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[player.i]||{};const seg=player.cur||{};if(it.kind!=="LF")b.dataset.lec="";
   const en=(seg.t==="file"&&seg.text)||seg.t==="en"?(seg.text||it.en):it.en;const ko=seg.t==="ko"?seg.text:(seg.ko||it.ko||"");
   const silent=seg.t==="wait"||(seg.t==="file"&&/silence_/.test(seg.src||""));const pauseLeft=silent?player.segs.slice(player.si).reduce((a,x)=>(x.t==="wait")?a+x.ms/1000:(x.t==="file"&&/silence_/.test(x.src))?a+(+x.src.match(/_(\d+)/)[1]):a,0):0;
   const head=h("span",{class:"eyebrow"},({Q:"질문",A:"답변",C:"표현",T:"내 자료"}[it.kind]||"")+" · "+(it.label||"")+" · "+(player.i+1)+"/"+player.items.length+(audSrc(it.key)||(seg.t==="file"&&!/silence_/.test(seg.src||""))?" · 🎧":""));
   if(it.kind==="LF"){const a=AUD.el;const t=a&&a.currentTime||0;const c=lecChapter(it,t);let ln=null;for(const x of it.lines||[])if(x.t<=t+0.2)ln=x;
     const mm=x=>Math.floor(x/60)+":"+String(Math.floor(x%60)).padStart(2,"0");
-    b.replaceChildren(h("span",{class:"eyebrow"},"🎧 "+(player.lecture||"음성 강의")+" · "+(c+1)+"/"+it.chapters.length+" "+(it.chapters[c]||{}).title+" · "+mm(t)+" / "+mm((it.dur||0)/lecRate())),
-      ln?h("p",{class:/[a-z]/i.test(ln.s)&&!/[가-힣]/.test(ln.s)?"en":"",style:"font-size:16px;line-height:1.5;margin:4px 0 0"+(ln.ko?";color:var(--accent);font-weight:600":"")},(ln.ko?"🗣 ":"")+ln.s):"",ln&&ln.ko?h("p",{class:"muted small",style:"margin:2px 0 0"},ln.ko):"");return}
+    const eb="🎧 "+(player.lecture||"음성 강의")+" · "+(c+1)+"/"+it.chapters.length+" "+(it.chapters[c]||{}).title+" · "+mm(t)+" / "+mm((it.dur||0)/lecRate());
+    const rec=S.log.find(x=>x.lec&&x.lec.ts===player.lecTs);
+    if(rec&&b.dataset.lec===String(player.lecTs)&&b.querySelector(".lecscript")){b.querySelector(".eyebrow").textContent=eb;lecMark();return}
+    if(rec){b.dataset.lec=String(player.lecTs);b.replaceChildren(h("span",{class:"eyebrow"},eb),lecScriptBox(rec));setTimeout(()=>lecMark(true),30);return}
+    b.dataset.lec="";b.replaceChildren(h("span",{class:"eyebrow"},eb),ln?h("p",{style:"font-size:16px;line-height:1.5;margin:4px 0 0"+(ln.ko?";color:var(--accent);font-weight:600":"")},(ln.ko?"🗣 ":"")+ln.s):"",ln&&ln.ko?h("p",{class:"muted small",style:"margin:2px 0 0"},ln.ko):"");return}
   if(it.kind==="L"){const lh=h("span",{class:"eyebrow"},"🎧 "+(player.lecture||"음성 강의")+" · "+(player.i+1)+"/"+player.items.length+" "+(it.label||"").replace(/^🎧 /,""));
     const rep=seg.t==="en"&&(it.parts||[]).find(p=>p.rep===seg.text);
     b.replaceChildren(lh,silent?h("p",{class:"muted small",style:"margin:4px 0 0"},pauseLeft>=2?"🗣 따라 말해 보세요 · "+pauseLeft.toFixed(0)+"초":"…"):
@@ -2405,17 +2416,7 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
     h("div",{class:"row"},h("button",{class:"btn sm "+(playing?"":"primary"),onclick:()=>{if(playing)playerPause();else lecturePlay(l)}},playing?(player.paused?"▶":"⏸"):"▶"),h("span",{class:"grow small",style:"font-weight:600"},l.lec.title),h("span",{class:"muted small"},"약 "+lectureMins(l.lec)+"분")),
     h("span",{class:"muted small"},l.date+" · "+(l.title||"모의시험")+(l.lvRaw||l.level?" · "+(l.lvRaw||l.level):"")),
     h("details",{},h("summary",{class:"small"},"파트 고르기"),...l.lec.secs.map((x,i)=>h("div",{class:"row",style:"margin-top:6px"},h("button",{class:"btn sm ghost",onclick:()=>lecturePlay(l,i)},"▶"),h("span",{class:"small"},(i+1)+". "+x.title)))),
-    lectureScript(l))};
-  // the whole script in one tall scrolling box; the line being heard is marked and kept in view
-  function lectureScript(l){const miss=LEC_MISS[l.lec.ts];const nm=miss?miss.size:0;let li=0;
-    const row=(t,el)=>{const r=h("div",{class:"lsl","data-li":li++,style:"padding:3px 6px;border-radius:6px"+(miss&&miss.has(t)?";border-left:3px solid var(--bad)":"")},el,miss&&miss.has(t)?h("span",{class:"small",style:"color:var(--bad)"},"⚠️ 이 문장은 음성을 받지 못해 빠졌어요"):null);return r};
-    const box=h("div",{class:"lecscript","data-ts":String(l.lec.ts),style:"max-height:62vh;overflow-y:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:10px;padding:6px 4px;margin-top:6px;display:flex;flex-direction:column;gap:2px"},
-      ...l.lec.secs.flatMap((x,i)=>[h("div",{class:"row",style:"margin:8px 2px 2px"},h("button",{class:"btn sm ghost",onclick:()=>lecturePlay(l,i)},"▶"),h("span",{class:"small",style:"font-weight:700"},(i+1)+". "+x.title)),
-        ...x.parts.flatMap(p=>p.rep?[row(p.rep,h("div",{},h("p",{class:"en small",style:"margin:0;color:var(--accent);font-weight:600"},"🗣 "+p.rep),p.ko?h("p",{class:"muted small",style:"margin:0"},p.ko):null))]
-          :p.en?[row(p.en,h("p",{class:"en small mono",style:"margin:0"},"🔊 "+p.en))]
-          :splitKo(p.ko).map(k=>row(k,h("p",{class:"small",style:"margin:0"},k))))]));
-    const d=h("details",{open:player.on&&player.lecTs===l.lec.ts},h("summary",{class:"small"},"대본 보기"+(nm?" · ⚠️ 빠진 문장 "+nm+"개":"")),box);
-    d.addEventListener("toggle",()=>{if(d.open)setTimeout(()=>lecMark(true),50)});return d}
+    LEC_MISS[l.lec.ts]&&LEC_MISS[l.lec.ts].size?h("span",{class:"small",style:"color:var(--bad)"},"⚠️ 음성을 받지 못한 문장 "+LEC_MISS[l.lec.ts].size+"개 — 재생 중 대본에 빨간색으로 표시돼요"):null)};
   const lectureOpts=[h("p",{class:"eyebrow"},"모의시험 음성 강의 "+withL.length+"개"),
     withL.length?h("div",{class:"list"},...withL.map(lecRow)):h("p",{class:"muted small"},"아직 만든 강의가 없어요. 아래 모의시험에서 만들거나, 모의시험 결과·기록 화면의 '🎧 음성 강의 만들기'를 누르세요."),
     noL.length?h("div",{},h("p",{class:"eyebrow",style:"margin-top:10px"},"강의가 없는 모의시험"),...noL.map(l=>h("div",{class:"row",style:"margin-top:6px"},h("span",{class:"grow small"},l.date+" · "+(l.title||"모의시험")+(l.lvRaw||l.level?" · "+(l.lvRaw||l.level):"")),
