@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261120-102342-69ccf7" data-rel="251">
+<html lang="ko" data-build="20261120-102832-6fd9f2" data-rel="252">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -2016,16 +2016,21 @@ function mp3Silence(sec){const n=Math.max(1,Math.round(sec/MP3S));const b=new Ui
 function mp3Frames(buf){let b=new Uint8Array(buf);let i=0;if(b[0]===0x49&&b[1]===0x44&&b[2]===0x33)i=10+((b[6]<<21)|(b[7]<<14)|(b[8]<<7)|b[9]);
   while(i<b.length-3&&!(b[i]===0xFF&&b[i+1]===0xF3&&b[i+2]===0x64))i++;if(i>=b.length-3)return null;return b.subarray(i)}
 const LECF={};let LEC_DIAG="";
-async function lectureFile(lec,onProg){const key="/lec/"+lec.ts+"_v1";if(LECF[key])return LECF[key];
+const lecKo=()=>Math.min(1.5,Math.max(0.8,+player.opts.lecKo||1.1)),lecEn=()=>Math.min(1.3,Math.max(0.7,+player.opts.lecEn||1));
+const pct=x=>(x>=1?"+":"")+Math.round((x-1)*100)+"%";
+async function lecClip(text,lang,speed){const tag=lang==="ko"?"ko":AUD.tag==="f"?"f":"m";const rate=pct(speed);const k="/lect/"+tag+"/"+rate+"/"+(lang==="ko"?"k"+koHash(text):txtHash(text));
+  const cache=await (self.caches?caches.open("oss-clips").catch(()=>null):null);if(cache){try{const hit=await cache.match(k);if(hit)return new Uint8Array(await hit.arrayBuffer())}catch(e){}}
+  const body=tag==="f"?{text,tag,voice:"en-US-EmmaMultilingualNeural",rate}:{text,tag,rate};
+  const r=await fetch(TTS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(!r.ok)throw new Error("tts "+r.status);
+  const u8=new Uint8Array(await r.arrayBuffer());if(!isMp3(u8))throw new Error("tts 응답이 mp3가 아님");if(cache)cache.put(k,new Response(u8)).catch(()=>{});return u8}
+async function lectureFile(lec,onProg){const key="/lec/"+lec.ts+"_v2_"+lecKo()+"_"+lecEn()+"_"+(AUD.tag==="f"?"f":"m");if(LECF[key])return LECF[key];
   const cache=await (self.caches?caches.open("oss-clips").catch(()=>null):null);
   const plan=[];const chapters=[];for(const x of lec.secs){chapters.push({title:x.title,i:plan.length});
     for(const p of x.parts){if(p.rep){plan.push({sil:1},{en:p.rep,show:p.rep,ko:p.ko||""},{sil:Math.min(9,Math.round(2+String(p.rep).split(/\s+/).length/2.2))})}else if(p.en)plan.push({en:p.en,show:p.en},{sil:1});else if(p.ko)for(const k of splitKo(p.ko))plan.push({ko:k,show:k})}plan.push({sil:2})}
   if(cache){try{const hit=await cache.match(key);const meta=await cache.match(key+"_m");if(hit&&meta){const m=await meta.json();const r={url:URL.createObjectURL(await hit.blob()),...m};LEC_DIAG=lec.title+" · 저장된 파일 사용 · 빠짐 0";LECF[key]=r;return r}}catch(e){}}
   const parts=new Array(plan.length);let done=0;const W=ms=>new Promise(r=>setTimeout(r,ms));
-  const get1=async x=>{for(const wait of [0,700,2000,4500]){if(wait)await W(wait);let u=null;try{u=x.ko?await natFetch(x.ko,"ko"):await natUrl(x.en)}catch(e){}
-      if(u){try{const f=mp3Frames(await (await fetch(u)).arrayBuffer());if(f&&f.length>MP3F*4)return f}catch(e){}}
-      // a failed clip is remembered by the fetcher for a while — forget it so the next try really asks again
-      try{const t=x.ko||x.en;delete SLOW[t];for(const k of Object.keys(NAT.urls))if(k.endsWith(x.ko?"/k"+koHash(t):"/"+txtHash(t)))delete NAT.urls[k]}catch(e){}}return null};
+  const get1=async x=>{for(const wait of [0,700,2000,4500]){if(wait)await W(wait);
+      try{const f=mp3Frames(x.ko?await lecClip(x.ko,"ko",lecKo()):await lecClip(x.en,"en",lecEn()));if(f&&f.length>MP3F*4)return f}catch(e){audLog.push("강의 음성 재시도: "+(e.message||e))}}return null};
   const pass=async idx=>{let k=0;const run=async()=>{while(k<idx.length){const i=idx[k++];const x=plan[i];parts[i]=x.sil?mp3Silence(x.sil):await get1(x);done++;if(onProg)onProg(Math.min(done,plan.length),plan.length)}};await Promise.all([run(),run()])};
   await pass(plan.map((_,i)=>i));let left=plan.map((_,i)=>i).filter(i=>!parts[i]);if(left.length){audLog.push("강의 음성 "+left.length+"개 다시 받기");await W(3000);await pass(left)}
   left=plan.map((_,i)=>i).filter(i=>!parts[i]);const miss=left.length;const voiced=plan.filter(x=>!x.sil).length;
@@ -2037,7 +2042,7 @@ async function lectureFile(lec,onProg){const key="/lec/"+lec.ts+"_v1";if(LECF[ke
   const blob=new Blob(parts,{type:"audio/mpeg"});r.url=URL.createObjectURL(blob);
   if(cache&&!miss){try{await cache.put(key,new Response(blob,{headers:{"Content-Type":"audio/mpeg"}}));await cache.put(key+"_m",new Response(JSON.stringify({dur:r.dur,chapters:r.chapters,lines:r.lines,miss:0})))}catch(e){}}
   LEC_DIAG=lec.title+" · "+Math.round(blob.size/1024)+"KB · "+Math.round(t/60)+"분 · 문장 "+voiced+"개 중 빠짐 "+miss+(miss?" ("+left.map(i=>(plan[i].ko||plan[i].en).slice(0,30)).join(" / ")+")":"");audLog.push("강의 파일 "+LEC_DIAG);LECF[key]=r;return r}
-const lecRate=()=>Math.min(1.5,Math.max(0.8,+player.opts.lecRate||1.1));
+const lecRate=()=>1;
 function lecChapter(it,t){let c=0;(it.chapters||[]).forEach((x,i)=>{if(t>=x.t-0.3)c=i});return c}
 function lecSeek(d){const it=player.items[player.i];const a=AUD.el;if(!it||it.kind!=="LF"||!a)return;const t=a.currentTime||0;const c=lecChapter(it,t);
   let to=c+d;if(d<0&&t-it.chapters[c].t>3)to=c;to=Math.max(0,Math.min(it.chapters.length-1,to));a.currentTime=it.chapters[to].t+0.01;if(player.paused)playerPause();else if(a.paused)a.play().catch(()=>{});mediaSession();updateNow();renderMini()}
@@ -2402,7 +2407,9 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
     noL.length?h("div",{},h("p",{class:"eyebrow",style:"margin-top:10px"},"강의가 없는 모의시험"),...noL.map(l=>h("div",{class:"row",style:"margin-top:6px"},h("span",{class:"grow small"},l.date+" · "+(l.title||"모의시험")+(l.lvRaw||l.level?" · "+(l.lvRaw||l.level):"")),
       CLAUDE_ONLY()?h("button",{class:"btn sm",onclick:e=>{const x=S.log.find(y=>y.ts===l.ts)||l;mockDetail(x,x,e.currentTarget)}},"피드백 + 강의 만들기"):null))):null,
     CLAUDE_ONLY()?null:h("p",{class:"muted small"},"강의 만들기는 Claude 앱에서만 돼요. 만든 강의는 '웹으로 통합'하면 여기서도 들을 수 있어요."),
-    WEB?h("label",{class:"f"},"강의 속도",h("select",{onchange:e=>{player.opts.lecRate=+e.target.value;saveO();try{if(player.on&&(player.items[player.i]||{}).kind==="LF")AUD.el.playbackRate=lecRate()}catch(x){}}},...[1,1.1,1.2,1.3].map(v=>h("option",{value:v,selected:lecRate()===v},v.toFixed(1)+"배")))):null,
+    WEB?h("div",{class:"row"},h("label",{class:"f"},"한국어 속도",h("select",{onchange:e=>{player.opts.lecKo=+e.target.value;saveO();if(player.on&&player.lecture)toast("다음 재생부터 적용돼요")}},...[0.9,1,1.1,1.2,1.3,1.4,1.5].map(v=>h("option",{value:v,selected:lecKo()===v},v.toFixed(1)+"배")))),
+      h("label",{class:"f"},"영어 속도",h("select",{onchange:e=>{player.opts.lecEn=+e.target.value;saveO();if(player.on&&player.lecture)toast("다음 재생부터 적용돼요")}},...[0.8,0.9,1,1.1,1.2].map(v=>h("option",{value:v,selected:lecEn()===v},v.toFixed(1)+"배"))))):null,
+    WEB?h("p",{class:"muted small"},"속도를 바꾸면 처음 한 번은 강의 음성을 그 속도로 새로 만들어요 (수십 초). 만든 조합은 저장돼서 다음부터 바로 재생돼요."):null,
     WEB?null:h("div",{class:"note",style:"flex-direction:column;align-items:stretch;gap:6px"},h("span",{},"Claude 앱 안에서는 휴대폰 기본 음성으로 읽어서, 화면이 꺼지거나 다른 앱으로 가면 멈춰요(돌아오면 이어서 재생). 일하면서 들으려면 웹 앱에서 들으세요 — 기록과 강의가 같이 넘어가요."),window.claude?.use?webLink("웹 앱에서 듣기 →","btn primary","l"):null),
     h("div",{class:"note"},"한국어 설명 → 영어 → 따라 말할 시간 순서로 나와요. 한 번 끝까지 재생되면 멈춰요. 웹에서는 화면을 꺼도 이어서 재생되고, 잠금화면에서 다음 파트로 넘길 수 있어요.")];
   const lecMode=o.mode==="lecture";
