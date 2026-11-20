@@ -1994,12 +1994,12 @@ const MP3F=144,MP3S=0.024;
 function mp3Silence(sec){const n=Math.max(1,Math.round(sec/MP3S));const b=new Uint8Array(n*MP3F);for(let i=0;i<n;i++){const o=i*MP3F;b[o]=0xFF;b[o+1]=0xF3;b[o+2]=0x64;b[o+3]=0xC4}return b}
 function mp3Frames(buf){let b=new Uint8Array(buf);let i=0;if(b[0]===0x49&&b[1]===0x44&&b[2]===0x33)i=10+((b[6]<<21)|(b[7]<<14)|(b[8]<<7)|b[9]);
   while(i<b.length-3&&!(b[i]===0xFF&&b[i+1]===0xF3&&b[i+2]===0x64))i++;if(i>=b.length-3)return null;return b.subarray(i)}
-const LECF={};
+const LECF={};let LEC_DIAG="";
 async function lectureFile(lec,onProg){const key="/lec/"+lec.ts+"_v1";if(LECF[key])return LECF[key];
   const cache=await (self.caches?caches.open("oss-clips").catch(()=>null):null);
   const plan=[];const chapters=[];for(const x of lec.secs){chapters.push({title:x.title,i:plan.length});
     for(const p of x.parts){if(p.rep){plan.push({sil:1},{en:p.rep,show:p.rep,ko:p.ko||""},{sil:Math.min(9,Math.round(2+String(p.rep).split(/\s+/).length/2.2))})}else if(p.en)plan.push({en:p.en,show:p.en},{sil:1});else if(p.ko)for(const k of splitKo(p.ko))plan.push({ko:k,show:k})}plan.push({sil:2})}
-  if(cache){try{const hit=await cache.match(key);const meta=await cache.match(key+"_m");if(hit&&meta){const m=await meta.json();const r={url:URL.createObjectURL(await hit.blob()),...m};LECF[key]=r;return r}}catch(e){}}
+  if(cache){try{const hit=await cache.match(key);const meta=await cache.match(key+"_m");if(hit&&meta){const m=await meta.json();const r={url:URL.createObjectURL(await hit.blob()),...m};LEC_DIAG=lec.title+" · 저장된 파일 사용 · 빠짐 0";LECF[key]=r;return r}}catch(e){}}
   const parts=new Array(plan.length);let done=0;const W=ms=>new Promise(r=>setTimeout(r,ms));
   const get1=async x=>{for(const wait of [0,700,2000,4500]){if(wait)await W(wait);let u=null;try{u=x.ko?await natFetch(x.ko,"ko"):await natUrl(x.en)}catch(e){}
       if(u){try{const f=mp3Frames(await (await fetch(u)).arrayBuffer());if(f&&f.length>MP3F*4)return f}catch(e){}}
@@ -2015,7 +2015,7 @@ async function lectureFile(lec,onProg){const key="/lec/"+lec.ts+"_v1";if(LECF[ke
   const r={dur:t,chapters:chapters.map(c=>({title:c.title,t:starts[c.i]})),lines:plan.map((x,i)=>x.sil?null:{t:starts[i],s:x.show,ko:x.ko||"",rep:!!(x.en&&x.ko!==undefined&&plan[i+1]&&plan[i+1].sil>1)}).filter(Boolean),miss};
   const blob=new Blob(parts,{type:"audio/mpeg"});r.url=URL.createObjectURL(blob);
   if(cache&&!miss){try{await cache.put(key,new Response(blob,{headers:{"Content-Type":"audio/mpeg"}}));await cache.put(key+"_m",new Response(JSON.stringify({dur:r.dur,chapters:r.chapters,lines:r.lines,miss:0})))}catch(e){}}
-  audLog.push("강의 파일 "+Math.round(blob.size/1024)+"KB · "+Math.round(t/60)+"분"+(miss?" · 빠진 문장 "+miss:""));LECF[key]=r;return r}
+  LEC_DIAG=lec.title+" · "+Math.round(blob.size/1024)+"KB · "+Math.round(t/60)+"분 · 문장 "+voiced+"개 중 빠짐 "+miss+(miss?" ("+left.map(i=>(plan[i].ko||plan[i].en).slice(0,30)).join(" / ")+")":"");audLog.push("강의 파일 "+LEC_DIAG);LECF[key]=r;return r}
 const lecRate=()=>Math.min(1.5,Math.max(0.8,+player.opts.lecRate||1.1));
 function lecChapter(it,t){let c=0;(it.chapters||[]).forEach((x,i)=>{if(t>=x.t-0.3)c=i});return c}
 function lecSeek(d){const it=player.items[player.i];const a=AUD.el;if(!it||it.kind!=="LF"||!a)return;const t=a.currentTime||0;const c=lecChapter(it,t);
@@ -2815,7 +2815,7 @@ function vSettings(m){
     WEB?h("div",{class:"card"},h("h3",{},"음성 서버 (자연스러운 음성 자동 녹음)"),h("p",{class:"muted small"},"스크립트·예시·모범답안 문장을 Microsoft 신경망 음성으로 자동 녹음해 내 계정에 저장해요. 중계 서버 주소를 한 번만 넣으면 됩니다."),
       h("input",{type:"url",id:"ttsurl",value:TTS_URL,placeholder:"https://….workers.dev"}),h("div",{class:"row"},h("button",{class:"btn sm",onclick:()=>{TTS_URL=$("#ttsurl").value.trim();try{localStorage.setItem("oss_tts_url",TTS_URL)}catch(e){}toast(TTS_URL?"저장했어요. 듣기 탭에서 녹음이 시작돼요":"음성 서버를 껐어요");clipSync(false)}},"저장"),h("button",{class:"btn sm ghost",onclick:async e=>{const out=e.target.parentNode.nextSibling;out.style.whiteSpace="pre-wrap";out.textContent="";TTS_URL=$("#ttsurl").value.trim().replace(/\/+$/,"");$("#ttsurl").value=TTS_URL;await ttsSrvDiag(t=>{out.textContent+=t+"\n"})}},"연결 테스트")),h("p",{class:"small mono",style:"word-break:break-all"},""),
       h("p",{class:"muted small"},cloud.ref?"계정 녹음 "+CLIPS.idx.size+"문장 저장됨":"로그인하면 계정에 녹음이 저장돼요")):null,
-    h("div",{class:"card"},h("h3",{},"데이터"),h("p",{class:"muted small mono",style:"font-size:10px"},"진단: "+(window.claude?.use?"claude":"web")+" · hash="+(HASH_SEEN||"-")+" · ds="+("DecompressionStream" in window)+" · clip="+!!navigator.clipboard?.readText+"\n재생 로그: "+(audLog.slice(-8).join(" | ")||"-")),h("p",{class:"muted small"},uid?h("span",{},"학습 기록은 내 Claude 계정에 저장되어 다른 기기에서도 이어집니다. ",h("b",{id:"csave"},claudeStatus())):cloud.user?"학습 기록은 OSS 계정("+cloud.user.email+")에 저장돼요.":"지금은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장됩니다."),
+    h("div",{class:"card"},h("h3",{},"데이터"),h("p",{class:"muted small mono",style:"font-size:10px"},"진단: "+(window.claude?.use?"claude":"web")+" · v="+APPV()+" · hash="+(HASH_SEEN||"-")+" · ds="+("DecompressionStream" in window)+" · clip="+!!navigator.clipboard?.readText+"\n재생 로그: "+(audLog.slice(-8).join(" | ")||"-")+(LEC_DIAG?"\n강의: "+LEC_DIAG:"")),h("p",{class:"muted small"},uid?h("span",{},"학습 기록은 내 Claude 계정에 저장되어 다른 기기에서도 이어집니다. ",h("b",{id:"csave"},claudeStatus())):cloud.user?"학습 기록은 OSS 계정("+cloud.user.email+")에 저장돼요.":"지금은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장됩니다."),
       h("div",{class:"row",id:"resetrow"},Object.keys(S.samples||{}).length?h("button",{class:"btn sm ghost",onclick:()=>{S.samples={};save();toast("예시 스크립트를 지웠어요. 듣기 탭에서 다시 만들 수 있어요");render()}},"듣기용 예시 스크립트 지우기"):null,h("button",{class:"btn sm ghost",onclick:e=>{if(e.currentTarget.nextSibling)return;e.currentTarget.after(h("button",{class:"btn sm",style:"color:var(--bad)",onclick:()=>{S=structuredClone(DEF);save();deck.order=[];render();toast("초기화했어요")}},"정말 초기화할게요"))}},"기록 전체 초기화…"))),adminCard());
 }
 
