@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261120-085906-46b31d">
+<html lang="ko" data-build="20261120-092749-1719d1">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -2004,10 +2004,47 @@ Reply with ONLY JSON: {"title":"짧은 강의 제목","sections":[{"title":"섹�
     if(!secs.length)throw new Error("빈 대본");l0.lec={ts:Date.now(),title:String(r.title||"모의시험 음성 강의"),secs};l0.detAt=Date.now();save();toast("음성 강의를 만들었어요 — '강의 듣기'를 누르세요");render()}
   catch(e){btn.disabled=false;btn.textContent=t0;toast("강의를 만들지 못했어요: "+errMsg(e))}}
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&player.on&&player.paused&&player.hidPause){player.hidPause=false;player.paused=false;/* the line spoken when the screen went off was cut: say it again */for(let k=player.si-1;k>=0;k--){const x=player.segs[k];if(x&&(x.t==="ko"||x.t==="en")){player.si=k;break}}keepAlive(true);playerStep();mediaSession();renderMini();toast("강의를 이어서 재생해요")}});
+{let lt=0;document.addEventListener("timeupdate",e=>{if(e.target!==AUD.el||!player.on)return;const it=player.items[player.i];if(!it||it.kind!=="LF")return;const now=Date.now();if(now-lt<900)return;lt=now;if(view==="listen"&&!document.hidden)updateNow()},true)}
 function lectureMins(lec){let n=0;for(const x of lec.secs)for(const p of x.parts)n+=p.rep?String(p.rep).split(/\s+/).length*2.2+3:p.en?String(p.en).split(/\s+/).length*0.45:String(p.ko||"").length*0.16;return Math.max(1,Math.round(n/60))}
 async function lecturePrefetch(lec){if(!WEB||!TTS_URL||!navigator.onLine)return;const jobs=[];for(const x of lec.secs)for(const p of x.parts){if(p.rep)jobs.push(()=>natUrl(p.rep));else if(p.en)jobs.push(()=>natUrl(p.en));else if(p.ko)for(const k of splitKo(p.ko))jobs.push(()=>natFetch(k,"ko"))}
   let i=0,ok=0;const run=async()=>{while(i<jobs.length){const j=jobs[i++];try{if(await j())ok++}catch(e){}}};await Promise.all([run(),run(),run()]);audLog.push("강의 음성 미리 받기 "+ok+"/"+jobs.length)}
-function lecturePlay(l0,from=0){const lec=l0.lec;if(!lec)return;lecturePrefetch(lec);if(!tts.ok&&!Object.keys(AUD.man).length){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
+// all clips are MPEG-2 layer III, 24 kHz, 48 kbps, mono (144-byte frames, 24 ms each): they join cleanly, and silence is made of empty frames
+const MP3F=144,MP3S=0.024;
+function mp3Silence(sec){const n=Math.max(1,Math.round(sec/MP3S));const b=new Uint8Array(n*MP3F);for(let i=0;i<n;i++){const o=i*MP3F;b[o]=0xFF;b[o+1]=0xF3;b[o+2]=0x64;b[o+3]=0xC4}return b}
+function mp3Frames(buf){let b=new Uint8Array(buf);let i=0;if(b[0]===0x49&&b[1]===0x44&&b[2]===0x33)i=10+((b[6]<<21)|(b[7]<<14)|(b[8]<<7)|b[9]);
+  while(i<b.length-3&&!(b[i]===0xFF&&b[i+1]===0xF3&&b[i+2]===0x64))i++;if(i>=b.length-3)return null;return b.subarray(i)}
+const LECF={};
+async function lectureFile(lec,onProg){const key="/lec/"+lec.ts+"_v1";if(LECF[key])return LECF[key];
+  const cache=await (self.caches?caches.open("oss-clips").catch(()=>null):null);
+  const plan=[];const chapters=[];for(const x of lec.secs){chapters.push({title:x.title,i:plan.length});
+    for(const p of x.parts){if(p.rep){plan.push({sil:1},{en:p.rep,show:p.rep,ko:p.ko||""},{sil:Math.min(9,Math.round(2+String(p.rep).split(/\s+/).length/2.2))})}else if(p.en)plan.push({en:p.en,show:p.en},{sil:1});else if(p.ko)for(const k of splitKo(p.ko))plan.push({ko:k,show:k})}plan.push({sil:2})}
+  if(cache){try{const hit=await cache.match(key);const meta=await cache.match(key+"_m");if(hit&&meta){const m=await meta.json();const r={url:URL.createObjectURL(await hit.blob()),...m};LECF[key]=r;return r}}catch(e){}}
+  const parts=new Array(plan.length);let done=0,miss=0;const jobs=plan.map((x,i)=>async()=>{if(x.sil){parts[i]=mp3Silence(x.sil)}else{
+      let u=null;try{u=x.ko?await natFetch(x.ko,"ko"):await natUrl(x.en)}catch(e){}
+      if(!u){try{u=x.ko?await natFetch(x.ko,"ko"):await natUrl(x.en)}catch(e){}}
+      let f=null;if(u){try{f=mp3Frames(await (await fetch(u)).arrayBuffer())}catch(e){}}
+      if(!f){miss++;parts[i]=mp3Silence(0.5)}else parts[i]=f}
+    done++;if(onProg)onProg(done,plan.length)});
+  let k=0;const run=async()=>{while(k<jobs.length){const j=jobs[k++];await j()}};await Promise.all([run(),run(),run(),run()]);
+  const voiced=plan.filter(x=>!x.sil).length;if(miss>Math.max(2,voiced*0.1))throw new Error("음성 "+miss+"/"+voiced+"개를 받지 못했어요");
+  // where each part and line starts, from the frame counts
+  let t=0;const starts=parts.map(b=>{const s0=t;t+=b.length/MP3F*MP3S;return s0});
+  const r={dur:t,chapters:chapters.map(c=>({title:c.title,t:starts[c.i]})),lines:plan.map((x,i)=>x.sil?null:{t:starts[i],s:x.show,ko:x.ko||"",rep:!!(x.en&&x.ko!==undefined&&plan[i+1]&&plan[i+1].sil>1)}).filter(Boolean),miss};
+  const blob=new Blob(parts,{type:"audio/mpeg"});r.url=URL.createObjectURL(blob);
+  if(cache&&!miss){try{await cache.put(key,new Response(blob,{headers:{"Content-Type":"audio/mpeg"}}));await cache.put(key+"_m",new Response(JSON.stringify({dur:r.dur,chapters:r.chapters,lines:r.lines,miss:0})))}catch(e){}}
+  audLog.push("강의 파일 "+Math.round(blob.size/1024)+"KB · "+Math.round(t/60)+"분"+(miss?" · 빠진 문장 "+miss:""));LECF[key]=r;return r}
+const lecRate=()=>Math.min(1.5,Math.max(0.8,+player.opts.lecRate||1.1));
+function lecChapter(it,t){let c=0;(it.chapters||[]).forEach((x,i)=>{if(t>=x.t-0.3)c=i});return c}
+function lecSeek(d){const it=player.items[player.i];const a=AUD.el;if(!it||it.kind!=="LF"||!a)return;const t=a.currentTime||0;const c=lecChapter(it,t);
+  let to=c+d;if(d<0&&t-it.chapters[c].t>3)to=c;to=Math.max(0,Math.min(it.chapters.length-1,to));a.currentTime=it.chapters[to].t+0.01;if(player.paused)playerPause();else if(a.paused)a.play().catch(()=>{});mediaSession();updateNow();renderMini()}
+async function lecturePlay(l0,from=0){const lec=l0.lec;if(!lec)return;
+  if(WEB&&TTS_URL&&navigator.onLine&&!player.lecSeg){if(player.on)playerStop();let tt=null;const prog=(d,n)=>{clearTimeout(tt);tt=setTimeout(()=>toast("강의 음성 준비 중 "+d+"/"+n+" (처음 한 번만)"),50)};
+    try{const f=await lectureFile(lec,prog);clearTimeout(tt);
+      player.items=[{kind:"LF",label:"🎧 "+lec.title,en:"",ko:"",src:f.url,chapters:f.chapters,lines:f.lines,dur:f.dur,start:(f.chapters[from]||{}).t||0}];player.lecture=lec.title;
+      if(player.opts.mode!=="lecture"){player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}}
+      player.loop=0;player.busy=false;player.on=true;player.paused=false;player.i=0;player.segs=[];player.si=0;ttsStop();wakeLock(true);keepAlive(false);playerStep();mediaSession();renderMini();toast((f.miss?"일부 문장 없이 ":"")+"강의 재생: "+lec.title);if(view==="listen")render();return}
+    catch(e){clearTimeout(tt);audLog.push("강의 파일 만들기 실패 → 문장별 재생: "+(e.message||e));toast("강의 파일을 만들지 못해 문장별로 재생해요")}}
+  lecturePrefetch(lec);if(!tts.ok&&!Object.keys(AUD.man).length){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
   if(player.on)playerStop();player.items=lec.secs.slice(from).map((x,i)=>({kind:"L",label:"🎧 "+(x.title||("파트 "+(from+i+1))),en:"",ko:"",parts:x.parts}));player.lecture=lec.title;if(player.opts.mode!=="lecture"){player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}}
   player.loop=0;player.busy=false;player.on=true;player.paused=false;player.i=0;player.segs=[];player.si=0;ttsStop();wakeLock(true);keepAlive(true);playerStep();mediaSession();renderMini();toast("강의 재생: "+lec.title);if(view==="listen")render()}
 function lectureBox(l0){if(!l0||l0.kind!=="mock"||!(l0.pq||[]).length)return null;const lec=l0.lec;
@@ -2168,12 +2205,13 @@ function playerPause(){if(!player.on)return;player.sys=false;clearInterval(playe
 // previous: like a music player — restart the current item if it is already under way, otherwise go back one item
 function audSoftStop(){audCb=null;AUD.own=Date.now();try{const a=AUD.el;if(a){a.onended=null;a.onerror=null;a.pause()}}catch(e){}}
 function playerKick(){setTimeout(()=>{if(!player.on||player.paused)return;const a=AUD.el;const playing=a&&!a.paused&&!a.ended&&a.src;if(playing||player.t||player.busy||(tts.ok&&speechSynthesis.speaking))return;audLog.push("이동 후 재생 재시도");if(a&&a.src&&a.paused&&!a.ended&&a.currentTime>0.05)a.play().catch(()=>playerStep());else playerStep()},1500)}
-function playerPrev(){if(!player.on)return;clearTimeout(player.t);player.t=null;audSoftStop();if(tts.ok&&speechSynthesis.speaking)speechSynthesis.cancel();keepAlive(true);
+function playerPrev(){if(!player.on)return;if((player.items[player.i]||{}).kind==="LF"){lecSeek(-1);return}clearTimeout(player.t);player.t=null;audSoftStop();if(tts.ok&&speechSynthesis.speaking)speechSynthesis.cancel();keepAlive(true);
   if(player.si<=1&&!player.loop&&player.items.length>1)player.i=(player.i-1+player.items.length)%player.items.length;player.loop=0;player.segs=[];player.si=0;player.paused=false;playerStep();playerKick();renderMini();if(view==="listen"&&!document.hidden)render()}
-function playerNext(){player.loop=0;if(!player.on)return;clearTimeout(player.t);player.t=null;audSoftStop();if(tts.ok&&speechSynthesis.speaking)speechSynthesis.cancel();keepAlive(true);player.i=(player.i+1)%player.items.length;player.segs=[];player.si=0;player.paused=false;playerStep();playerKick();renderMini()}
+function playerNext(){player.loop=0;if(!player.on)return;if((player.items[player.i]||{}).kind==="LF"){lecSeek(1);return}clearTimeout(player.t);player.t=null;audSoftStop();if(tts.ok&&speechSynthesis.speaking)speechSynthesis.cancel();keepAlive(true);player.i=(player.i+1)%player.items.length;player.segs=[];player.si=0;player.paused=false;playerStep();playerKick();renderMini()}
 function silenceSegs(sec){const out=[];let left=Math.floor(sec+0.001);for(const d of [20,10,5,3,2,1]){while(left>=d){out.push({t:"file",src:"audio/silence_"+d+".mp3",rate:1});left-=d}}const frac=Math.round((sec-Math.floor(sec+0.001))*1000);if(frac>=100)out.push({t:"wait",ms:frac});return out}
 const koR=()=>Math.min(1.5,Math.max(0.8,+player.opts.koRate||1.2));
 function buildSegs(it){const o=player.opts;const segs=[];
+  if(it.kind==="LF")return [{t:"file",src:it.src,rate:lecRate(),text:"",ko:"",lf:true,start:it.start||0}];
   if(it.kind==="L"){for(const p of it.parts||[]){if(p.rep){segs.push(...silenceSegs(1),{t:"en",text:p.rep,ko:p.ko||""},...silenceSegs(Math.min(9,Math.round(2+String(p.rep).split(/\s+/).length/2.2))))}else if(p.en)segs.push({t:"en",text:p.en,ko:""},...silenceSegs(1));else if(p.ko)for(const k of splitKo(p.ko))segs.push({t:"ko",text:k})}segs.push(...silenceSegs(2));return segs}const src=audSrc(it.key);const sents=splitSent(it.en);const inf=(+o.repeat)===0;const ko=o.ko!=="off"&&!(inf&&player.loop>0);const n=inf?1:Math.max(1,o.repeat|0);const pause=Math.max(0,+o.pause||0);
   // where the translation goes: after the first repetition (default) or right before the last one
   const late=o.koAt==="last"&&n>=2;const koBefore=r=>ko&&late&&r===n-1;const koAfter=r=>ko&&!late&&r===0;
@@ -2244,7 +2282,7 @@ function playerStep(){if(!player.on||player.paused)return;const it=player.items[
     // prefetch the next few account clips so playback does not stall
     player.segs.slice(player.si+1,player.si+6).forEach(x=>{if(x.t==="file"&&/^fs:/.test(x.src)){const [t2,h2]=x.src.slice(3).split("/");clipUrl(t2,h2)}});return}
   if(seg.t==="file"){const m=/silence_(\d+)/.exec(seg.src||"");if(m){const want=+m[1]*1000;const t0=Date.now();audPlay(seg.src,{rate:1,onend:()=>{const left=want-(Date.now()-t0);if(left>150){audLog.push("silence short by "+(left/1000).toFixed(1)+"s → 타이머 보정");player.t=setTimeout(()=>{player.t=null;after()},left)}else after()}});return}
-    audPlay(seg.src,{rate:seg.rate,onend:after});return}
+    audPlay(seg.src,{rate:seg.rate,onend:after});if(seg.lf){const a=AUD.el;const go2=()=>{if(seg.start){try{a.currentTime=seg.start}catch(e){}seg.start=0}};if(a.readyState>=1)go2();else a.addEventListener("loadedmetadata",go2,{once:true})}return}
   if(seg.t==="wait"){if(document.hidden){audPlay("audio/silence_1.mp3",{rate:1,onend:after,onerror:after});return}player.t=setTimeout(()=>{player.t=null;after()},seg.ms);return}
   // speech synthesis segments (fallback / Korean): cannot run while the page is in the background on iPhone → skip
   {const up=seg.noUp?null:seg.t==="en"&&seg.text?txtSrc(seg.text):seg.t==="ko"&&seg.en?txtSrc(seg.en,"ko"):null;if(up){const isKo=seg.t==="ko";if(isKo){seg.ko=seg.text;seg.text=""}seg.t="file";seg.src=up;seg.rate=isKo?koR():tts.rate;playerStep();return}}
@@ -2281,6 +2319,10 @@ function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[pla
   const en=(seg.t==="file"&&seg.text)||seg.t==="en"?(seg.text||it.en):it.en;const ko=seg.t==="ko"?seg.text:(seg.ko||it.ko||"");
   const silent=seg.t==="wait"||(seg.t==="file"&&/silence_/.test(seg.src||""));const pauseLeft=silent?player.segs.slice(player.si).reduce((a,x)=>(x.t==="wait")?a+x.ms/1000:(x.t==="file"&&/silence_/.test(x.src))?a+(+x.src.match(/_(\d+)/)[1]):a,0):0;
   const head=h("span",{class:"eyebrow"},({Q:"질문",A:"답변",C:"표현",T:"내 자료"}[it.kind]||"")+" · "+(it.label||"")+" · "+(player.i+1)+"/"+player.items.length+(audSrc(it.key)||(seg.t==="file"&&!/silence_/.test(seg.src||""))?" · 🎧":""));
+  if(it.kind==="LF"){const a=AUD.el;const t=a&&a.currentTime||0;const c=lecChapter(it,t);let ln=null;for(const x of it.lines||[])if(x.t<=t+0.2)ln=x;
+    const mm=x=>Math.floor(x/60)+":"+String(Math.floor(x%60)).padStart(2,"0");
+    b.replaceChildren(h("span",{class:"eyebrow"},"🎧 "+(player.lecture||"음성 강의")+" · "+(c+1)+"/"+it.chapters.length+" "+(it.chapters[c]||{}).title+" · "+mm(t)+" / "+mm((it.dur||0)/lecRate())),
+      ln?h("p",{class:/[a-z]/i.test(ln.s)&&!/[가-힣]/.test(ln.s)?"en":"",style:"font-size:16px;line-height:1.5;margin:4px 0 0"+(ln.ko?";color:var(--accent);font-weight:600":"")},(ln.ko?"🗣 ":"")+ln.s):"",ln&&ln.ko?h("p",{class:"muted small",style:"margin:2px 0 0"},ln.ko):"");return}
   if(it.kind==="L"){const lh=h("span",{class:"eyebrow"},"🎧 "+(player.lecture||"음성 강의")+" · "+(player.i+1)+"/"+player.items.length+" "+(it.label||"").replace(/^🎧 /,""));
     const rep=seg.t==="en"&&(it.parts||[]).find(p=>p.rep===seg.text);
     b.replaceChildren(lh,silent?h("p",{class:"muted small",style:"margin:4px 0 0"},pauseLeft>=2?"🗣 따라 말해 보세요 · "+pauseLeft.toFixed(0)+"초":"…"):
@@ -2356,6 +2398,7 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
     noL.length?h("div",{},h("p",{class:"eyebrow",style:"margin-top:10px"},"강의가 없는 모의시험"),...noL.map(l=>h("div",{class:"row",style:"margin-top:6px"},h("span",{class:"grow small"},l.date+" · "+(l.title||"모의시험")+(l.lvRaw||l.level?" · "+(l.lvRaw||l.level):"")),
       CLAUDE_ONLY()?h("button",{class:"btn sm",onclick:e=>{const x=S.log.find(y=>y.ts===l.ts)||l;mockDetail(x,x,e.currentTarget)}},"피드백 + 강의 만들기"):null))):null,
     CLAUDE_ONLY()?null:h("p",{class:"muted small"},"강의 만들기는 Claude 앱에서만 돼요. 만든 강의는 '웹으로 통합'하면 여기서도 들을 수 있어요."),
+    WEB?h("label",{class:"f"},"강의 속도",h("select",{onchange:e=>{player.opts.lecRate=+e.target.value;saveO();try{if(player.on&&(player.items[player.i]||{}).kind==="LF")AUD.el.playbackRate=lecRate()}catch(x){}}},...[1,1.1,1.2,1.3].map(v=>h("option",{value:v,selected:lecRate()===v},v.toFixed(1)+"배")))):null,
     WEB?null:h("div",{class:"note",style:"flex-direction:column;align-items:stretch;gap:6px"},h("span",{},"Claude 앱 안에서는 휴대폰 기본 음성으로 읽어서, 화면이 꺼지거나 다른 앱으로 가면 멈춰요(돌아오면 이어서 재생). 일하면서 들으려면 웹 앱에서 들으세요 — 기록과 강의가 같이 넘어가요."),window.claude?.use?webLink("웹 앱에서 듣기 →","btn primary","l"):null),
     h("div",{class:"note"},"한국어 설명 → 영어 → 따라 말할 시간 순서로 나와요. 한 번 끝까지 재생되면 멈춰요. 웹에서는 화면을 꺼도 이어서 재생되고, 잠금화면에서 다음 파트로 넘길 수 있어요.")];
   const lecMode=o.mode==="lecture";
