@@ -4,7 +4,7 @@ import pathlib, hashlib, json, time
 root = pathlib.Path(__file__).resolve().parents[1]
 body = (root / "src/artifact.html").read_text(encoding="utf-8")
 head = """<!doctype html>
-<html lang="ko" data-build="BUILD_ID">
+<html lang="ko" data-build="BUILD_ID" data-rel="REL_NO">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -24,7 +24,9 @@ head = """<!doctype html>
 <body>
 """
 build = time.strftime("%Y%m%d-%H%M%S") + "-" + hashlib.sha1(body.encode()).hexdigest()[:6]
-(root / "docs/index.html").write_text(head.replace("BUILD_ID", build) + body + "\n</body>\n</html>\n", encoding="utf-8")
-(root / "docs/version.json").write_text(json.dumps({"v": build}), encoding="utf-8")
-print("build", build)
+# release number shown in the app as (vN): the number of the published version (tools/release.txt, raised at each release)
+rel = (root / "tools/release.txt").read_text().strip() if (root / "tools/release.txt").exists() else ""
+(root / "docs/index.html").write_text(head.replace("BUILD_ID", build).replace("REL_NO", rel) + body + "\n</body>\n</html>\n", encoding="utf-8")
+(root / "docs/version.json").write_text(json.dumps({"v": build, "rel": rel}), encoding="utf-8")
+print("build", build, "rel", rel)
 print("wrote docs/index.html", len(body))
