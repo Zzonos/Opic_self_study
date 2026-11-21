@@ -6,6 +6,9 @@ body = (root / "src/artifact.html").read_text(encoding="utf-8")
 # base listening units (내 표현 듣기) live in tools/units.json
 units = json.dumps(json.loads((root / "tools/units.json").read_text(encoding="utf-8")), ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
 body = body.replace("/*UNITS_JSON*/[]", units)
+# extra Background Survey topics live in tools/survey_more.json
+smore = json.dumps(json.loads((root / "tools/survey_more.json").read_text(encoding="utf-8")), ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+body = body.replace("/*SURVEY_MORE*/[]", smore)
 head = """<!doctype html>
 <html lang="ko" data-build="BUILD_ID" data-rel="REL_NO">
 <head>
