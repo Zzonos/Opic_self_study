@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261120-220924-51daee" data-rel="261">
+<html lang="ko" data-build="20261121-111128-3ef9c1" data-rel="262">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -2099,12 +2099,12 @@ async function lecturePlay(l0,from){const lec=l0.lec;if(!lec)return;const fromLi
   if(WEB&&TTS_URL&&navigator.onLine&&!player.lecSeg){if(player.on)playerStop();let tt=null;const prog=(d,n)=>{clearTimeout(tt);tt=setTimeout(()=>toast("강의 음성 준비 중 "+d+"/"+n+" (처음 한 번만)"),50)};
     try{const f=await lectureFile(lec,prog);clearTimeout(tt);
       player.lecTs=lec.ts;const saved=fromList?lecPosGet(lec.ts):0;const resume=saved&&saved<(f.dur||0)-8?Math.max(0,saved-2):0;
-      player.items=[{kind:"LF",label:"🎧 "+lec.title,en:"",ko:"",src:f.url,chapters:f.chapters,lines:f.lines,dur:f.dur,start:resume||(f.chapters[from]||{}).t||0}];player.lecture=lec.title;
+      player.items=[{kind:"LF",label:"🎧 "+lec.title,en:"",ko:"",src:f.url,chapters:f.chapters,lines:f.lines,dur:f.dur,start:resume||(f.chapters[from]||{}).t||0}];player.lecture=lec.title;player.src="lecture";
       if(player.opts.mode!=="lecture"){player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}}
       player.loop=0;player.busy=false;player.on=true;player.paused=false;player.i=0;player.segs=[];player.si=0;ttsStop();wakeLock(true);keepAlive(false);playerStep();mediaSession();renderMini();toast(f.miss?"⚠️ 음성을 받지 못한 문장 "+f.miss+"개는 빠진 채 재생해요 · 뒤에서 계속 다시 받아요":resume?"지난번 들은 곳부터 이어서 재생 ("+Math.floor(resume/60)+":"+String(Math.floor(resume%60)).padStart(2,"0")+") · 처음부터는 파트 1의 ▶":"강의 재생: "+lec.title);if(view==="listen")render();return}
     catch(e){clearTimeout(tt);audLog.push("강의 파일 만들기 실패 → 문장별 재생: "+(e.message||e));toast("강의 파일을 만들지 못해 문장별로 재생해요")}}
   lecturePrefetch(lec);if(!tts.ok&&!Object.keys(AUD.man).length){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
-  if(player.on)playerStop();player.items=lec.secs.slice(from).map((x,i)=>({kind:"L",label:"🎧 "+(x.title||("파트 "+(from+i+1))),en:"",ko:"",parts:x.parts}));player.lecture=lec.title;if(player.opts.mode!=="lecture"){player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}}
+  if(player.on)playerStop();player.items=lec.secs.slice(from).map((x,i)=>({kind:"L",label:"🎧 "+(x.title||("파트 "+(from+i+1))),en:"",ko:"",parts:x.parts}));player.lecture=lec.title;player.src="lecture";if(player.opts.mode!=="lecture"){player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}}
   player.loop=0;player.busy=false;player.on=true;player.paused=false;player.i=0;player.segs=[];player.si=0;ttsStop();wakeLock(true);keepAlive(true);playerStep();mediaSession();renderMini();toast("강의 재생: "+lec.title);if(view==="listen")render()}
 function lectureBox(l0){if(!l0||l0.kind!=="mock"||!(l0.pq||[]).length)return null;const lec=l0.lec;
   if(!lec)return null;
@@ -2240,7 +2240,9 @@ if(player.opts.pause==null){player.opts.pause=player.opts.think!=null?Math.min(1
 function scriptTopics(){return TOPICS.filter(t=>S.scripts[t.id]&&(S.scripts[t.id].scripts||[]).length)}
 function sampleTopics(){return TOPICS.filter(t=>t.id!=="intro"&&(mySurvey().includes(t.id)||t.group==="돌발"))}
 function modelTopics(){return TOPICS.filter(t=>allQs(t).some(q=>myModel(q)))}
-function buildPlaylist(){const o=player.opts;const items=[];if(o.mode==="sent")return unitPlaylist();
+// the listen tab the current playback was started from: switching tabs only changes what is shown, never what is playing
+const ownTab=()=>player.on&&player.src===player.opts.mode;
+function buildPlaylist(){const o=Object.assign({},player.opts,{mode:player.src||player.opts.mode});const items=[];if(o.mode==="sent")return unitPlaylist();
   if(o.mode==="model"){const sel=o.mtopics||[];for(const t of modelTopics().filter(t=>!sel.length||sel.includes(t.id)))allQs(t).forEach(q=>{const m=myModel(q);if(!m)return;
       items.push({kind:"A",label:t.en+" · "+QT[q.t]+" · 모범답안",en:m,ko:"",ex:"",q:o.withQ?{en:q.q,ko:q.k||"",key:qKey(t,q)}:null})});
     return o.shuffle?pick(items,items.length):items}
@@ -2256,10 +2258,10 @@ function buildPlaylist(){const o=player.opts;const items=[];if(o.mode==="sent")r
   if(o.cards)for(const c of [...CARDS,...S.custom])items.push({kind:"C",key:c.c==="custom"?null:c.id,label:CAT[c.c]||"내 표현",en:c.en.replace(/___/g,"something"),ko:c.ko,ex:c.ex||""});
   return o.shuffle?pick(items,items.length):items}
 function savedPos(){try{const p=JSON.parse(localStorage.getItem("opic30_pos")||"null");if(p&&p.mode===player.opts.mode&&Array.isArray(p.items)&&p.items.length&&Date.now()-p.ts<6*3600e3&&p.i<p.items.length)return p}catch(e){}return null}
-function playerStart(resume){player.lecture=null;if(!resume&&player.opts.mode==="sent")player.opts.uonly="";if(!tts.ok&&!Object.keys(AUD.man).length){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
+function playerStart(resume){player.lecture=null;player.lecTs=null;player.src=player.opts.mode;clearTimeout(player.t);player.t=null;player.tok=(player.tok||0)+1;if(!resume&&player.opts.mode==="sent")player.opts.uonly="";if(!tts.ok&&!Object.keys(AUD.man).length){toast("이 브라우저는 음성 재생을 지원하지 않아요");return}
   const pos=resume===true?savedPos():null;player.items=pos?pos.items:buildPlaylist();if(!player.items.length){toast("재생할 항목이 없어요. 아래에서 내용을 선택하세요");return}
   player.loop=0;player.busy=false;player.on=true;player.paused=false;player.i=pos?pos.i:0;player.segs=pos?buildSegs(player.items[pos.i]):[];player.si=pos?Math.min(pos.si,Math.max(0,player.segs.length-1)):0;ttsStop();wakeLock(true);keepAlive(true);playerStep();mediaSession();renderMini();if(view==="listen")render()}
-function playerStop(){player.lecture=null;player.lecTs=null;try{localStorage.removeItem("opic30_pos")}catch(e){}player.sys=false;clearInterval(player.sysT);player.on=false;player.paused=false;clearTimeout(player.t);player.t=null;ttsStop();wakeLock(false);keepAlive(false);try{navigator.mediaSession.playbackState="none"}catch(e){}renderMini();if(view==="listen")render()}
+function playerStop(){player.lecture=null;player.lecTs=null;player.src=null;try{localStorage.removeItem("opic30_pos")}catch(e){}player.sys=false;clearInterval(player.sysT);player.on=false;player.paused=false;clearTimeout(player.t);player.t=null;ttsStop();wakeLock(false);keepAlive(false);try{navigator.mediaSession.playbackState="none"}catch(e){}renderMini();if(view==="listen")render()}
 function playerPause(){if(!player.on)return;player.sys=false;clearInterval(player.sysT);player.paused=!player.paused;clearTimeout(player.t);player.t=null;if(player.paused){audStop();if(tts.ok)speechSynthesis.cancel();keepAlive(false)}else{keepAlive(true);playerStep()}mediaSession();renderMini();if(view==="listen")render()}
 // previous: like a music player — restart the current item if it is already under way, otherwise go back one item
 function audSoftStop(){audCb=null;AUD.own=Date.now();try{const a=AUD.el;if(a){a.onended=null;a.onerror=null;a.pause()}}catch(e){}}
@@ -2336,7 +2338,7 @@ function playerStep(){if(!player.on||player.paused)return;const it=player.items[
   if(player.si>=player.segs.length&&it.unit){it._n=(it._n||0)+1;const rep=unitRep();if(rep===0||it._n<rep){player.segs=[];player.si=0;if(view==="listen")updateNow();playerStep();return}
     it._n=0;player.loop=0;player.i=(player.i+1)%player.items.length;player.segs=[];player.si=0;if(player.i===0)player.items=buildPlaylist();if(view==="listen"&&!document.hidden)render();playerStep();return}
   if(player.si>=player.segs.length){if((+player.opts.repeat)===0){player.loop=(player.loop||0)+1;player.segs=[];player.si=0;playerStep();return}player.loop=0;if(player.lecture&&player.i+1>=player.items.length){toast("강의가 끝났어요 👏");playerStop();return}player.i=(player.i+1)%player.items.length;player.segs=[];player.si=0;if(player.i===0)player.items=buildPlaylist();playerStep();return}
-  try{localStorage.setItem("opic30_pos",JSON.stringify({ts:Date.now(),mode:player.opts.mode,i:player.i,si:player.si,items:player.items}))}catch(e){}
+  try{localStorage.setItem("opic30_pos",JSON.stringify({ts:Date.now(),mode:player.src||player.opts.mode,i:player.i,si:player.si,items:player.items}))}catch(e){}
   const seg=player.segs[player.si];const tok=player.tok=(player.tok||0)+1;
   const after=()=>{if(!player.on||player.paused||tok!==player.tok)return;player.tok++;player.si++;if(view==="listen")updateNow();playerStep()};
   player.cur=seg;if(view==="listen")updateNow();
@@ -2396,7 +2398,7 @@ setInterval(()=>{if(!player.on||player.paused||player.t||player.busy)return;if(a
 const MI={prev:'<svg viewBox="0 0 24 24"><path d="M6 5v14"/><path d="M19 5 9 12l10 7z" fill="currentColor"/></svg>',next:'<svg viewBox="0 0 24 24"><path d="M18 5v14"/><path d="M5 5l10 7-10 7z" fill="currentColor"/></svg>',play:'<svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg>',pause:'<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>',stop:'<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>'};
 function renderMini(){const m=$("#mini");if(!player.on){m.hidden=true;return}m.hidden=false;const it=player.items[player.i]||{};
   m.replaceChildren(h("span",{class:"now"},(player.paused?"⏸ ":"▶ ")+(it.label||"")+" — "+(it.en||"")),h("button",{onclick:playerPrev,"aria-label":"이전",title:"이전",html:MI.prev}),h("button",{onclick:playerPause,"aria-label":player.paused?"재생":"일시정지",title:player.paused?"재생":"일시정지",html:player.paused?MI.play:MI.pause}),h("button",{onclick:playerNext,"aria-label":"다음",title:"다음",html:MI.next}),h("button",{onclick:playerStop,"aria-label":"끄기",title:"끄기",html:MI.stop}))}
-function updateNow(){const b=$("#nowbox");if(!b)return;const it=player.items[player.i]||{};const seg=player.cur||{};if(it.kind!=="LF"&&it.kind!=="UF")b.dataset.lec="";
+function updateNow(){const b=$("#nowbox");if(!b)return;if(!ownTab()){if(b.dataset.lec||b.dataset.np){b.dataset.lec="";b.dataset.np="";b.replaceChildren(h("span",{class:"muted small"},"재생을 누르면 여기에 지금 나오는 문장이 표시돼요."))}return}b.dataset.np="1";const it=player.items[player.i]||{};const seg=player.cur||{};if(it.kind!=="LF"&&it.kind!=="UF")b.dataset.lec="";
   const en=(seg.t==="file"&&seg.text)||seg.t==="en"?(seg.text||it.en):it.en;const ko=seg.t==="ko"?seg.text:(seg.ko||it.ko||"");
   const silent=seg.t==="wait"||(seg.t==="file"&&/silence_/.test(seg.src||""));const pauseLeft=silent?player.segs.slice(player.si).reduce((a,x)=>(x.t==="wait")?a+x.ms/1000:(x.t==="file"&&/silence_/.test(x.src))?a+(+x.src.match(/_(\d+)/)[1]):a,0):0;
   const head=h("span",{class:"eyebrow"},({Q:"질문",A:"답변",C:"표현",T:"내 자료"}[it.kind]||"")+" · "+(it.label||"")+" · "+(player.i+1)+"/"+player.items.length+(audSrc(it.key)||(seg.t==="file"&&!/silence_/.test(seg.src||""))?" · 🎧":""));
@@ -2452,7 +2454,7 @@ function unitPlaylist(){const o=player.opts;if(o.uonly){const one=allUnits().fin
   const round=player.uround=(player.uround||0)+1;return unitList().filter(x=>!unitEasyOn(x.u.id)||round%3===0).map(x=>unitItem(x.u))}
 const unitRep=()=>{const v=player.opts.urep;return v==null||v===""?2:+v};
 function unitPlay(id,only){const o=player.opts;o.mode="sent";o.uonly=only?id:"";try{localStorage.setItem("opic30_player",JSON.stringify(o))}catch(e){}
-  if(player.on)playerStop();player.items=buildPlaylist();if(!player.items.length){toast("재생할 표현이 없어요");return}player.i=Math.max(0,player.items.findIndex(x=>x.unit===id));
+  if(player.on)playerStop();player.src="sent";player.items=buildPlaylist();if(!player.items.length){player.src=null;toast("재생할 표현이 없어요");return}player.i=Math.max(0,player.items.findIndex(x=>x.unit===id));
   player.loop=0;player.busy=false;player.on=true;player.paused=false;player.segs=[];player.si=0;ttsStop();wakeLock(true);keepAlive(true);playerStep();mediaSession();renderMini();if(only)toast("이 표현만 계속 반복해요 · 전체로 돌아가려면 '▶ 전체 듣기'");if(view==="listen")render()}
 // script ▶ inside a unit: jump to that step of the file being played
 function unitSeekTo(i){const it=player.items[player.i];const a=AUD.el;if(!it||it.kind!=="UF"||!a||!it.chapters||!it.chapters[i])return;a.currentTime=it.chapters[i].t+0.01;if(a.paused&&!player.paused)a.play().catch(()=>{});setTimeout(()=>lecMark(true),300)}
@@ -2495,7 +2497,7 @@ function unitBody(u,ms){return [ms&&ms.length?h("div",{class:"small",style:"marg
   h("p",{class:"en",style:"margin:10px 0 2px"},u.mini[0]),h("p",{class:"muted small",style:"margin:0"},u.mini[1])]}
 function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{try{localStorage.setItem("opic30_player",JSON.stringify(o))}catch(e){}};
   const ck=(k,l)=>h("label",{},h("input",{type:"checkbox",id:"pl_"+k,checked:o[k],onchange:e=>{o[k]=e.target.checked;saveO()}}),l);
-  const setMode=m=>{if(o.mode===m)return;o.mode=m;saveO();if(m==="lecture"||player.lecture){render();return}if(player.on){player.items=buildPlaylist();player.i=0;player.segs=[];player.si=0;audStop();if(tts.ok)speechSynthesis.cancel();if(!player.items.length){playerStop();toast("재생할 항목이 없어요")}else{clearTimeout(player.t);player.t=null;playerStep()}}render()};
+  const setMode=m=>{if(o.mode===m)return;o.mode=m;saveO();render()};
   const tabs=h("div",{class:"segs"},...[["sent","내 표현"],["sample","예시"],["script","내 스크립트"],["model","모범답안"],["lecture","음성 강의"]].map(([v,l])=>h("button",{class:"seg"+(o.mode===v?" on":""),style:"white-space:nowrap;font-size:13px;padding-left:4px;padding-right:4px;min-width:0",onclick:()=>setMode(v)},l)));
   const now=h("div",{class:"nowbox",id:"nowbox"},h("span",{class:"muted small"},"재생을 누르면 여기에 지금 나오는 문장이 표시돼요."));
   const sts=scriptTopics();const nScripts=sts.reduce((a,t)=>a+(S.scripts[t.id].scripts||[]).length,0);
@@ -2514,7 +2516,7 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
       h("label",{class:"f"},"다음 항목까지 간격",h("select",{id:"pl_gap",onchange:e=>{o.gap=+e.target.value;saveO()}},...[0,0.5,1,2,3].map(v=>h("option",{value:v,selected:+o.gap===v},v?v+"초":"없음"))))),
     h("p",{class:"muted small"},o.mode==="sent"?"재생 순서: 영어 → (첫 번째만 한국어 해석) → 쉬는 시간 → 영어 → 쉬는 시간 … 반복 횟수만큼 → 다음 항목까지 간격.":(o.unit||"whole")==="whole"?"재생 순서: 스크립트 전체 영어 → (첫 번째만 전체 해석) → 쉬는 시간 → 전체 영어 → 쉬는 시간 … 반복 횟수만큼 → 다음 스크립트.":"재생 순서: 한 문장 영어 → (첫 번째만 해석) → 쉬는 시간 → 같은 문장 … 반복 횟수만큼 → 다음 문장.")];
   // 내 표현 듣기: units in weak-point order
-  const UL=unitList();const sentMode=o.mode==="sent";const curUnit=player.on&&sentMode?(player.items[player.i]||{}).unit:null;
+  const UL=unitList();const sentMode=o.mode==="sent";const curUnit=ownTab()&&sentMode?(player.items[player.i]||{}).unit:null;
   const urow=x=>{const u=x.u;const ms=unitMistakes(u);const easy=unitEasyOn(u.id);const playing=curUnit===u.id;const k=WEB?lecKey(unitLec(u)):"";
     const tag=ms.length?"실수 "+ms.length+"회":u.src==="card"?(S.cards[u.card]==="again"?"표현카드 · 다시":"표현카드"):"말하기 습관";
     return h("div",{class:"li",style:"flex-direction:column;align-items:stretch;gap:4px"+(playing?";border-color:var(--accent)":"")+(easy?";opacity:.6":"")},
@@ -2525,7 +2527,7 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
         h("button",{class:"btn sm ghost",onclick:()=>unitEasy(u.id,!easy)},easy?"↩ 다시 자주 듣기":"익숙해요 ✓")),
       h("details",{},h("summary",{class:"small"},"내용 보기"),...unitBody(u,ms)))};
   const nCardTodo=unitCardsTodo().length,nUncov=unitUncovered().length;
-  const sentOpts=[o.uonly&&player.on?h("div",{class:"note",style:"align-items:center"},h("span",{class:"grow"},"🔁 한 표현만 반복 중"),h("button",{class:"btn sm",onclick:()=>playerStart(false)},"▶ 전체 듣기")):null,
+  const sentOpts=[o.uonly&&ownTab()?h("div",{class:"note",style:"align-items:center"},h("span",{class:"grow"},"🔁 한 표현만 반복 중"),h("button",{class:"btn sm",onclick:()=>playerStart(false)},"▶ 전체 듣기")):null,
     h("div",{class:"row"},h("label",{class:"f"},"한 표현 반복",h("select",{onchange:e=>{o.urep=+e.target.value;saveO()}},...[1,2,3,5,0].map(v=>h("option",{value:v,selected:unitRep()===v},v?v+"번 듣고 다음":"무한 (다음 누를 때까지)")))),
       WEB?h("label",{class:"f"},"한국어 속도",h("select",{onchange:e=>{o.lecKo=+e.target.value;saveO();toast("다음 표현부터 적용돼요");setTimeout(()=>lecPrebuild(),3000)}},...[0.9,1,1.1,1.2,1.3,1.4,1.5].map(v=>h("option",{value:v,selected:lecKo()===v},v.toFixed(1)+"배")))):null,
       WEB?h("label",{class:"f"},"영어 속도",h("select",{onchange:e=>{o.lecEn=+e.target.value;saveO();toast("다음 표현부터 적용돼요");setTimeout(()=>lecPrebuild(),3000)}},...[0.8,0.9,1,1.1,1.2].map(v=>h("option",{value:v,selected:lecEn()===v},v.toFixed(1)+"배")))):null),
@@ -2558,7 +2560,7 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
     h("div",{class:"note"},"연습에서 AI 평가를 받을 때 내가 말한 이야기를 목표 레벨로 다듬어 준 모범답안이에요. 질문마다 가장 최근 것만 들어가고, 같은 질문을 다시 연습하면 새 모범답안으로 바뀝니다.")];
   // 음성 강의: every mock test that has a lecture, newest first; pick one to play. Tests without one can get one here.
   const mocks=S.log.filter(l=>l.kind==="mock"&&(l.pq||[]).length).slice().reverse();const withL=mocks.filter(l=>l.lec),noL=mocks.filter(l=>!l.lec).slice(0,5);
-  const lecRow=l=>{const playing=player.on&&player.lecture===l.lec.title;return h("div",{class:"li",style:"flex-direction:column;align-items:stretch;gap:4px"+(playing?";border-color:var(--accent)":"")},
+  const lecRow=l=>{const playing=ownTab()&&player.lecture===l.lec.title;return h("div",{class:"li",style:"flex-direction:column;align-items:stretch;gap:4px"+(playing?";border-color:var(--accent)":"")},
     h("div",{class:"row"},h("button",{class:"btn sm "+(playing?"":"primary"),onclick:()=>{if(playing)playerPause();else lecturePlay(l)}},playing?(player.paused?"▶":"⏸"):"▶"),h("span",{class:"grow small",style:"font-weight:600"},l.lec.title),h("span",{class:"muted small"},"약 "+lectureMins(l.lec)+"분")),
     h("span",{class:"muted small"},l.date+" · "+(l.title||"모의시험")+(l.lvRaw||l.level?" · "+(l.lvRaw||l.level):"")+(WEB?" · ":""),WEB?h("span",{"data-lecready":lecKey(l.lec)},LECBG.ready[lecKey(l.lec)]?"🔊 음성 준비됨":"음성 준비 전"):null),
     h("details",{},h("summary",{class:"small"},"파트 고르기"),...l.lec.secs.map((x,i)=>h("div",{class:"row",style:"margin-top:6px"},h("button",{class:"btn sm ghost",onclick:()=>lecturePlay(l,i)},"▶"),h("span",{class:"small"},(i+1)+". "+x.title)))),
@@ -2573,12 +2575,12 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
     WEB?h("p",{class:"muted small"},"속도를 바꾸면 처음 한 번은 강의 음성을 그 속도로 새로 만들어요 (수십 초). 만든 조합은 저장돼서 다음부터 바로 재생돼요."):null,
     WEB?null:h("div",{class:"note",style:"flex-direction:column;align-items:stretch;gap:6px"},h("span",{},"Claude 앱 안에서는 휴대폰 기본 음성으로 읽어서, 화면이 꺼지거나 다른 앱으로 가면 멈춰요(돌아오면 이어서 재생). 일하면서 들으려면 웹 앱에서 들으세요 — 기록과 강의가 같이 넘어가요."),window.claude?.use?webLink("웹 앱에서 듣기 →","btn primary","l"):null),
     h("div",{class:"note"},"한국어 설명 → 영어 → 따라 말할 시간 순서로 나와요. 한 번 끝까지 재생되면 멈춰요. 웹에서는 화면을 꺼도 이어서 재생되고, 잠금화면에서 다음 파트로 넘길 수 있어요.")];
-  const lecMode=o.mode==="lecture";if((lecMode||o.mode==="sent")&&player.lecTs)setTimeout(()=>lecMark(true),80);if((lecMode||o.mode==="sent")&&WEB)setTimeout(()=>lecPrebuild(),1500);
+  const own=ownTab();const lecMode=o.mode==="lecture";if((lecMode||o.mode==="sent")&&own&&player.lecTs)setTimeout(()=>lecMark(true),80);if((lecMode||o.mode==="sent")&&WEB)setTimeout(()=>lecPrebuild(),1500);
   const box=h("div",{class:"card"},h("div",{class:"hdr"},h("div",{},h("h3",{},lecMode?"음성 강의":sentMode?"내 표현 듣기":"무한 재생"),h("p",{class:"muted small"},lecMode?"모의시험 피드백을 강의처럼 듣기. 목록에서 골라 재생하세요.":sentMode?"자주 틀리는 표현을 응용 문장·미니 답변과 함께 반복해서 들어요.":"업무 중 배경으로 계속 듣기. 끝나면 처음부터 다시 반복합니다.")),lecMode||sentMode?null:rateCtl()),
     tabs,lecMode||sentMode?null:clipLine,now,
-    lecMode&&!player.on?null:h("div",{class:"row"},player.on?h("button",{class:"btn primary",onclick:playerPause},player.paused?"▶ 이어서":"⏸ 일시정지"):(()=>{const p=savedPos();return p?h("span",{class:"row"},h("button",{class:"btn primary",onclick:()=>playerStart(true)},"▶ 이어서 재생 ("+(p.i+1)+"/"+p.items.length+")"),h("button",{class:"btn",onclick:()=>playerStart(false)},"처음부터")):h("button",{class:"btn primary",onclick:()=>playerStart(false)},sentMode?"▶ 약한 표현부터 듣기":"▶ 무한 재생 시작")})(),player.on?h("button",{class:"btn",onclick:playerPrev},"◀◀ 이전"):null,player.on?h("button",{class:"btn",onclick:playerNext},"다음 ▶▶"):null,player.on?h("button",{class:"btn ghost",onclick:playerStop},"■ 끄기"):null),
+    lecMode&&!own?null:h("div",{class:"row"},own?h("button",{class:"btn primary",onclick:playerPause},player.paused?"▶ 이어서":"⏸ 일시정지"):(()=>{const p=savedPos();return p?h("span",{class:"row"},h("button",{class:"btn primary",onclick:()=>playerStart(true)},"▶ 이어서 재생 ("+(p.i+1)+"/"+p.items.length+")"),h("button",{class:"btn",onclick:()=>playerStart(false)},"처음부터")):h("button",{class:"btn primary",onclick:()=>playerStart(false)},sentMode?"▶ 약한 표현부터 듣기":"▶ 무한 재생 시작")})(),own?h("button",{class:"btn",onclick:playerPrev},"◀◀ 이전"):null,own?h("button",{class:"btn",onclick:playerNext},"다음 ▶▶"):null,own?h("button",{class:"btn ghost",onclick:playerStop},"■ 끄기"):null),
     ...(lecMode?lectureOpts:o.mode==="script"?scriptOpts:o.mode==="sample"?sampleOpts:o.mode==="model"?modelOpts:sentOpts));
-  if(player.on)setTimeout(updateNow,0);return box}
+  if(own)setTimeout(updateNow,0);return box}
 
 /* ---- LISTEN ---- */
 let ld={mode:"quiz",q:null,revealed:false,plays:0};
