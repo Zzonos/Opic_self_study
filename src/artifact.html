@@ -2425,8 +2425,10 @@ function awakeNeeded(){return document.visibilityState==="visible"&&(AWAKE.busy>
 async function awakeOn(){if(WEB||document.visibilityState!=="visible")return;
   if(AWAKE.lockOk!==false&&!(AWAKE.lock&&!AWAKE.lock.released)){try{AWAKE.lock=await navigator.wakeLock.request("screen");if(!AWAKE.lockOk)audLog.push("화면 켜짐 유지: Wake Lock 허용됨");AWAKE.lockOk=true}
     catch(e){AWAKE.lockOk=false;AWAKE.lockErr=(e&&e.name)||String(e);audLog.push("Wake Lock 불가 ("+AWAKE.lockErr+")")}}
-  try{if(!AWAKE.vid){const v=document.createElement("video");v.muted=true;v.defaultMuted=true;v.loop=true;v.playsInline=true;v.setAttribute("muted","");v.setAttribute("playsinline","");v.setAttribute("webkit-playsinline","");v.setAttribute("aria-hidden","true");
+  /* iOS keeps the screen on only for media that is really playing: a muted or looping video does not count, so the video has a silent sound track, is not muted, and jumps back instead of looping (the NoSleep method) */
+  try{if(!AWAKE.vid){const v=document.createElement("video");v.playsInline=true;v.setAttribute("playsinline","");v.setAttribute("webkit-playsinline","");v.setAttribute("title","OSS");v.setAttribute("aria-hidden","true");try{v.volume=0.01}catch(e){}
       v.style.cssText="position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:0.02;pointer-events:none;z-index:2147483646";v.src=NOSLEEP_MP4;document.body.appendChild(v);AWAKE.vid=v;
+      v.addEventListener("timeupdate",()=>{if(v.currentTime>0.5)v.currentTime=Math.random()*0.4});v.addEventListener("ended",()=>{v.currentTime=0;v.play().catch(()=>{})});
       v.addEventListener("pause",()=>{if(awakeNeeded()&&!document.hidden)setTimeout(()=>{v.play().catch(()=>{})},300)})}
     if(AWAKE.vid.paused){await AWAKE.vid.play();if(!AWAKE.vidOk)audLog.push("화면 켜짐 유지: 영상 방식 재생 중");}AWAKE.vidOk=true;AWAKE.vidErr=""}catch(e){AWAKE.vidOk=false;AWAKE.vidErr=(e&&e.name)||String(e)}
   AWAKE.how=[AWAKE.lockOk?"lock":"",AWAKE.vidOk?"video":""].filter(Boolean).join("+")}
