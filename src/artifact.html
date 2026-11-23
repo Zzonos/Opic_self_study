@@ -644,21 +644,24 @@ async function cloudAttach(u){cloud.user=u;cloud.ref=firebase.firestore().collec
 function busyNow(){try{if(timer.on)return true;if(view==="mock"&&mock&&!mock.result)return true;if(view==="chat"&&chat&&!chat.summary)return true;
   for(const b of [...AZ_BTNS,...MIC_BTNS])if(b.isConnected&&b._isOn&&b._isOn())return true}catch(e){}return false}
 function syncRender(msg){if(busyNow()){cloud.pendingRender=true;audLog.push("다른 기기 기록 반영(화면 유지)");return}render();if(msg)toast(msg)}
-function cloudApply(d){if(!d)return;if((d.updatedAt||0)===cloud.lastPush)return;try{const before=JSON.stringify(S);mergeState(JSON.parse(d.state||"{}"),true);if(JSON.stringify(S)!==before){syncRender("계정의 새 기록을 반영했어요");setTimeout(()=>clipSync(false),3000);if((S.updatedAt||0)>(d.updatedAt||0))cloudPush(false)}}catch(e){}}
+// Korean translations (~250 KB) live in meta/trans instead of the account document
+let transSig="";async function transPush(){const j=JSON.stringify(S.trans||{});const sig=j.length+":"+txtHash(j.slice(-200));if(sig===transSig)return 0;const at=Date.now();await cloud.ref.collection("meta").doc("trans").set({t:j,at});transSig=sig;cloud.transSeen=at;return at}
+async function transPull(d){if(!d||!d.transAt||d.transAt===cloud.transSeen||!cloud.ref)return;try{const x=await cloud.ref.collection("meta").doc("trans").get();if(x.exists){Object.assign(S.trans=S.trans||{},JSON.parse(x.data().t||"{}"));cloud.transSeen=d.transAt;try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}}catch(e){audLog.push("번역 불러오기 실패: "+(e.code||e.message))}}
+function cloudApply(d){if(!d)return;transPull(d);if((d.updatedAt||0)===cloud.lastPush)return;try{const before=JSON.stringify(S);mergeState(JSON.parse(d.state||"{}"),true);if(JSON.stringify(S)!==before){syncRender("계정의 새 기록을 반영했어요");setTimeout(()=>clipSync(false),3000);if((S.updatedAt||0)>(d.updatedAt||0))cloudPush(false)}}catch(e){}}
 // foreground refresh: the realtime listener can be asleep after the app was in the background
 async function cloudRefresh(){try{if(cloud.ref){const snap=await cloud.ref.get({source:"server"});if(snap.exists)cloudApply(snap.data())}
   if(docRef){const remote=await claudeLoad(docRef);if(remote&&(remote.updatedAt||0)>(S.updatedAt||0)){mergeState(remote,true);syncRender("다른 기기의 기록을 반영했어요")}}}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")cloudRefresh()});window.addEventListener("pageshow",e=>{if(e.persisted)cloudRefresh()});
-async function cloudPull(first){if(!cloud.ref)return;const snap=await cloud.ref.get();if(snap.exists){const d=snap.data();let remote={};try{remote=JSON.parse(d.state||"{}")}catch(e){}mergeState(remote,true);if(first)toast("계정 기록을 불러왔어요")}await cloudPush(true);setTimeout(()=>fillCardKo().then(()=>clipSync(false)),3000)}
+async function cloudPull(first){if(!cloud.ref)return;const snap=await cloud.ref.get();if(snap.exists){const d=snap.data();await transPull(d);let remote={};try{remote=JSON.parse(d.state||"{}")}catch(e){}mergeState(remote,true);if(first)toast("계정 기록을 불러왔어요")}await cloudPush(true);setTimeout(()=>fillCardKo().then(()=>clipSync(false)),3000)}
 const HIST={};const hasDet=l=>!!(l&&(l.a||l.model||(l.pq&&l.pq.length)));
 const arVer=l=>Math.max(l.detAt||0,l.regAt||0,l.lec&&l.lec.ts||0,1);
 async function histArchive(){if(!cloud.ref)return;for(const l of S.log){if(!l.ts||!hasDet(l)||(l.ar&&(l.arV||0)>=arVer(l)))continue;try{const c=Object.assign({},l);delete c.lecLog;delete c.lecDraft;await cloud.ref.collection("meta").doc("h_"+l.ts).set({l:JSON.stringify(c),t:l.ts});l.ar=true;l.arV=arVer(l);HIST[l.ts]=l}catch(e){audLog.push("기록 보관 실패: "+(e.code||e.message));break}}}
 function histLoad(ts){if(HIST[ts]||!cloud.ref)return Promise.resolve(HIST[ts]||null);return cloud.ref.collection("meta").doc("h_"+ts).get().then(d=>{if(!d.exists)return null;const l=JSON.parse(d.data().l||"null");HIST[ts]=l;return l}).catch(()=>null)}
-function cloudState(){let j="";const enc=new TextEncoder();for(const n of [40,15,5,0]){const o=Object.assign({},S);const keep=S.log.length-n;
+function cloudState(){let j="";const enc=new TextEncoder();for(const n of [40,15,5,0]){const o=Object.assign({},S);o.trans={};const keep=S.log.length-n;
     o.log=S.log.map((l,i)=>{const arch=i<keep&&l.ar&&(l.arV||0)>=arVer(l)&&hasDet(l);if(!arch&&!l.lecLog&&!l.lecDraft)return l;const c=Object.assign({},l);delete c.lecLog;delete c.lecDraft;if(arch){delete c.a;delete c.model;delete c.pq;delete c.str}return c});
-    j=JSON.stringify(o);const b=enc.encode(j).length;if(b<880000)break;audLog.push("계정 저장 크기 "+Math.round(b/1024)+"KB → 보관된 기록 상세 줄임 (최근 "+n+"개만 전체)")}return j}
-async function cloudPush(now){if(!cloud.ref)return;clearTimeout(cloud.pushT);const doIt=async()=>{try{/* merge what another device saved first, so this push never overwrites it */try{const snap=await cloud.ref.get({source:"server"});if(snap.exists){const d=snap.data();if(d.updatedAt&&d.updatedAt!==cloud.lastPush&&d.state)mergeState(JSON.parse(d.state),true)}}catch(e){}
-    cloud.lastPush=S.updatedAt||Date.now();await histArchive();await cloud.ref.set({state:cloudState(),updatedAt:cloud.lastPush,email:cloud.user?.email||""},{merge:true});statsPush();cloud.lastErr=null;const el=$("#syncst");if(el)el.textContent="동기화됨 "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}catch(e){cloud.lastErr=e;audLog.push("계정 저장 실패: "+(e.code||e.message));const el=$("#syncst");if(el)el.textContent="동기화 실패: "+(e.code||e.message)}};
+    j=JSON.stringify(o);const b=enc.encode(j).length;if(b<950000)break;audLog.push("계정 저장 크기 "+Math.round(b/1024)+"KB → 보관된 기록 상세 줄임 (최근 "+n+"개만 전체)")}return j}
+async function cloudPush(now){if(!cloud.ref)return;clearTimeout(cloud.pushT);const doIt=async()=>{try{/* merge what another device saved first, so this push never overwrites it */try{const snap=await cloud.ref.get({source:"server"});if(snap.exists){const d=snap.data();await transPull(d);if(d.updatedAt&&d.updatedAt!==cloud.lastPush&&d.state)mergeState(JSON.parse(d.state),true)}}catch(e){}
+    cloud.lastPush=S.updatedAt||Date.now();await histArchive();const tAt=await transPush();await cloud.ref.set({state:cloudState(),updatedAt:cloud.lastPush,email:cloud.user?.email||"",...(tAt?{transAt:tAt}:{})},{merge:true});statsPush();cloud.lastErr=null;const el=$("#syncst");if(el)el.textContent="동기화됨 "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}catch(e){cloud.lastErr=e;audLog.push("계정 저장 실패: "+(e.code||e.message));const el=$("#syncst");if(el)el.textContent="동기화 실패: "+(e.code||e.message)}};
   if(now){await doIt();if(cloud.lastErr)throw cloud.lastErr}else cloud.pushT=setTimeout(doIt,1500)}
 // per-account usage summary (each user writes only their own; the owner account can read all — see firestore.rules)
 const ADMIN_EMAIL="zzono717@gmail.com";
@@ -2177,7 +2180,7 @@ function lecSeek(d){const it=player.items[player.i];const a=AUD.el;if(!it||it.ki
   let to=c+d;if(d<0&&t-it.chapters[c].t>3)to=c;to=Math.max(0,Math.min(it.chapters.length-1,to));a.currentTime=it.chapters[to].t+0.01;if(player.paused)playerPause();else if(a.paused)a.play().catch(()=>{});mediaSession();updateNow();renderMini();setTimeout(()=>lecMark(true),300)}
 // lecture playlist: repeat a lecture N times, then go on to the next one (list order or random)
 const lecRep=()=>{const v=player.opts.lrep;return v==null||v===""?1:+v};
-function lecList(){return S.log.filter(l=>l.kind==="mock"&&(l.pq||[]).length&&l.lec).slice().reverse()}
+function lecList(){return S.log.filter(l=>l.kind==="mock"&&l.lec).slice().reverse()}
 function lecCur(){return lecList().find(l=>l.lec.ts===player.lecTs||l.lec.title===player.lecture)}
 function lecNext(rand){const L=lecList();if(!L.length)return null;const i=L.findIndex(l=>l===lecCur());if(L.length===1)return L[0];if(rand){const o=L.filter((_,k)=>k!==i);return o[Math.floor(Math.random()*o.length)]}return L[(i+1)%L.length]}
 // next lecture without stopping the audio session, so it keeps going in the background
@@ -2680,7 +2683,7 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
     ...common,
     h("div",{class:"note"},"연습에서 AI 평가를 받을 때 내가 말한 이야기를 목표 레벨로 다듬어 준 모범답안이에요. 질문마다 가장 최근 것만 들어가고, 같은 질문을 다시 연습하면 새 모범답안으로 바뀝니다.")];
   // 음성 강의: every mock test that has a lecture, newest first; pick one to play. Tests without one can get one here.
-  const mocks=S.log.filter(l=>l.kind==="mock"&&(l.pq||[]).length).slice().reverse();const withL=mocks.filter(l=>l.lec),noL=mocks.filter(l=>!l.lec).slice(0,5);
+  const mocks=S.log.filter(l=>l.kind==="mock"&&((l.pq||[]).length||l.lec)).slice().reverse();const withL=mocks.filter(l=>l.lec),noL=mocks.filter(l=>!l.lec&&(l.pq||[]).length).slice(0,5);
   const lecRow=l=>{const playing=ownTab()&&player.lecture===l.lec.title;return h("div",{class:"li",style:"flex-direction:column;align-items:stretch;gap:4px"+(playing?";border-color:var(--accent)":"")},
     h("div",{class:"row"},h("button",{class:"btn sm "+(playing?"":"primary"),onclick:()=>{if(playing)playerPause();else lecturePlay(l)}},playing?(player.paused?"▶":"⏸"):"▶"),h("span",{class:"grow small",style:"font-weight:600"},l.lec.title),h("span",{class:"muted small"},"약 "+lectureMins(l.lec)+"분")),
     h("span",{class:"muted small"},l.date+" · "+(l.title||"모의시험")+(l.lvRaw||l.level?" · "+(l.lvRaw||l.level):"")+(WEB?" · ":""),WEB?h("span",{"data-lecready":lecKey(l.lec)},LECBG.ready[lecKey(l.lec)]?"🔊 음성 준비됨":"음성 준비 전"):null),
