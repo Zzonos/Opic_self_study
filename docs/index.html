@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261123-221426-7d1d40" data-rel="274">
+<html lang="ko" data-build="20261123-223552-8ea17a" data-rel="275">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -559,7 +559,14 @@ const SYNC_LIM=180000;
 async function packJSON(obj){const bytes=new TextEncoder().encode(JSON.stringify(obj));
   if("CompressionStream" in window){const cs=new CompressionStream("deflate-raw");const w=cs.writable.getWriter();w.write(bytes);w.close();const buf=await new Response(cs.readable).arrayBuffer();return "z"+b64u(buf)}
   return "r"+b64u(bytes.buffer)}
-async function packState(){let p=syncPayload();let c=await packJSON(p);
+// records too large for one link go in several links (each a self-contained part the web merges on its own)
+let syncParts=null;
+async function packParts(){const p=syncPayload();const clean=l=>{if(!l||(!l.lecLog&&!l.lecDraft))return l;const x=Object.assign({},l);delete x.lecLog;delete x.lecDraft;return x};p.log=(p.log||[]).map(clean);
+  let c=await packJSON(p);if(c.length<=SYNC_LIM)return [c];const p0=Object.assign({},p,{analysis:null});c=await packJSON(p0);if(c.length<=SYNC_LIM)return [c];
+  const out=[];let cur=[],curCode=null;const wrap=(logs,first)=>first?Object.assign({},p0,{log:logs}):{delta:true,log:logs,del:[],updatedAt:p.updatedAt};
+  for(const l of p0.log){const t=[...cur,l];const cc=await packJSON(wrap(t,!out.length));if(cc.length>SYNC_LIM&&cur.length){out.push(curCode);cur=[l];curCode=await packJSON(wrap(cur,false))}else{cur=t;curCode=cc}}
+  if(curCode)out.push(curCode);return out}
+async function packState(){const parts=await packParts();syncParts=parts.length>1?parts:null;if(parts.length>1||parts[0].length<=SYNC_LIM)return parts[0];let p=syncPayload();let c=await packJSON(p);
   const shrink=[o=>Object.assign({},o,{analysis:null}),
     o=>Object.assign({},o,{log:(o.log||[]).map((l,i,a)=>i<a.length-10?(()=>{const x=Object.assign({},l);delete x.a;delete x.model;delete x.pq;delete x.str;return x})():l)}),
     o=>Object.assign({},o,{log:(o.log||[]).slice(-60)})];
@@ -576,7 +583,11 @@ async function unpackState(t){const kind=t[0];const u=unb64u(t.slice(1));let byt
 function webUrl(mode="s"){let code=curSyncCode();const LIM=SYNC_LIM;
   if(code.length>LIM){const bak=S;S=Object.assign({},bak,{log:bak.log.slice(-60),analysis:null});code=packStateSync();S=bak;if(code.length>LIM)return null}
   return WEB_URL+"#"+mode+"_"+code}
-function webLink(label,cls,mode="s"){const url=webUrl(mode);if(!url){prepSyncCode();return h("a",{class:cls,href:"#","data-weblink":mode,style:"text-decoration:none;white-space:nowrap",target:"_blank",rel:"noopener",onclick:e=>{if(e.currentTarget.getAttribute("href")==="#"){e.preventDefault();toast("보낼 기록을 준비하는 중이에요. 1–2초 뒤 다시 눌러 주세요");prepSyncCode()}else{S.syncedAt=Date.now();S.syncFull=false;save()}}},label)}
+const SYNC_DONE=new Set();
+function webLink(label,cls,mode="s"){if(syncParts&&syncVer===stVer&&syncParts.length>1){const n=syncParts.length;return h("span",{class:"row","data-syncparts":"1",style:"gap:6px;flex-wrap:wrap"},...syncParts.map((c,i)=>h("a",{class:cls+(SYNC_DONE.has(i)?" ghost":""),href:WEB_URL+"#"+mode+"_"+c,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",
+    onclick:e=>{SYNC_DONE.add(i);e.currentTarget.classList.add("ghost");if(SYNC_DONE.size>=n){S.syncedAt=Date.now();S.syncFull=false;SYNC_DONE.clear();save();toast("마지막 부분이에요 · 웹에서 완료되면 끝이에요")}else toast((i+1)+"/"+n+" 보냄 · 웹에서 완료되면 Claude로 돌아와 나머지도 눌러 주세요")}},(SYNC_DONE.has(i)?"✓ ":"")+label+" "+(i+1)+"/"+n)),
+    h("span",{class:"muted small",style:"flex-basis:100%"},"기록이 커서 "+n+"번에 나눠 보내요. 차례대로 눌러 주세요."))}
+  const url=webUrl(mode);if(!url){prepSyncCode();return h("a",{class:cls,href:"#","data-weblink":mode,style:"text-decoration:none;white-space:nowrap",target:"_blank",rel:"noopener",onclick:e=>{if(e.currentTarget.getAttribute("href")==="#"){e.preventDefault();toast("보낼 기록을 준비하는 중이에요. 1–2초 뒤 다시 눌러 주세요");prepSyncCode()}else{S.syncedAt=Date.now();S.syncFull=false;save()}}},label)}
   return h("a",{class:cls,href:url,"data-weblink":mode,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",onclick:()=>{S.syncedAt=Date.now();S.syncFull=false;save();setTimeout(()=>toast(mode==="x"?"통합이 끝나면 '완료' 화면이 떠요. 그다음 홈 화면 앱을 열면 반영돼 있어요":"웹 앱이 열리면 로그인 후 자동으로 통합돼요"),200)}},label)}
 function syncToWeb(){try{const url=webUrl();if(!url){toast("기록이 너무 커서 링크로 못 보내요. 설정의 기록 코드를 사용해 주세요");return}
   const w=window.open(url,"_blank","noopener");S.syncedAt=Date.now();save();toast(w?"웹 앱이 열리면 로그인 후 자동으로 통합돼요":"팝업이 차단됐어요. 브라우저에서 팝업을 허용해 주세요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
@@ -603,7 +614,7 @@ async function syncDone(n){const ov=h("div",{style:"position:fixed;left:0;top:0;
 let syncCode=null,syncCodeAt=0,syncVer=-1;
 // the prepared code is used only while nothing has changed since (a save here, or records merged in from the account)
 function curSyncCode(){return (syncCode&&syncVer===stVer)?syncCode:packStateSync()}
-let prepT=null;function prepSyncCode(){clearTimeout(prepT);prepT=setTimeout(()=>{syncCodeAt=Date.now();const v=stVer;try{packState().then(c=>{if(v!==stVer)return;syncCode=c;syncVer=v;const u=webUrl();if(u)document.querySelectorAll("a[data-weblink]").forEach(a=>a.href=webUrl(a.dataset.weblink)||a.href)}).catch(()=>{})}catch(e){}},400)}
+let prepT=null;function prepSyncCode(){clearTimeout(prepT);prepT=setTimeout(()=>{syncCodeAt=Date.now();const v=stVer;try{packState().then(c=>{if(v!==stVer)return;syncCode=c;syncVer=v;if(syncParts&&!document.querySelector("[data-syncparts]")&&document.querySelector("a[data-weblink]")){render();return}const u=webUrl();if(u)document.querySelectorAll("a[data-weblink]").forEach(a=>a.href=webUrl(a.dataset.weblink)||a.href)}).catch(()=>{})}catch(e){}},400)}
 function copyNow(text){let ok=false;try{const ta=document.createElement("textarea");ta.value=text;ta.setAttribute("readonly","");ta.style.cssText="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px";document.body.appendChild(ta);ta.focus();ta.select();ta.setSelectionRange(0,text.length);ok=document.execCommand("copy");ta.remove()}catch(e){}
   if(!ok){try{navigator.clipboard.writeText(text).catch(()=>{})}catch(e){}}return ok}
 // web → Claude: copy the latest code in the tap itself, then the link opens Claude
@@ -656,9 +667,12 @@ async function cloudRefresh(){try{if(cloud.ref){const snap=await cloud.ref.get({
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")cloudRefresh()});window.addEventListener("pageshow",e=>{if(e.persisted)cloudRefresh()});
 async function cloudPull(first){if(!cloud.ref)return;const snap=await cloud.ref.get();if(snap.exists){const d=snap.data();let remote={};try{remote=JSON.parse(d.state||"{}")}catch(e){}mergeState(remote,true);if(first)toast("계정 기록을 불러왔어요")}await cloudPush(true);setTimeout(()=>fillCardKo().then(()=>clipSync(false)),3000)}
 const HIST={};const hasDet=l=>!!(l&&(l.a||l.model||(l.pq&&l.pq.length)));
-async function histArchive(){if(!cloud.ref)return;for(const l of S.log){if(!l.ts||l.ar||!hasDet(l))continue;try{await cloud.ref.collection("meta").doc("h_"+l.ts).set({l:JSON.stringify(l),t:l.ts});l.ar=true;HIST[l.ts]=l}catch(e){break}}}
+const arVer=l=>Math.max(l.detAt||0,l.regAt||0,l.lec&&l.lec.ts||0,1);
+async function histArchive(){if(!cloud.ref)return;for(const l of S.log){if(!l.ts||!hasDet(l)||(l.ar&&(l.arV||0)>=arVer(l)))continue;try{const c=Object.assign({},l);delete c.lecLog;delete c.lecDraft;await cloud.ref.collection("meta").doc("h_"+l.ts).set({l:JSON.stringify(c),t:l.ts});l.ar=true;l.arV=arVer(l);HIST[l.ts]=l}catch(e){audLog.push("기록 보관 실패: "+(e.code||e.message));break}}}
 function histLoad(ts){if(HIST[ts]||!cloud.ref)return Promise.resolve(HIST[ts]||null);return cloud.ref.collection("meta").doc("h_"+ts).get().then(d=>{if(!d.exists)return null;const l=JSON.parse(d.data().l||"null");HIST[ts]=l;return l}).catch(()=>null)}
-function cloudState(){let j="";for(const n of [40,15,5]){const o=Object.assign({},S);const keep=S.log.length-n;o.log=S.log.map((l,i)=>i<keep&&l.ar&&hasDet(l)?(()=>{const c=Object.assign({},l);delete c.a;delete c.model;delete c.pq;delete c.str;delete c.lec;return c})():l);j=JSON.stringify(o);if(j.length<900000)break;audLog.push("계정 저장 크기 "+Math.round(j.length/1024)+"KB → 오래된 기록 상세 줄임")}return j}
+function cloudState(){let j="";const enc=new TextEncoder();for(const n of [40,15,5,0]){const o=Object.assign({},S);const keep=S.log.length-n;
+    o.log=S.log.map((l,i)=>{const arch=i<keep&&l.ar&&(l.arV||0)>=arVer(l)&&hasDet(l);if(!arch&&!l.lecLog&&!l.lecDraft)return l;const c=Object.assign({},l);delete c.lecLog;delete c.lecDraft;if(arch){delete c.a;delete c.model;delete c.pq;delete c.str}return c});
+    j=JSON.stringify(o);const b=enc.encode(j).length;if(b<880000)break;audLog.push("계정 저장 크기 "+Math.round(b/1024)+"KB → 보관된 기록 상세 줄임 (최근 "+n+"개만 전체)")}return j}
 async function cloudPush(now){if(!cloud.ref)return;clearTimeout(cloud.pushT);const doIt=async()=>{try{/* merge what another device saved first, so this push never overwrites it */try{const snap=await cloud.ref.get({source:"server"});if(snap.exists){const d=snap.data();if(d.updatedAt&&d.updatedAt!==cloud.lastPush&&d.state)mergeState(JSON.parse(d.state),true)}}catch(e){}
     cloud.lastPush=S.updatedAt||Date.now();await histArchive();await cloud.ref.set({state:cloudState(),updatedAt:cloud.lastPush,email:cloud.user?.email||""},{merge:true});statsPush();cloud.lastErr=null;const el=$("#syncst");if(el)el.textContent="동기화됨 "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}catch(e){cloud.lastErr=e;audLog.push("계정 저장 실패: "+(e.code||e.message));const el=$("#syncst");if(el)el.textContent="동기화 실패: "+(e.code||e.message)}};
   if(now){await doIt();if(cloud.lastErr)throw cloud.lastErr}else cloud.pushT=setTimeout(doIt,1500)}
