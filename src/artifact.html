@@ -1449,9 +1449,10 @@ function vHistory(m){const KIND={practice:"연습",mock:"모의시험",chat:"대
       l.kind==="mock"&&(l.pq||[]).length?h("div",{},
         mockOld&&CLAUDE_ONLY()?h("p",{class:"muted small"},"이 모의시험은 예전 방식으로 채점돼 틀린 표현·팁이 없어요. 아래 버튼으로 저장된 답변에 대한 자세한 피드백과 음성 강의를 한 번에 받을 수 있어요 (레벨·점수는 그대로)."):null,
         l.lvPrev?h("p",{class:"muted small"},"다시 채점됨 · 처음 판정 "+l.lvPrev):null,
-        h("div",{class:"row"},CLAUDE_ONLY()?(recBusy(l0.ts)?busyBtn(l0.ts,"primary"):h("button",{class:"btn primary sm",onclick:e=>mockDetail(l0,l,e.currentTarget)},mockOld?"자세한 피드백 + 음성 강의 받기":"자세한 피드백 + 음성 강의 다시 받기")):null,h("button",{class:"btn sm",onclick:e=>mockRegrade(l0,l,e.currentTarget)},"다시 채점")),CLAUDE_ONLY()?null:claudeOnlyNote(),
+        h("div",{class:"row"},CLAUDE_ONLY()?(recBusy(l0.ts)?busyBtn(l0.ts,"primary"):h("button",{class:"btn primary sm",onclick:e=>mockDetail(l0,l,e.currentTarget)},mockOld?"자세한 피드백 + 음성 강의 받기":"자세한 피드백 + 음성 강의 다시 받기")):null,h("button",{class:"btn sm",onclick:e=>mockRegrade(l0,l,e.currentTarget)},"다시 채점"),
+          CLAUDE_ONLY()&&(l0.pq||[]).some(x=>x&&x.fx)&&(l0.pq||[]).some(x=>x&&x.a&&x.a.trim().length>20&&!x.pol)&&!recBusy(l0.ts)?h("button",{class:"btn sm",onclick:e=>polishMake(S.log.find(y=>y.ts===l0.ts)||l0,e.currentTarget)},(l0.pq||[]).some(x=>x&&x.pol)?"✨ 남은 답변 다듬기":"✨ 내 답변 다듬은 모범답안 만들기"):null),CLAUDE_ONLY()?null:claudeOnlyNote(),
         h("p",{class:"muted small"},"저장된 답변으로 다시 분석해요. 설정의 '채점·분석 모델'"+(S.profile.aiTier==="complex"?" (지금: 최고 성능)":" (지금: 기본)")+"을 써요."+((l.pq||[]).some(x=>x&&x.a&&x.a.length===600)?" 이 시험은 답변이 600자까지만 저장돼 긴 답변은 뒷부분이 빠진 채로 분석돼요.":""))):null,
-      (l.pq||[]).length?h("details",{open:!!(l.pq||[]).some(x=>x&&x.fx)},h("summary",{},"문항별 피드백 ("+l.pq.length+")"),mockPatterns(l.pat),...l.pq.map((x,i)=>h("div",{style:"margin-top:10px;display:flex;flex-direction:column;gap:4px"},h("p",{class:"small",style:"font-weight:600"},(i+1)+". "+(x.q||"")+(x.l?" · "+x.l:"")),x.a?h("p",{class:"muted small"},x.a):null,x.pr&&x.pr.pron!=null?h("p",{class:"muted small"},"🎙 Azure 발음 "+x.pr.pron+" · 정확도 "+x.pr.acc+" · 유창성 "+x.pr.flu+(x.pr.pros!=null?" · 억양 "+x.pr.pros:"")+(x.s?" · "+fmt(x.s):"")):null,x.c?h("p",{class:"small"},x.c):null,x.g?h("p",{class:"small",style:"color:var(--good)"},"👍 "+x.g):null,mockFixList(x.fx),mockClosing(x.cl),x.t?h("p",{class:"small"},h("b",{},"💡 다음에는 "),x.t):null,x.b?h("p",{class:"small",style:"color:var(--accent)"},"→ "+x.b):null))):null,
+      (l.pq||[]).length?h("details",{open:!!(l.pq||[]).some(x=>x&&x.fx)},h("summary",{},"문항별 피드백 ("+l.pq.length+")"),mockPatterns(l.pat),...l.pq.map((x,i)=>h("div",{style:"margin-top:10px;display:flex;flex-direction:column;gap:4px"},h("p",{class:"small",style:"font-weight:600"},(i+1)+". "+(x.q||"")+(x.l?" · "+x.l:"")),x.a?h("p",{class:"muted small"},x.a):null,x.pr&&x.pr.pron!=null?h("p",{class:"muted small"},"🎙 Azure 발음 "+x.pr.pron+" · 정확도 "+x.pr.acc+" · 유창성 "+x.pr.flu+(x.pr.pros!=null?" · 억양 "+x.pr.pros:"")+(x.s?" · "+fmt(x.s):"")):null,x.c?h("p",{class:"small"},x.c):null,x.g?h("p",{class:"small",style:"color:var(--good)"},"👍 "+x.g):null,mockFixList(x.fx),mockClosing(x.cl),x.t?h("p",{class:"small"},h("b",{},"💡 다음에는 "),x.t):null,x.b?h("p",{class:"small",style:"color:var(--accent)"},"→ "+x.b):null,polBox(x)))):null,
       l.recovered&&!l.a?h("p",{class:"muted small"},"예전 기록이라 내 답변·총평은 저장돼 있지 않아요."):!hasDet(l)&&!fx.length?h("p",{class:"muted small"},HIST["_"+l0.ts]&&!HIST[l0.ts]&&cloud.ref?"세부 내용을 불러오는 중이거나, 세부 내용이 저장되기 전에 만든 기록이에요.":"세부 내용이 저장되기 전에 만든 기록이라 점수만 남아 있어요."):null,
       h("div",{class:"row"},t&&q?h("button",{class:"btn sm primary",onclick:()=>go("practice",{topic:t,q,kind:QT[q.t]})},"이 질문 다시 연습"):null,(()=>{const b=h("button",{class:"btn sm ghost",style:"color:var(--bad);margin-left:auto",onclick:()=>{if(b.dataset.ok){histDelete([l0])}else{b.dataset.ok=1;b.textContent="한 번 더 누르면 삭제";setTimeout(()=>{if(b.isConnected){delete b.dataset.ok;b.textContent="🗑 이 기록 삭제"}},3000)}}},"🗑 이 기록 삭제");return b})()));
     return h("div",{},head,det)};
@@ -1928,7 +1929,7 @@ function mockQCard(p,it){const fx=(p.fixes||[]).filter(f=>f&&f.original&&f.bette
 const CLAUDE_ONLY=()=>!!window.claude?.use;
 const claudeOnlyNote=()=>h("p",{class:"muted small"},"자세한 피드백과 음성 강의는 Claude 앱에서 만들 수 있어요. Claude에서 만든 뒤 '웹으로 통합'하면 여기서도 보고 들을 수 있어요.");
 // after the detail is saved, the lecture is made from it right away
-async function detailThenLecture(l0,btn){if(!l0)return;const b=btn||document.createElement("button");b.disabled=true;b.textContent="음성 강의 만드는 중… (1–2분)";toast("자세한 피드백 완료 — 이어서 음성 강의를 만들어요");await lectureMake(l0,b);try{await unitsFromMock()}catch(e){}}
+async function detailThenLecture(l0,btn){if(!l0)return;const b=btn||document.createElement("button");b.disabled=true;b.textContent="음성 강의 만드는 중… (1–2분)";toast("자세한 피드백 완료 — 이어서 음성 강의를 만들어요");await lectureMake(l0,b);try{await polishMake(l0)}catch(e){}try{await unitsFromMock()}catch(e){}}
 async function mockDetailAI(pq,lvl){const body=pq.map((x,i)=>`Q${i+1}: ${x.q||""}\nA${i+1}${x.s?" ("+x.s+"s)":""}: ${x.a||"(no answer)"}${prLine(x.pr||x.pron)}`).join("\n\n");
   const prompt=`You are an experienced OPIc rater and speaking coach for a Korean learner (target ${tgt()}). Below are the questions and the learner's answers (voice-dictated) from a mock test that was already rated ${lvl||"?"} overall. Do NOT re-rate; give feedback the learner can act on.
 - "fixes": up to 3 real mistakes per answer, most important first. "original" = the learner's exact words copied from the answer (short span), "better" = the natural corrected version, "why" = 한국어 한 줄. Grammar, wrong word, Korean-style phrasing, tense etc. Skip misheard names and fillers. No fixes for a solid answer.
@@ -2027,6 +2028,30 @@ Reply with ONLY JSON: {"title":"짧은 강의 제목","opening":{"title":"오프
     L=live();L.lec={ts:Date.now(),title:String(r2&&r2.title||"모의시험 음성 강의"),secs};L.detAt=Date.now();delete L.lecDraft;delete L.lecErr;if(L!==l0){l0.lec=L.lec;l0.detAt=L.detAt}
     LECJOB=null;save();audLog.push("음성 강의 저장: "+l0.date);toast("음성 강의를 만들었어요 — 듣기 → 음성 강의에서 들을 수 있어요");render()}
   catch(e){lecTrace(l0,"실패: "+((e&&e.code)||"")+" "+String(e&&e.message||e).slice(0,80)+(stale()?" (이미 새로 시작됨)":""));if(stale())return;LECJOB=null;btn.disabled=false;btn.textContent=t0;const m=errMsg(e);L=live();L.lecErr={t:Date.now(),m:String(m).slice(0,120)};save();audLog.push("음성 강의 실패: "+m);toast("강의를 만들지 못했어요: "+m+" · 다시 누르면 이어서 만들어요");render()}}
+// MY ANSWER, POLISHED — each answer rewritten at the target level keeping the learner's own content, story and order (3 short saved steps of 5 questions)
+let POLJOB=null;
+async function polishMake(l0,btn){if(!sample)return;const live=()=>S.log.find(x=>x.kind===l0.kind&&x.ts===l0.ts)||l0;let L=live();const pq=(L.pq||[]);
+  const todo=pq.map((x,i)=>x&&x.a&&x.a.trim().length>20&&!x.pol?i:-1).filter(i=>i>=0);if(!todo.length)return 0;
+  if(POLJOB&&POLJOB.ts===l0.ts){toast("이미 만들고 있어요");return}const job={ts:l0.ts};POLJOB=job;const groups=[];for(let i=0;i<todo.length;i+=5)groups.push(todo.slice(i,i+5));
+  const upd=k=>{job.label="내 답변 다듬는 중 "+k+"/"+groups.length+"…";if(btn){btn.disabled=true;btn.textContent="⏳ "+job.label}document.querySelectorAll('[data-lecprog="'+l0.ts+'"]').forEach(el=>{el.textContent=el.tagName==="BUTTON"?"⏳ "+job.label:job.label})};
+  let n=0;try{for(let g=0;g<groups.length;g++){upd(g+1);const qs=groups[g];
+      const p=`You are an OPIc speaking coach. Rewrite each of the learner's answers below into a natural ${tgt()}-level spoken answer.
+KEEP the learner's own content: the same story, facts, people, places, opinions and the same order of ideas. Do not invent new events; small natural details that connect the learner's ideas are fine.
+FIX: grammar, tense (past stories stay in past tense), articles and plurals, word choice; remove fillers (uh, um), restarts and repeated words; join short choppy sentences with connectors (so, but, because, when, after that, that's why).
+STRUCTURE: a clear first sentence that answers the question, the learner's details in their order, and a short closing line (add one if the learner had none).
+LENGTH: about the same as the original, at least 6 sentences and at most about 170 words. Spoken style, contractions OK.
+For each answer also give a Korean translation and one short Korean line on the main changes.
+${qs.map(i=>{const x=pq[i];return `Q${i+1}: ${x.q||""}\nLearner's answer: ${(x.a||"").slice(0,2200)}${(x.fx||[]).length?"\nKnown corrections: "+x.fx.map(f=>f.o+" → "+f.b).join(" | "):""}`}).join("\n\n")}
+
+Reply with ONLY JSON: {"answers":[{"n":1,"en":"...","ko":"...","changes":"한국어 한 줄"}]} — no double quotes inside strings.`;
+      const r=await aiRetry(()=>sample.json(p,{cache:false}),"내 답변 다듬기 "+(g+1)+"/"+groups.length);L=live();
+      for(const a of (r&&r.answers)||[]){const i=(+a.n)-1;if(qs.includes(i)&&L.pq[i]&&a.en){L.pq[i].pol={en:String(a.en),ko:String(a.ko||""),ch:String(a.changes||""),at:Date.now()};n++}}
+      L.detAt=Math.max(L.detAt||0,Date.now());save()}
+    POLJOB=null;toast("내 답변 다듬은 모범답안 "+n+"개를 만들었어요 · 문항별 피드백에서 볼 수 있어요");render();return n}
+  catch(e){POLJOB=null;toast("다듬은 답변을 만들지 못했어요: "+errMsg(e)+" · 다시 누르면 남은 것만 만들어요");render();return n}}
+function polBox(x){const p=x&&x.pol;if(!p)return null;return h("details",{style:"margin-top:4px;border-left:3px solid var(--accent);padding-left:8px"},h("summary",{class:"small",style:"font-weight:600;color:var(--accent)"},"✨ 내 답변 다듬은 모범답안"),
+  h("p",{class:"en",style:"margin:6px 0 2px;line-height:1.6"},p.en),h("div",{class:"row"},h("button",{class:"btn sm ghost",onclick:e=>speak(p.en,{btn:e.currentTarget,whole:true})},"🔊 듣기")),
+  p.ko?h("p",{class:"muted small",style:"margin:2px 0"},p.ko):null,p.ch?h("p",{class:"small",style:"margin:2px 0"},h("b",{},"바뀐 점 "),p.ch):null)}
 // back in front after the app was frozen mid-step (screen off / other app): the pending request is dead, continue from the saved steps
 document.addEventListener("visibilitychange",()=>{if(!LECJOB)return;if(document.hidden){LECJOB.hiddenAt=Date.now();if(LECJOB.onHide)LECJOB.onHide();return}
   if(LECJOB.hiddenAt&&Date.now()-LECJOB.hiddenAt>8000){const rec=S.log.find(x=>x.ts===LECJOB.ts);LECJOB=null;if(rec&&!rec.lec)setTimeout(()=>{toast("끊겼던 음성 강의를 이어서 만들어요");lectureMake(rec).then(()=>unitsFromMock()).catch(()=>{})},800)}else LECJOB.hiddenAt=0});
@@ -2160,7 +2185,7 @@ async function lecturePlay(l0,from){const lec=l0.lec;if(!lec)return;const fromLi
   if(player.on)playerStop();player.items=lec.secs.slice(from).map((x,i)=>({kind:"L",label:"🎧 "+(x.title||("파트 "+(from+i+1))),en:"",ko:"",parts:x.parts}));player.lecture=lec.title;player.src="lecture";player.lecN=0;if(player.opts.mode!=="lecture"){player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}}
   player.loop=0;player.busy=false;player.on=true;player.paused=false;player.i=0;player.segs=[];player.si=0;ttsStop();wakeLock(true);keepAlive(true);playerStep();mediaSession();renderMini();toast("강의 재생: "+lec.title);if(view==="listen")render()}
 // while feedback or a lecture is being made for a record, every button for it shows that and cannot be pressed again
-let DETJOB=null;const recBusy=ts=>LECJOB&&LECJOB.ts===ts?(LECJOB.label||"강의 대본 만드는 중…"):DETJOB&&DETJOB.ts===ts?(DETJOB.label||"자세한 피드백 만드는 중…"):"";
+let DETJOB=null;const recBusy=ts=>POLJOB&&POLJOB.ts===ts?(POLJOB.label||"내 답변 다듬는 중…"):LECJOB&&LECJOB.ts===ts?(LECJOB.label||"강의 대본 만드는 중…"):DETJOB&&DETJOB.ts===ts?(DETJOB.label||"자세한 피드백 만드는 중…"):"";
 const busyBtn=(ts,cls)=>h("button",{class:"btn sm "+(cls||""),disabled:true,"data-lecprog":String(ts)},"⏳ "+recBusy(ts));
 // where a lecture without audio yet stands: steps done, last failure
 function lecStatusLine(l){const d=l.lecDraft;const n=d?lecGroups(d.n).length+1:0;const done=d?Object.keys(d.parts||{}).length:0;const run=LECJOB&&LECJOB.ts===l.ts;
