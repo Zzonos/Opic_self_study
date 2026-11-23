@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261123-083357-2054ce" data-rel="265">
+<html lang="ko" data-build="20261123-132154-ec9140" data-rel="266">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -487,14 +487,19 @@ let claudePushT=null,claudeErr=false;
 function claudeState(){const o=JSON.parse(JSON.stringify(S));if(o.log&&o.log.length>400)o.log=o.log.slice(-400);
   if(o.log){const keep=o.log.length-40;o.log=o.log.map((l,i)=>i<keep&&(l.a||l.model||l.pq)?(()=>{const c=Object.assign({},l);delete c.a;delete c.model;delete c.pq;delete c.str;return c})():l)}return o}
 const CL_CHUNK=60000;// characters per document (worst case ~180 KB of UTF-8, under the 256 KiB cap)
-async function claudeLoad(col){const meta=await col.doc("meta").get();
+async function claudeLoad(col){const meta=await col.doc("meta").get();if(meta.exists&&meta.data().t&&!claudeSeenT)claudeSeenT=meta.data().t;
   if(meta.exists&&meta.data().n){const n=meta.data().n;const parts=await Promise.all(Array.from({length:n},(_,i)=>col.doc("c"+i).get()));const str=parts.map(p=>p.exists?(p.data().s||""):"").join("");try{return JSON.parse(str)}catch(e){}}
   const [m,sc,tr]=await Promise.all([col.doc("main").get(),col.doc("scripts").get(),col.doc("trans").get()]);if(!m.exists)return null;
   return JSON.parse(JSON.stringify(Object.assign({},m.data(),sc.exists?sc.data():{},{trans:(tr.exists&&tr.data().t)||{}})))}
 let claudeBusy=Promise.resolve();
-async function claudeSave(col){const str=JSON.stringify(claudeState());const n=Math.max(1,Math.ceil(str.length/CL_CHUNK));
+// Claude-side saves replace the whole account copy: if another window/device saved since this one last read or wrote, merge that first so its new records (lectures, feedback) are not overwritten
+let claudeSeenT=0;
+async function claudeSave(col){try{const meta=await col.doc("meta").get();const t=meta.exists?(meta.data().t||0):0;
+    if(t&&t!==claudeSeenT){const remote=await claudeLoad(col);if(remote){const before=JSON.stringify(S.log.map(l=>[l.ts,!!l.lec,l.detAt||0]));mergeState(remote,true);dedupeLog();
+      if(JSON.stringify(S.log.map(l=>[l.ts,!!l.lec,l.detAt||0]))!==before){audLog.push("Claude 저장 전 다른 창·기기의 기록을 합침");try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}setTimeout(()=>{if(typeof syncRender==="function")syncRender("다른 기기의 기록을 반영했어요")},0)}}}}catch(e){audLog.push("Claude 저장 전 확인 실패: "+(e.code||e.message||e))}
+  const str=JSON.stringify(claudeState());const n=Math.max(1,Math.ceil(str.length/CL_CHUNK));
   for(let i=0;i<n;i++)await col.doc("c"+i).set({s:str.slice(i*CL_CHUNK,(i+1)*CL_CHUNK)});
-  await col.doc("meta").set({n,updatedAt:S.updatedAt||0,v:2,t:Date.now()})}
+  const t=Date.now();await col.doc("meta").set({n,updatedAt:S.updatedAt||0,v:2,t});claudeSeenT=t}
 let claudeCanWrite=true;
 function claudePush(){if(!docRef||!claudeCanWrite)return;clearTimeout(claudePushT);claudePushT=setTimeout(()=>{claudeBusy=claudeBusy.then(async()=>{try{await claudeSave(docRef);claudeErr=false;claudeSavedAt=Date.now();const el=$("#csave");if(el)el.textContent=claudeStatus()}catch(e){if(!claudeErr){claudeErr=true;
       toast(e&&e.code==="invalid_argument"&&window.__oss_notOwner?"이 계정은 이 페이지에 '보기' 권한으로 초대돼 Claude에 저장할 수 없어요. 소유자에게 '편집' 권한으로 초대해 달라고 하세요":"Claude 계정 저장 실패: "+(e.code||e.message||e))}}})},800)}
