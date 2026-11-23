@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261123-134526-f90d73" data-rel="270">
+<html lang="ko" data-build="20261123-134859-319ecb" data-rel="271">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1088,7 +1088,7 @@ Give 3-5 fixes and 4-6 expressions. Model answers must sound spontaneous: no sto
 // long AI jobs (scripts): a busy/limited API, a cut-off answer or broken JSON usually works on the next try —
 // retry twice by itself, waiting what the API asks (rate limit) or a few seconds; every failure is written to the log
 async function aiRetry(fn,what){const waits=[3,8];for(let k=0;;k++){try{return await fn()}catch(e){const c=(e&&e.code)||"";audLog.push(what+" 실패 ("+(k+1)+"회): "+(c||"")+" "+String(e&&e.message||e).slice(0,100));if(audLog.length>30)audLog.shift();
-  if(k>=waits.length||!/^(rate_limited|upstream_error|invalid_json|empty_completion)$/.test(c))throw e;const w=e.retryAfter||waits[k];toast("AI 응답 "+(c==="rate_limited"?"한도 대기":c==="invalid_json"?"형식 오류":"오류")+" — "+w+"초 뒤 자동으로 다시 시도해요");await new Promise(r=>setTimeout(r,w*1000))}}}
+  if(k>=waits.length||!/^(rate_limited|upstream_error|invalid_json|empty_completion|timeout)$/.test(c))throw e;const w=e.retryAfter||waits[k];toast("AI 응답 "+(c==="rate_limited"?"한도 대기":c==="invalid_json"?"형식 오류":c==="timeout"?"시간 초과":"오류")+" — "+w+"초 뒤 자동으로 다시 시도해요");await new Promise(r=>setTimeout(r,w*1000))}}}
 // only: indexes of the questions to write (new questions added to a topic that already has scripts)
 async function genScript(topic,onText,only=null,depth=0){const want=only||topic.qs.map((q,i)=>i);
   const r=await genScript1(topic,onText,only);let sc=(Array.isArray(r&&r.scripts)?r.scripts:[]).filter(x=>x&&x.answer);
@@ -2009,12 +2009,15 @@ function lecQText(x,i){const fx=(x.fx||[]).map(f=>`  - "${f.o}" → "${f.b}" (${
 const lecNorm=arr=>(arr||[]).map(x=>({title:String(x&&x.title||""),parts:((x&&x.parts)||[]).map(p=>p&&p.rep?{rep:String(p.rep),ko:String(p.ko||"")}:p&&p.en?{en:String(p.en)}:p&&p.ko?{ko:String(p.ko)}:null).filter(Boolean)})).filter(x=>x.parts.length);
 const lecGroups=n=>{const g=[];for(let i=0;i<n;i+=5)g.push(Array.from({length:Math.min(5,n-i)},(_,k)=>i+k));return g};
 let LECJOB=null;
+// step-by-step trace kept on the record (synced), so a lecture that never appears can be diagnosed afterwards
+function lecTrace(l0,msg){try{const L=S.log.find(x=>x.kind===l0.kind&&x.ts===l0.ts)||l0;L.lecLog=[...(L.lecLog||[]),new Date().toTimeString().slice(0,8)+" "+msg].slice(-40);save()}catch(e){}}
 async function lectureMake(l0,btn){if(!sample){toast(ERR.not_granted);return}const pq=(l0.pq||[]).filter(x=>x);if(!pq.length){toast("저장된 답변이 없어 강의를 만들 수 없어요");return}
   const live=()=>S.log.find(x=>x.kind===l0.kind&&x.ts===l0.ts)||l0;const job={ts:l0.ts,tok:Math.random(),hiddenAt:0};LECJOB=job;const stale=()=>LECJOB!==job;
   const groups=lecGroups(pq.length);const nSteps=groups.length+1;let L=live();
   if(!L.lecDraft||L.lecDraft.n!==pq.length)L.lecDraft={n:pq.length,parts:{},at:Date.now()};
   btn=btn||document.createElement("button");btn.disabled=true;const t0=btn.textContent;const prog=k=>{const t="강의 대본 만드는 중 "+k+"/"+nSteps+" · 끊겨도 이어서 만들어요";btn.textContent=t;const el=document.querySelector('[data-lecprog="'+l0.ts+'"]');if(el)el.textContent=t};
-  toast("음성 강의를 "+nSteps+"단계로 만들어요 · 화면이 꺼지거나 앱을 벗어나도 돌아오면 이어서 만들어요");
+  toast("음성 강의를 "+nSteps+"단계로 만들어요 · 화면이 꺼지거나 앱을 벗어나도 돌아오면 이어서 만들어요");lecTrace(l0,"시작 v"+(document.documentElement.dataset.rel||APPV())+" · 완료된 단계 "+Object.keys(L.lecDraft.parts).length+"/"+nSteps+" · 모델 "+(S.profile.aiTier||"default"));
+  job.onHide=()=>lecTrace(l0,"화면 꺼짐/앱 벗어남");
   const head=`You are a warm, experienced OPIc speaking coach. You are writing part of an AUDIO LECTURE in Korean about this learner's mock test (overall ${l0.lvRaw||l0.level||"?"}, target ${tgt()}); the learner listens while working, without looking at the screen.`;
   try{for(let gi=0;gi<groups.length;gi++){L=live();if(L.lecDraft&&L.lecDraft.parts[gi])continue;prog(gi+1);
       const p=`${head}
@@ -2024,7 +2027,7 @@ ${LEC_RULES}
 ${groups[gi].map(i=>lecQText(pq[i],i)).join("\n\n")}
 
 Reply with ONLY JSON: {"sections":[{"title":"섹션 제목","parts":[{"ko":"..."},{"en":"..."},{"rep":"...","ko":"..."}]}]}`;
-      const r=await aiRetry(()=>sample.json(p,{cache:false}),"음성 강의 "+(gi+1)+"/"+nSteps);if(stale())return;
+      lecTrace(l0,(gi+1)+"단계 요청");const t1=Date.now();const r=await aiRetry(()=>sample.json(p,{cache:false}),"음성 강의 "+(gi+1)+"/"+nSteps);if(stale()){lecTrace(l0,(gi+1)+"단계 응답 (이미 새로 시작돼 버림)");return}lecTrace(l0,(gi+1)+"단계 완료 "+Math.round((Date.now()-t1)/1000)+"초");
       L=live();L.lecDraft=L.lecDraft&&L.lecDraft.n===pq.length?L.lecDraft:{n:pq.length,parts:{},at:Date.now()};L.lecDraft.parts[gi]=lecNorm(r&&r.sections);L.lecDraft.at=Date.now();save()}
     prog(nSteps);L=live();const body=groups.flatMap((_,gi)=>L.lecDraft.parts[gi]||[]);if(!body.length)throw new Error("빈 대본");
     const reps=body.flatMap(x=>x.parts.filter(p=>p.rep).map(p=>p.rep)).slice(0,30);const pat=(l0.pat||[]).map(x=>`- ${x.issue}${x.ex?" | "+x.ex:""}${x.fix?" | "+x.fix:""}`).join("\n");
@@ -2037,13 +2040,13 @@ ${pat?"Repeated mistakes:\n"+pat+"\n":""}${l0.sum?"Overall comment: "+l0.sum+"\n
 ${reps.map(x=>"- "+x).join("\n")}
 
 Reply with ONLY JSON: {"title":"짧은 강의 제목","opening":{"title":"오프닝: ...","parts":[...]},"closing":{"title":"마무리: ...","parts":[...]}}`;
-    const r2=await aiRetry(()=>sample.json(p2,{cache:false}),"음성 강의 "+nSteps+"/"+nSteps);if(stale())return;
+    lecTrace(l0,nSteps+"단계 요청");const t2=Date.now();const r2=await aiRetry(()=>sample.json(p2,{cache:false}),"음성 강의 "+nSteps+"/"+nSteps);if(stale()){lecTrace(l0,nSteps+"단계 응답 (이미 새로 시작돼 버림)");return}lecTrace(l0,nSteps+"단계 완료 "+Math.round((Date.now()-t2)/1000)+"초");
     const secs=[...lecNorm([r2&&r2.opening]),...body,...lecNorm([r2&&r2.closing])];
     L=live();L.lec={ts:Date.now(),title:String(r2&&r2.title||"모의시험 음성 강의"),secs};L.detAt=Date.now();delete L.lecDraft;delete L.lecErr;if(L!==l0){l0.lec=L.lec;l0.detAt=L.detAt}
     LECJOB=null;save();audLog.push("음성 강의 저장: "+l0.date);toast("음성 강의를 만들었어요 — 듣기 → 음성 강의에서 들을 수 있어요");render()}
-  catch(e){if(stale())return;LECJOB=null;btn.disabled=false;btn.textContent=t0;const m=errMsg(e);L=live();L.lecErr={t:Date.now(),m:String(m).slice(0,120)};save();audLog.push("음성 강의 실패: "+m);toast("강의를 만들지 못했어요: "+m+" · 다시 누르면 이어서 만들어요");render()}}
+  catch(e){lecTrace(l0,"실패: "+((e&&e.code)||"")+" "+String(e&&e.message||e).slice(0,80)+(stale()?" (이미 새로 시작됨)":""));if(stale())return;LECJOB=null;btn.disabled=false;btn.textContent=t0;const m=errMsg(e);L=live();L.lecErr={t:Date.now(),m:String(m).slice(0,120)};save();audLog.push("음성 강의 실패: "+m);toast("강의를 만들지 못했어요: "+m+" · 다시 누르면 이어서 만들어요");render()}}
 // back in front after the app was frozen mid-step (screen off / other app): the pending request is dead, continue from the saved steps
-document.addEventListener("visibilitychange",()=>{if(!LECJOB)return;if(document.hidden){LECJOB.hiddenAt=Date.now();return}
+document.addEventListener("visibilitychange",()=>{if(!LECJOB)return;if(document.hidden){LECJOB.hiddenAt=Date.now();if(LECJOB.onHide)LECJOB.onHide();return}
   if(LECJOB.hiddenAt&&Date.now()-LECJOB.hiddenAt>8000){const rec=S.log.find(x=>x.ts===LECJOB.ts);LECJOB=null;if(rec&&!rec.lec)setTimeout(()=>{toast("끊겼던 음성 강의를 이어서 만들어요");lectureMake(rec).then(()=>unitsFromMock()).catch(()=>{})},800)}else LECJOB.hiddenAt=0});
 // a draft left from an earlier session (app closed mid-way) is continued once, a few seconds after the app opens in Claude mode
 setTimeout(()=>{try{if(!CLAUDE_ONLY()||!sample||LECJOB)return;const rec=S.log.slice().reverse().find(l=>l.kind==="mock"&&!l.lec&&l.lecDraft&&Date.now()-(l.lecDraft.at||0)<2*86400e3);if(rec){toast("끊겼던 음성 강의를 이어서 만들어요");lectureMake(rec).then(()=>unitsFromMock()).catch(()=>{})}}catch(e){}},9000);
@@ -2165,7 +2168,7 @@ function lecStatusLine(l){const d=l.lecDraft;const n=d?lecGroups(d.n).length+1:0
   return txt?h("div",{class:"small","data-lecprog":String(l.ts),style:"flex-basis:100%;color:"+(l.lecErr&&!d&&!run?"var(--bad)":"var(--accent)")},txt):null}
 function lectureBox(l0){if(!l0||l0.kind!=="mock"||!(l0.pq||[]).length)return null;const lec=l0.lec;
   if(!lec){if(!CLAUDE_ONLY()||!(l0.pq||[]).some(q=>q&&(q.fx||q.t)))return null;return h("div",{class:"card",style:"display:flex;flex-direction:column;gap:6px"},h("h3",{},"🎧 음성 강의"),
-    h("p",{class:"muted small"},"아직 음성 강의가 없어요. 자세한 피드백은 있으니 강의만 만들 수 있어요 (네 단계, 단계마다 저장돼요)."),lecStatusLine(l0),
+    h("p",{class:"muted small"},"아직 음성 강의가 없어요. 자세한 피드백은 있으니 강의만 만들 수 있어요 (네 단계, 단계마다 저장돼요)."),lecStatusLine(l0),(l0.lecLog||[]).length?h("details",{},h("summary",{class:"small"},"진행 기록 ("+l0.lecLog.length+")"),h("pre",{class:"small mono",style:"white-space:pre-wrap;font-size:11px;margin:4px 0"},l0.lecLog.join("\n"))):null,
     h("div",{class:"row"},h("button",{class:"btn primary sm",onclick:e=>{lectureMake(S.log.find(y=>y.ts===l0.ts)||l0,e.currentTarget).then(()=>unitsFromMock()).catch(()=>{})}},l0.lecDraft?"강의 이어서 만들기":"강의만 만들기")))}
   return h("div",{class:"card"},h("h3",{},"🎧 "+lec.title),h("p",{class:"muted small"},"약 "+lectureMins(lec)+"분 · "+lec.secs.length+"개 파트 · 화면을 꺼도 이어서 재생돼요 (웹)"),
     h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>lecturePlay(l0)},"▶ 강의 듣기"),window.claude?.use?webLink("웹 앱에서 듣기 →","btn","l"):null,null),
@@ -3132,7 +3135,9 @@ const BEST_KINDS=["eval","mock","coach"];
 const bestTier=(input,opt)=>!(WEB&&API.on)&&(!opt||!opt.modelTier)&&S.profile&&S.profile.aiTier==="complex"&&BEST_KINDS.includes(aiKind(input))?Object.assign({},opt||{},{modelTier:"complex"}):opt;
 function wrapSample(s){const w=(...a)=>awakeDuring(s(...a));const json0=async(input,opt)=>{opt=bestTier(input,opt);aiCount(input);
     // use the plain call so we learn which model tier actually answered (json() does not report it)
-    const want=(opt&&opt.modelTier)||"default";const r=await s(input,opt);tierCount(want,r&&r.modelTierApplied);
+    const want=(opt&&opt.modelTier)||"default";
+    /* a request lost between the app and Claude (e.g. after the screen went off) never answers: give up after a while so it can be retried */
+    const lim=(opt&&opt.timeoutMs)||(want==="complex"?240000:180000);let tm;const r=await Promise.race([s(input,opt),new Promise((_,rej)=>{tm=setTimeout(()=>{const e=new Error("AI 응답이 "+Math.round(lim/1000)+"초 동안 오지 않음");e.code="timeout";rej(e)},lim)})]).finally(()=>clearTimeout(tm));tierCount(want,r&&r.modelTierApplied);
     if(r&&r.truncated){const fx=jsonRepair(r.text);if(!(fx&&fx.v&&typeof fx.v==="object")){const e=new Error("invalid_json");e.code="invalid_json";e.text=r.text;throw e}audLog.push("응답 길이 한도 → 잘린 끝 버리고 복구");const out=JSON.parse(JSON.stringify(fx.v));out._cut=true;return out}
     let v,cut=false;try{v=parseReply(r&&r.text)}catch(pe){const tx=String(r&&r.text||"");const fx=jsonRepair(tx);
       if(fx&&fx.v&&typeof fx.v==="object"){v=fx.v;cut=fx.cut;audLog.push("JSON 복구"+(cut?" (끝이 잘림 → 마지막 항목 버림)":" (따옴표 등)")+" · "+tx.length+"자")}
