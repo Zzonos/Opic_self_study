@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261123-132154-ec9140" data-rel="266">
+<html lang="ko" data-build="20261123-132935-f9bd14" data-rel="267">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1998,7 +1998,8 @@ async function mockRegradeNow(btn){if(!sample){toast(ERR.not_granted);return}con
   catch(e){btn.disabled=false;btn.textContent=t0;toast("채점하지 못했어요: "+errMsg(e))}}
 const splitKo=t=>String(t||"").split(/(?<=[.!?…])\s+/).map(x=>x.trim()).filter(Boolean);
 async function lectureMake(l0,btn){if(!sample){toast(ERR.not_granted);return}const pq=(l0.pq||[]).filter(x=>x);if(!pq.length){toast("저장된 답변이 없어 강의를 만들 수 없어요");return}
-  btn.disabled=true;const t0=btn.textContent;btn.textContent="강의 대본 만드는 중… (1–2분)";
+  btn.disabled=true;const t0=btn.textContent;btn.textContent="강의 대본 만드는 중… (1–2분) · 다른 앱으로 가지 마세요";toast("강의를 만드는 1–2분 동안 Claude 앱을 벗어나면 끊길 수 있어요");
+  let wentBg=false;const onVis=()=>{if(document.hidden)wentBg=true};document.addEventListener("visibilitychange",onVis);const live=()=>S.log.find(x=>x.kind===l0.kind&&x.ts===l0.ts)||l0;
   const qs=pq.map((x,i)=>{const fx=(x.fx||[]).map(f=>`  - "${f.o}" → "${f.b}" (${f.w||""})`).join("\n");
     return `Q${i+1}${x.l?" ["+x.l+"]":""}: ${x.q||""}\nAnswer: ${(x.a||"(no answer)").slice(0,1500)}${x.c?"\nComment: "+x.c:""}${fx?"\nCorrections:\n"+fx:""}${x.t?"\nTip: "+x.t:""}${x.cl&&x.cl.en?"\nBetter closing: "+x.cl.en+(x.cl.i?" ("+x.cl.i+")":""):""}${x.b?"\nModel sentence: "+x.b:""}`}).join("\n\n");
   const pat=(l0.pat||[]).map(x=>`- ${x.issue}${x.ex?" | "+x.ex:""}${x.fix?" | "+x.fix:""}`).join("\n");
@@ -2018,8 +2019,14 @@ ${qs}
 
 Reply with ONLY JSON: {"title":"짧은 강의 제목","sections":[{"title":"섹션 제목","parts":[{"ko":"..."},{"en":"..."},{"rep":"...","ko":"..."}]}]}`;
   try{const r=await aiRetry(()=>sample.json(prompt,{cache:false}),"음성 강의");const secs=(r&&r.sections||[]).map(x=>({title:String(x.title||""),parts:(x.parts||[]).map(p=>p&&p.rep?{rep:String(p.rep),ko:String(p.ko||"")}:p&&p.en?{en:String(p.en)}:p&&p.ko?{ko:String(p.ko)}:null).filter(Boolean)})).filter(x=>x.parts.length);
-    if(!secs.length)throw new Error("빈 대본");l0.lec={ts:Date.now(),title:String(r.title||"모의시험 음성 강의"),secs};l0.detAt=Date.now();save();toast("음성 강의를 만들었어요 — '강의 듣기'를 누르세요");render()}
-  catch(e){btn.disabled=false;btn.textContent=t0;toast("강의를 만들지 못했어요: "+errMsg(e))}}
+    if(!secs.length)throw new Error("빈 대본");
+    /* the record may have been replaced by a sync merge while the lecture was being written: attach it to the record that is in the log now */
+    const L=live();L.lec={ts:Date.now(),title:String(r.title||"모의시험 음성 강의"),secs};L.detAt=Date.now();delete L.lecErr;if(L!==l0){l0.lec=L.lec;l0.detAt=L.detAt}document.removeEventListener("visibilitychange",onVis);
+    save();audLog.push("음성 강의 저장: "+l0.date);toast("음성 강의를 만들었어요 — 듣기 → 음성 강의에서 들을 수 있어요");render()}
+  catch(e){document.removeEventListener("visibilitychange",onVis);btn.disabled=false;btn.textContent=t0;const m=errMsg(e);const L=live();L.lecErr={t:Date.now(),m:String(m).slice(0,120),bg:wentBg};save();audLog.push("음성 강의 실패: "+m+(wentBg?" (만드는 중 앱이 백그라운드로 감)":""));
+    if(wentBg&&!lectureMake.retried){lectureMake.retried=true;LEC_RETRY=L;toast("앱을 벗어나서 강의 만들기가 끊겼어요 — 돌아오면 다시 만들어요")}else toast("강의를 만들지 못했어요: "+m)}}
+// a lecture interrupted because the app went to the background is made again once the app is back in front
+let LEC_RETRY=null;document.addEventListener("visibilitychange",()=>{if(document.hidden||!LEC_RETRY)return;const L=LEC_RETRY;LEC_RETRY=null;if(L.lec)return;setTimeout(()=>{toast("끊겼던 음성 강의를 다시 만들어요");lectureMake(L,document.createElement("button")).then(()=>{lectureMake.retried=false;return unitsFromMock()}).catch(()=>{})},800)});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&player.on&&player.paused&&player.hidPause){player.hidPause=false;player.paused=false;/* the line spoken when the screen went off was cut: say it again */for(let k=player.si-1;k>=0;k--){const x=player.segs[k];if(x&&(x.t==="ko"||x.t==="en")){player.si=k;break}}keepAlive(true);playerStep();mediaSession();renderMini();toast("강의를 이어서 재생해요")}});
 // the audio element is not in the page, so its timeupdate never reaches document listeners: poll the position instead
 setInterval(()=>{if(!player.on||document.hidden)return;const it=player.items[player.i];if(!it||(it.kind!=="LF"&&it.kind!=="UF"))return;try{if(view==="listen")updateNow();lecMark()}catch(e){}},700);
@@ -2600,7 +2607,8 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
     h("p",{class:"eyebrow"},"모의시험 음성 강의 "+withL.length+"개"),WEB&&withL.length?h("div",{id:"lecbg",style:"margin:-2px 0 6px"},lecBgStatus()):null,
     withL.length?h("div",{class:"list"},...withL.map(lecRow)):h("p",{class:"muted small"},"아직 만든 강의가 없어요. 아래 모의시험에서 만들거나, 모의시험 결과·기록 화면의 '🎧 음성 강의 만들기'를 누르세요."),
     noL.length?h("div",{},h("p",{class:"eyebrow",style:"margin-top:10px"},"강의가 없는 모의시험"),...noL.map(l=>h("div",{class:"row",style:"margin-top:6px"},h("span",{class:"grow small"},l.date+" · "+(l.title||"모의시험")+(l.lvRaw||l.level?" · "+(l.lvRaw||l.level):"")),
-      CLAUDE_ONLY()?h("button",{class:"btn sm",onclick:e=>{const x=S.log.find(y=>y.ts===l.ts)||l;mockDetail(x,x,e.currentTarget)}},"피드백 + 강의 만들기"):null))):null,
+      CLAUDE_ONLY()?(()=>{const hasD=(l.pq||[]).some(q=>q&&(q.fx||q.t));return h("button",{class:"btn sm",onclick:e=>{const x=S.log.find(y=>y.ts===l.ts)||l;if(hasD){lectureMake.retried=false;lectureMake(x,e.currentTarget).then(()=>unitsFromMock()).catch(()=>{})}else mockDetail(x,x,e.currentTarget)}},hasD?"강의 만들기":"피드백 + 강의 만들기")})():null,
+      l.lecErr?h("div",{class:"small",style:"flex-basis:100%;color:var(--bad)"},"⚠️ 지난번 강의 만들기 실패 ("+new Date(l.lecErr.t).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})+") · "+l.lecErr.m+(l.lecErr.bg?" · 만드는 중에 앱을 벗어났어요":"")):null))):null,
     CLAUDE_ONLY()?null:h("p",{class:"muted small"},"강의 만들기는 Claude 앱에서만 돼요. 만든 강의는 '웹으로 통합'하면 여기서도 들을 수 있어요."),
     WEB?h("div",{class:"row"},h("label",{class:"f"},"한국어 속도",h("select",{onchange:e=>{player.opts.lecKo=+e.target.value;saveO();if(player.on&&player.lecture)toast("다음 재생부터 적용돼요");setTimeout(()=>{lecPrebuild().then(()=>{if(view==="listen")lecBgUpd()})},3000);lecBgUpd()}},...[0.9,1,1.1,1.2,1.3,1.4,1.5].map(v=>h("option",{value:v,selected:lecKo()===v},v.toFixed(1)+"배")))),
       h("label",{class:"f"},"영어 속도",h("select",{onchange:e=>{player.opts.lecEn=+e.target.value;saveO();if(player.on&&player.lecture)toast("다음 재생부터 적용돼요");setTimeout(()=>{lecPrebuild().then(()=>{if(view==="listen")lecBgUpd()})},3000);lecBgUpd()}},...[0.8,0.9,1,1.1,1.2].map(v=>h("option",{value:v,selected:lecEn()===v},v.toFixed(1)+"배"))))):null,
