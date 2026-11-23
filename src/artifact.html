@@ -527,13 +527,14 @@ const WEB_URL="https://zzonos.github.io/Opic_self_study/";
 const b64u=b=>{const u=new Uint8Array(b);let bin="";for(let i=0;i<u.length;i+=0x8000)bin+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")};
 const unb64u=t=>{t=t.replace(/-/g,"+").replace(/_/g,"/");t+="=".repeat((4-t.length%4)%4);const bin=atob(t);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u};
 function syncPayload(){if(!S.syncedAt||S.syncFull)return fullPayload();
-  const since=S.syncedAt-7*86400e3;const st=x=>x?(x.ts||(x.date?Date.parse(x.date):0)||0):0;
+  /* only what changed since the last completed send (2 minute margin); a record counts as changed when feedback, a lecture or polished answers were added */
+  const since=S.syncedAt-120e3;const st=x=>x?(x.ts||(x.date?Date.parse(x.date):0)||0):0;
   const pick=o=>Object.fromEntries(Object.entries(o||{}).filter(([k,v])=>st(v)>since));
   const scripts=pick(S.scripts),samples=pick(S.samples);const models=Object.fromEntries(Object.entries(S.models||{}).filter(([q])=>((S.modelsAt||{})[q]||0)>since));
   let trans={};if((S.transAllAt||0)>since)trans=S.trans||{};else{const sents=new Set();const add=t=>splitSent(t).forEach(x=>sents.add(x));
     for(const sc of [...Object.values(scripts),...Object.values(samples)])for(const x of (sc.scripts||[]))add(x&&x.answer);for(const m of Object.values(models))add(m);
     for(const x of sents)if(S.trans[x])trans[x]=S.trans[x]}
-  return {delta:true,del:S.del||[],log:S.log.filter(l=>Math.max(l.ts||Date.parse(l.date)||0,l.detAt||0)>since),scripts,samples,models,modelsAt:S.modelsAt||{},trans,custom:S.custom,delC:S.delC||[],texts:S.texts||[],cards:S.cards,cardsAt:S.cardsAt||{},profile:S.profile,profileAt:S.profileAt||0,today:S.today,analysis:S.analysis||null,usage:S.usage||{},transVer:S.transVer||1,transAllAt:S.transAllAt||0,drill:S.drill||{p:{}},units:S.units||{},unitSt:S.unitSt||{},updatedAt:S.updatedAt}}
+  return {delta:true,del:S.del||[],log:S.log.filter(l=>Math.max(l.ts||Date.parse(l.date)||0,l.detAt||0,l.regAt||0,l.lec&&l.lec.ts||0)>since),scripts,samples,models,modelsAt:S.modelsAt||{},trans,custom:S.custom,delC:S.delC||[],texts:S.texts||[],cards:S.cards,cardsAt:S.cardsAt||{},profile:S.profile,profileAt:S.profileAt||0,today:S.today,analysis:S.analysis||null,usage:S.usage||{},transVer:S.transVer||1,transAllAt:S.transAllAt||0,drill:S.drill||{p:{}},units:S.units||{},unitSt:S.unitSt||{},updatedAt:S.updatedAt}}
 function fullPayload(){return {del:S.del||[],log:S.log,scripts:S.scripts,samples:S.samples||{},models:S.models||{},modelsAt:S.modelsAt||{},trans:S.trans||{},custom:S.custom,delC:S.delC||[],texts:S.texts||[],cards:S.cards,cardsAt:S.cardsAt||{},profile:S.profile,profileAt:S.profileAt||0,today:S.today,analysis:S.analysis||null,usage:S.usage||{},transVer:S.transVer||1,transAllAt:S.transAllAt||0,drill:S.drill||{p:{}},units:S.units||{},unitSt:S.unitSt||{},updatedAt:S.updatedAt}}
 function packStateSync(){return "r"+b64u(new TextEncoder().encode(JSON.stringify(syncPayload())).buffer)}
 const SYNC_LIM=180000;
@@ -564,10 +565,12 @@ async function unpackState(t){const kind=t[0];const u=unb64u(t.slice(1));let byt
 function webUrl(mode="s"){let code=curSyncCode();const LIM=SYNC_LIM;
   if(code.length>LIM){const bak=S;S=Object.assign({},bak,{log:bak.log.slice(-60),analysis:null});code=packStateSync();S=bak;if(code.length>LIM)return null}
   return WEB_URL+"#"+mode+"_"+code}
-const SYNC_DONE=new Set();
+const syncSig=()=>syncParts?syncParts.length+":"+syncParts.map(c=>c.length+c.slice(-12)).join(","):"";
+const SYNC_DONE=new Set();function syncDoneLoad(){try{const o=JSON.parse(localStorage.getItem("oss_syncdone")||"null");SYNC_DONE.clear();if(o&&o.sig===syncSig())o.done.forEach(i=>SYNC_DONE.add(i))}catch(e){}}
+function syncDoneSave(){try{localStorage.setItem("oss_syncdone",JSON.stringify({sig:syncSig(),done:[...SYNC_DONE]}))}catch(e){}}
 function syncPartsHint(){return syncParts&&syncVer===stVer&&syncParts.length>1?h("p",{class:"muted small",style:"flex-basis:100%;margin:4px 0 0"},"기록이 커서 "+syncParts.length+"번에 나눠 보내요. 1번부터 차례대로 누르고, 웹에서 '통합 완료'가 뜨면 다음 번호를 눌러 주세요."):null}
-function webLink(label,cls,mode="s"){if(syncParts&&syncVer===stVer&&syncParts.length>1){const n=syncParts.length;return h("span",{"data-syncparts":"1",style:"display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center"},...syncParts.map((c,i)=>h("a",{class:cls+(SYNC_DONE.has(i)?" ghost":""),href:WEB_URL+"#"+mode+"_"+c,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",
-    onclick:e=>{SYNC_DONE.add(i);e.currentTarget.classList.add("ghost");if(SYNC_DONE.size>=n){S.syncedAt=Date.now();S.syncFull=false;SYNC_DONE.clear();save();toast("마지막 부분이에요 · 웹에서 완료되면 끝이에요")}else toast((i+1)+"/"+n+" 보냄 · 웹에서 완료되면 Claude로 돌아와 나머지도 눌러 주세요")}},(SYNC_DONE.has(i)?"✓ ":"")+label+" "+(i+1)+"/"+n)))}
+function webLink(label,cls,mode="s"){if(syncParts&&syncVer===stVer&&syncParts.length>1){const n=syncParts.length;syncDoneLoad();return h("span",{"data-syncparts":"1",style:"display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center"},...syncParts.map((c,i)=>h("a",{class:cls+(SYNC_DONE.has(i)?" ghost":""),href:WEB_URL+"#"+mode+"_"+c,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",
+    onclick:e=>{SYNC_DONE.add(i);syncDoneSave();e.currentTarget.classList.add("ghost");if(SYNC_DONE.size>=n){S.syncedAt=Date.now();S.syncFull=false;SYNC_DONE.clear();try{localStorage.removeItem("oss_syncdone")}catch(e){}save();toast("마지막 부분이에요 · 웹에서 완료되면 끝이에요")}else toast((i+1)+"/"+n+" 보냄 · 웹에서 완료되면 Claude로 돌아와 나머지도 눌러 주세요")}},(SYNC_DONE.has(i)?"✓ ":"")+label+" "+(i+1)+"/"+n)))}
   const url=webUrl(mode);if(!url){prepSyncCode();return h("a",{class:cls,href:"#","data-weblink":mode,style:"text-decoration:none;white-space:nowrap",target:"_blank",rel:"noopener",onclick:e=>{if(e.currentTarget.getAttribute("href")==="#"){e.preventDefault();toast("보낼 기록을 준비하는 중이에요. 1–2초 뒤 다시 눌러 주세요");prepSyncCode()}else{S.syncedAt=Date.now();S.syncFull=false;save()}}},label)}
   return h("a",{class:cls,href:url,"data-weblink":mode,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",onclick:()=>{S.syncedAt=Date.now();S.syncFull=false;save();setTimeout(()=>toast(mode==="x"?"통합이 끝나면 '완료' 화면이 떠요. 그다음 홈 화면 앱을 열면 반영돼 있어요":"웹 앱이 열리면 로그인 후 자동으로 통합돼요"),200)}},label)}
 function syncToWeb(){try{const url=webUrl();if(!url){toast("기록이 너무 커서 링크로 못 보내요. 설정의 기록 코드를 사용해 주세요");return}
