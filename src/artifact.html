@@ -1993,7 +1993,8 @@ let LECJOB=null;
 // step-by-step trace kept on the record (synced), so a lecture that never appears can be diagnosed afterwards
 function lecTrace(l0,msg){try{const L=S.log.find(x=>x.kind===l0.kind&&x.ts===l0.ts)||l0;L.lecLog=[...(L.lecLog||[]),new Date().toTimeString().slice(0,8)+" "+msg].slice(-40);save()}catch(e){}}
 async function lectureMake(l0,btn){if(!sample){toast(ERR.not_granted);return}const pq=(l0.pq||[]).filter(x=>x);if(!pq.length){toast("저장된 답변이 없어 강의를 만들 수 없어요");return}
-  const live=()=>S.log.find(x=>x.kind===l0.kind&&x.ts===l0.ts)||l0;const job={ts:l0.ts,tok:Math.random(),hiddenAt:0};LECJOB=job;const stale=()=>LECJOB!==job;
+  if(LECJOB&&LECJOB.ts===l0.ts&&!LECJOB.hiddenAt&&Date.now()-LECJOB.started<300000){toast("이미 이 강의를 만들고 있어요 · 잠시만 기다려 주세요");return}
+  const live=()=>S.log.find(x=>x.kind===l0.kind&&x.ts===l0.ts)||l0;const job={ts:l0.ts,tok:Math.random(),hiddenAt:0,started:Date.now()};LECJOB=job;const stale=()=>LECJOB!==job;
   const groups=lecGroups(pq.length);const nSteps=groups.length+1;let L=live();
   if(!L.lecDraft||L.lecDraft.n!==pq.length)L.lecDraft={n:pq.length,parts:{},at:Date.now()};
   btn=btn||document.createElement("button");btn.disabled=true;const t0=btn.textContent;const prog=k=>{const t="강의 대본 만드는 중 "+k+"/"+nSteps+" · 끊겨도 이어서 만들어요";btn.textContent=t;const el=document.querySelector('[data-lecprog="'+l0.ts+'"]');if(el)el.textContent=t};
