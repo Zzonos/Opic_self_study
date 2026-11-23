@@ -1191,9 +1191,13 @@ const clipJob={on:false,done:0,total:0,err:0,last:""};
 let listenTick=0;setInterval(()=>{if(!player.on||player.paused)return;S.usage=S.usage||{};S.usage.listen=(S.usage.listen||0)+30;if(++listenTick%10===0)save()},30000);
 // keep checking for sentences without a natural-voice recording (new cards, new scripts, edited translations)
 setInterval(()=>{if(!clipJob.retryAt||Date.now()>clipJob.retryAt)clipSync(false)},15*60e3);
+// polished answers are recorded only in the voice in use (saves half the voice-service quota)
+const POL_H=new Set();
 function clipSentences(){const out={};const add=t=>{for(const sn of splitSent(t)){out[txtHash(sn)]=sn}};
   for(const st of [S.samples||{},S.scripts||{}])for(const sc of Object.values(st))for(const x of (sc&&sc.scripts||[]))add(x&&x.answer||"");
   for(const m of Object.values(S.models||{}))add(m);
+  // polished model answers of the 10 latest mock tests (about 120 sentences a test)
+  POL_H.clear();for(const l of S.log.filter(l=>l.kind==="mock"&&(l.pq||[]).some(q=>q&&q.pol)).slice(-10))for(const q of l.pq||[])if(q&&q.pol)for(const sn of splitSent(q.pol.en)){const h=txtHash(sn);if(!out[h])POL_H.add(h);out[h]=sn}
   // my own expression cards (added from feedback) have no studio recording: record them as whole phrases
   for(const c of (S.custom||[])){const t=String(c&&c.en||"").replace(/___/g,"something").trim();if(/[a-z]/i.test(t))out[txtHash(t)]=t}return out}
 function clipMissing(){const all=clipSentences();return Object.entries(all).filter(([h,sn])=>!CLIPS.idx.has(h)||(transOf(sn)&&!koFresh(h,sn)))}
@@ -1211,7 +1215,7 @@ async function clipSync(force){if(clipJob.on||!WEB||!cloud.ref||!TTS_URL||!navig
   clipJob.on=true;clipJob.lastRun=Date.now();clipJob.lastErr="";clipJob.done=0;clipJob.total=todo.length;clipJob.err=0;clipJob.last="";const upd=()=>{const el=$("#clipst");if(el)el.replaceChildren(clipStatus())};upd();
   const col=cloud.ref.collection("clips");const idxRef=cloud.ref.collection("meta").doc("clipidx");
   for(const [h,sn] of todo){if(!player||!cloud.ref)break;try{const ko=transOf(sn);const doc={h,en:sn,t:Date.now()};const has=CLIPS.idx.has(h);
-      for(const tag of (has?["ko"]:["m","f","ko"])){const text=tag==="ko"?ko:sn;if(!text)continue;let bytes;try{bytes=await ttsFetch(text,tag)}catch(e){if(tag===(AUD.tag==="f"?"f":"m"))throw e;audLog.push("녹음 "+tag+" 실패(건너뜀): "+String(e.message||e).slice(0,60));continue}doc[tag]=firebase.firestore.Blob.fromUint8Array(bytes);
+      for(const tag of (has?["ko"]:POL_H.has(h)?[AUD.tag==="f"?"f":"m"]:["m","f","ko"])){const text=tag==="ko"?ko:sn;if(!text)continue;let bytes;try{bytes=await ttsFetch(text,tag)}catch(e){if(tag===(AUD.tag==="f"?"f":"m"))throw e;audLog.push("녹음 "+tag+" 실패(건너뜀): "+String(e.message||e).slice(0,60));continue}doc[tag]=firebase.firestore.Blob.fromUint8Array(bytes);
         try{const cache=await caches.open("oss-clips");await cache.put("/clip/"+tag+"/"+h,new Response(new Blob([bytes],{type:"audio/mpeg"})));delete CLIPS.urls[tag+"/"+h]}catch(e){}}
       const koOk=!!(ko&&doc.ko);if(koOk)doc.kt=ko;await col.doc(h).set(doc,{merge:true});const kh=koOk?koHash(ko):"";await idxRef.set({hashes:firebase.firestore.FieldValue.arrayUnion(h),t:Date.now(),...(kh?{kh:{[h]:kh}}:{})},{merge:true});CLIPS.idx.add(h);if(kh)CLIPS.kh[h]=kh;clipJob.done++;clipJob.last=sn.slice(0,40)}
     catch(e){clipJob.err++;clipJob.last="실패: "+(e.message||e);clipJob.lastErr=(e.code?e.code+" ":"")+(e.message||String(e)).slice(0,120);if(clipJob.err>=3&&clipJob.done===0)break;if(/403/.test(clipJob.lastErr||"")&&clipJob.err>=2)break}
@@ -2067,7 +2071,7 @@ Reply with ONLY JSON: {"answers":[{"n":1,"en":"...","ko":"...","changes":"한국
     POLJOB=null;toast("내 답변 다듬은 모범답안 "+n+"개를 만들었어요 · 문항별 피드백에서 볼 수 있어요");render();return n}
   catch(e){POLJOB=null;toast("다듬은 답변을 만들지 못했어요: "+errMsg(e)+" · 다시 누르면 남은 것만 만들어요");render();return n}}
 function polBox(x){const p=x&&x.pol;if(!p)return null;return h("details",{style:"margin-top:4px;border-left:3px solid var(--accent);padding-left:8px"},h("summary",{class:"small",style:"font-weight:600;color:var(--accent)"},"✨ 내 답변 다듬은 모범답안"),
-  h("p",{class:"en",style:"margin:6px 0 2px;line-height:1.6"},p.en),h("div",{class:"row"},h("button",{class:"btn sm ghost",onclick:e=>speak(p.en,{btn:e.currentTarget,whole:true})},"🔊 듣기")),
+  h("p",{class:"en",style:"margin:6px 0 2px;line-height:1.6"},p.en),h("div",{class:"row",style:"align-items:center;gap:6px"},h("button",{class:"spk","aria-label":"듣기",title:"듣기",html:SPK_ICON,onclick:e=>speak(p.en,{btn:e.currentTarget,whole:true})}),h("span",{class:"muted small"},"듣기")),
   p.ko?h("p",{class:"muted small",style:"margin:2px 0"},p.ko):null,p.ch?h("p",{class:"small",style:"margin:2px 0"},h("b",{},"바뀐 점 "),p.ch):null)}
 // back in front after the app was frozen mid-step (screen off / other app): the pending request is dead, continue from the saved steps
 document.addEventListener("visibilitychange",()=>{if(!LECJOB)return;if(document.hidden){LECJOB.hiddenAt=Date.now();if(LECJOB.onHide)LECJOB.onHide();return}
