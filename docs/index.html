@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261123-223552-8ea17a" data-rel="275">
+<html lang="ko" data-build="20261123-224018-397e81" data-rel="276">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -584,9 +584,9 @@ function webUrl(mode="s"){let code=curSyncCode();const LIM=SYNC_LIM;
   if(code.length>LIM){const bak=S;S=Object.assign({},bak,{log:bak.log.slice(-60),analysis:null});code=packStateSync();S=bak;if(code.length>LIM)return null}
   return WEB_URL+"#"+mode+"_"+code}
 const SYNC_DONE=new Set();
-function webLink(label,cls,mode="s"){if(syncParts&&syncVer===stVer&&syncParts.length>1){const n=syncParts.length;return h("span",{class:"row","data-syncparts":"1",style:"gap:6px;flex-wrap:wrap"},...syncParts.map((c,i)=>h("a",{class:cls+(SYNC_DONE.has(i)?" ghost":""),href:WEB_URL+"#"+mode+"_"+c,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",
-    onclick:e=>{SYNC_DONE.add(i);e.currentTarget.classList.add("ghost");if(SYNC_DONE.size>=n){S.syncedAt=Date.now();S.syncFull=false;SYNC_DONE.clear();save();toast("마지막 부분이에요 · 웹에서 완료되면 끝이에요")}else toast((i+1)+"/"+n+" 보냄 · 웹에서 완료되면 Claude로 돌아와 나머지도 눌러 주세요")}},(SYNC_DONE.has(i)?"✓ ":"")+label+" "+(i+1)+"/"+n)),
-    h("span",{class:"muted small",style:"flex-basis:100%"},"기록이 커서 "+n+"번에 나눠 보내요. 차례대로 눌러 주세요."))}
+function syncPartsHint(){return syncParts&&syncVer===stVer&&syncParts.length>1?h("p",{class:"muted small",style:"flex-basis:100%;margin:4px 0 0"},"기록이 커서 "+syncParts.length+"번에 나눠 보내요. 1번부터 차례대로 누르고, 웹에서 '통합 완료'가 뜨면 다음 번호를 눌러 주세요."):null}
+function webLink(label,cls,mode="s"){if(syncParts&&syncVer===stVer&&syncParts.length>1){const n=syncParts.length;return h("span",{"data-syncparts":"1",style:"display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center"},...syncParts.map((c,i)=>h("a",{class:cls+(SYNC_DONE.has(i)?" ghost":""),href:WEB_URL+"#"+mode+"_"+c,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",
+    onclick:e=>{SYNC_DONE.add(i);e.currentTarget.classList.add("ghost");if(SYNC_DONE.size>=n){S.syncedAt=Date.now();S.syncFull=false;SYNC_DONE.clear();save();toast("마지막 부분이에요 · 웹에서 완료되면 끝이에요")}else toast((i+1)+"/"+n+" 보냄 · 웹에서 완료되면 Claude로 돌아와 나머지도 눌러 주세요")}},(SYNC_DONE.has(i)?"✓ ":"")+label+" "+(i+1)+"/"+n)))}
   const url=webUrl(mode);if(!url){prepSyncCode();return h("a",{class:cls,href:"#","data-weblink":mode,style:"text-decoration:none;white-space:nowrap",target:"_blank",rel:"noopener",onclick:e=>{if(e.currentTarget.getAttribute("href")==="#"){e.preventDefault();toast("보낼 기록을 준비하는 중이에요. 1–2초 뒤 다시 눌러 주세요");prepSyncCode()}else{S.syncedAt=Date.now();S.syncFull=false;save()}}},label)}
   return h("a",{class:cls,href:url,"data-weblink":mode,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",onclick:()=>{S.syncedAt=Date.now();S.syncFull=false;save();setTimeout(()=>toast(mode==="x"?"통합이 끝나면 '완료' 화면이 떠요. 그다음 홈 화면 앱을 열면 반영돼 있어요":"웹 앱이 열리면 로그인 후 자동으로 통합돼요"),200)}},label)}
 function syncToWeb(){try{const url=webUrl();if(!url){toast("기록이 너무 커서 링크로 못 보내요. 설정의 기록 코드를 사용해 주세요");return}
@@ -595,7 +595,7 @@ function unsyncedCount(){const t=S.syncedAt||0;return S.log.filter(l=>(l.ts||0)>
 function lastSyncLine(){let v="";try{v=localStorage.getItem("oss_lastsync")||""}catch(e){}if(!v)return null;const [t,...m]=v.split("|");return h("p",{class:"muted small"},"마지막 Claude 통합: "+new Date(+t).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})+" · "+m.join("|"))}
 function syncCard(){if(window.claude?.use===undefined)return null;const n=unsyncedCount();
   return h("div",{class:"card"},h("h3",{},"웹으로 통합"),h("p",{class:"muted small"},"여기(Claude)가 기본 저장소예요. '웹으로 통합'은 웹 계정에 저장만 하고 완료 화면을 띄우고(처음 한 번은 로그인 필요), '통합하고 웹 열기'는 저장 후 웹 앱에 머물러요. 웹 → Claude 방향은 Claude가 링크 데이터를 전달하지 않아 아래 '기록 코드'로만 가능해요."),
-    h("div",{class:"row"},webLink("웹으로 통합"+(n?" (새 기록 "+n+"건)":""),"btn primary","x"),webLink("통합하고 웹 열기 →","btn","s"),h("button",{class:"btn sm ghost",onclick:()=>{S.syncFull=true;save();toast("다음 '웹으로 통합'은 전체 기록을 보내요 (링크가 길어져요)");render()}},S.syncFull?"전체 보내기 예약됨":"전체 기록 보내기"),S.syncedAt?h("span",{class:"muted small"},"마지막 전송 "+new Date(S.syncedAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})):null))}
+    h("div",{class:"row"},webLink("웹으로 통합"+(n?" (새 기록 "+n+"건)":""),"btn primary","x"),webLink("통합하고 웹 열기 →","btn","s"),syncPartsHint(),h("button",{class:"btn sm ghost",onclick:()=>{S.syncFull=true;save();toast("다음 '웹으로 통합'은 전체 기록을 보내요 (링크가 길어져요)");render()}},S.syncFull?"전체 보내기 예약됨":"전체 기록 보내기"),S.syncedAt?h("span",{class:"muted small"},"마지막 전송 "+new Date(S.syncedAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})):null))}
 // web side: pick up a payload from the URL hash and merge it once signed in (or right away without an account)
 let pendingSync=null;
 let syncClose=false;
@@ -1422,7 +1422,7 @@ const ART_URL=(IS_ANDROID&&!window.claude?.use)?"intent://claude.ai/artifact/HuA
 function aiNote(){if(sample||window.claude?.use)return null;prepSyncCode();return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"프로필 입력·스크립트 생성·AI 평가·대화는 Claude 앱에서 해요. Claude 앱의 '웹으로 통합' 버튼으로 여기로 오면 최신 기록이 자동으로 합쳐집니다. 여기서는 무한 재생·마이크 연습·표현카드를 쓰세요."),h("a",{class:"btn sm",href:ART_URL,target:IS_ANDROID?"_self":"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",onclick:sendToClaude},"Claude에서 열기"))}
 // small "open in Claude" link for the web build when the AI already runs here (API mode)
 function claudeMini(){if(window.claude?.use||!sample)return null;prepSyncCode();return h("a",{class:"btn sm",href:ART_URL,target:IS_ANDROID?"_self":"_blank",rel:"noopener",title:"Claude 앱에서 열기 (최신 기록 함께 보냄)",style:"text-decoration:none;white-space:nowrap;padding:4px 10px;font-size:12px;min-height:0",onclick:sendToClaude},"Claude 모드")}
-function webNote(){if(!window.claude?.use)return null;const n=unsyncedCount();return h("div",{class:"note ai",style:"align-items:center"},h("span",{class:"grow"},"여기(Claude)의 프로필·스크립트·예시·기록을 웹 계정에 보내요. '웹으로 통합'은 저장만 하고 완료 화면을 띄우니, 그 뒤 홈 화면의 OSS 앱을 열면 반영돼 있어요."+(n?" (새 기록 "+n+"건)":"")),h("div",{class:"row",style:"gap:6px"},webLink("웹으로 통합","btn sm primary","x"),webLink("열기 →","btn sm","s")))}
+function webNote(){if(!window.claude?.use)return null;const n=unsyncedCount();return h("div",{class:"note ai",style:"align-items:center;flex-wrap:wrap"},h("span",{class:"grow",style:"min-width:220px"},"여기(Claude)의 프로필·스크립트·예시·기록을 웹 계정에 보내요. '웹으로 통합'은 저장만 하고 완료 화면을 띄우니, 그 뒤 홈 화면의 OSS 앱을 열면 반영돼 있어요."+(n?" (새 기록 "+n+"건)":"")),h("div",{class:"row",style:"gap:6px;flex-wrap:wrap"},webLink("웹으로 통합","btn sm primary","x"),webLink("열기 →","btn sm","s")),syncPartsHint())}
 
 /* ---- TODAY ---- */
 function vToday(m){if(sub&&sub.analysis)return vAnalysis(m);if(sub&&sub.history)return vHistory(m);
