@@ -9,6 +9,9 @@ body = body.replace("/*UNITS_JSON*/[]", units)
 # extra Background Survey topics live in tools/survey_more.json
 smore = json.dumps(json.loads((root / "tools/survey_more.json").read_text(encoding="utf-8")), ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
 body = body.replace("/*SURVEY_MORE*/[]", smore)
+# word cards live in tools/words.json
+words = json.dumps(json.loads((root / "tools/words.json").read_text(encoding="utf-8")), ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+body = body.replace("/*WORDS_JSON*/[]", words)
 head = """<!doctype html>
 <html lang="ko" data-build="BUILD_ID" data-rel="REL_NO">
 <head>
