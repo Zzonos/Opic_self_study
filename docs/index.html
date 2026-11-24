@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261124-233915-697d80" data-rel="283">
+<html lang="ko" data-build="20261124-234537-bd099a" data-rel="284">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -636,15 +636,22 @@ function syncToClaude(){try{const code=curSyncCode();
   if(p&&p.then)p.then(()=>done(true),()=>done(false));else done(false);
   if(!w)toast("팝업이 차단됐어요. 브라우저에서 팝업을 허용해 주세요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
 async function importWebCode(t){t=String(t||"").trim();if(!t){toast("칸이 비어 있어요. 칸을 길게 눌러 '붙여넣기'를 선택하세요");return false}
-  try{const o=await parseCode(t);const n0=S.log.length;const sc0=JSON.stringify(S.scripts).length;mergeState(o,false);S.webImportedAt=Date.now();save();const nn=S.log.length-n0;
-    toast(nn?"웹 기록 "+nn+"건을 새로 합쳤어요"+(JSON.stringify(S.scripts).length!==sc0?" · 스크립트도 갱신":""):"합쳤어요 — 새 기록은 없었어요 (이미 최신)");render();return true}catch(e){toast("가져오기 실패: "+(e&&e.message||e));return false}}
+  try{const o=await parseCode(t);const n0=S.log.length;const sc0=JSON.stringify(S.scripts).length;
+    /* records deleted here are kept out on purpose (a deletion syncs everywhere); remember them so they can be brought back on request */
+    const dead=new Set(S.del||[]);const have=new Set(S.log.map(logKey));DEL_BLOCKED=dead.size?(o.log||[]).filter(l=>l&&logDead(dead,l)&&!have.has(logKey(l))):[];
+    mergeState(o,false);S.webImportedAt=Date.now();save();const nn=S.log.length-n0;
+    toast((nn?"웹 기록 "+nn+"건을 새로 합쳤어요"+(JSON.stringify(S.scripts).length!==sc0?" · 스크립트도 갱신":""):"합쳤어요 — 새 기록은 없었어요 (이미 최신)")+(DEL_BLOCKED.length?" · 여기서 지운 기록 "+DEL_BLOCKED.length+"건은 제외했어요":""));render();return true}catch(e){toast("가져오기 실패: "+(e&&e.message||e));return false}}
 // a box that merges by itself the moment a code is pasted
 function webPasteBox(ph){const ta=h("textarea",{autocapitalize:"off",autocorrect:"off",spellcheck:"false",rows:1,style:"min-height:44px;font-family:var(--mono);font-size:11px",placeholder:ph});let busy=false;
   const go=async()=>{const v=ta.value.trim();if(busy||v.length<20)return;busy=true;ta.disabled=true;const ok=await importWebCode(v);busy=false;ta.disabled=false;if(ok)ta.value=""};
   ta.addEventListener("paste",()=>setTimeout(go,30));ta.addEventListener("input",()=>{if(ta.value.trim().length>200)setTimeout(go,30)});return ta}
+let DEL_BLOCKED=[];
+function delRestore(){const list=DEL_BLOCKED;if(!list.length)return;const back=new Set();for(const k of S.del||[])if(list.some(l=>logDead(new Set([k]),l)))back.add(k);
+  S.del=(S.del||[]).filter(k=>!back.has(k));mergeState({log:list},false);DEL_BLOCKED=[];save();toast("지운 기록 "+list.length+"건을 되살렸어요");render()}
 function webImportCard(){if(!window.claude?.use)return null;
   return h("div",{class:"card"},h("h3",{},"웹 계정 기록 가져오기"),h("p",{class:"muted small"},"웹에서 'Claude 모드'나 '기록 코드 복사'를 누르면 기록 코드가 복사돼요. 아래 칸을 길게 눌러 붙여넣으면 바로 합쳐집니다 (기록은 양쪽 모두 남고, 스크립트·프로필은 더 최신 쪽으로). Claude 앱은 보안상 클립보드를 직접 읽지 못해 붙여넣기는 한 번 해 주셔야 해요."),
-    webPasteBox("여기를 길게 눌러 붙여넣기 → 자동으로 합쳐져요"))}
+    webPasteBox("여기를 길게 눌러 붙여넣기 → 자동으로 합쳐져요"),
+    DEL_BLOCKED.length?h("div",{class:"note",style:"align-items:center;flex-wrap:wrap;margin-top:8px"},h("span",{class:"grow",style:"min-width:200px"},"방금 붙여넣은 웹 기록 중 "+DEL_BLOCKED.length+"건은 여기서 지운 기록이라 제외했어요 ("+[...new Set(DEL_BLOCKED.map(l=>l.date))].slice(0,4).join(", ")+"). 지운 게 실수였다면 되살릴 수 있어요."),h("button",{class:"btn sm primary",onclick:delRestore},"지운 기록 "+DEL_BLOCKED.length+"건 되살리기")):null)}
 // Claude 오늘 화면 맨 위: 웹에서 넘어왔을 때 바로 붙여넣는 칸
 function webPasteNote(){if(!window.claude?.use)return null;const t=S.webImportedAt?new Date(S.webImportedAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):"";
   return h("div",{class:"note",style:"flex-direction:column;align-items:stretch;gap:6px"},h("span",{class:"small"},"🔄 웹(API 모드)에서 넘어왔다면 여기에 붙여넣기 — 바로 합쳐져요"+(t?" · 마지막 가져오기 "+t:"")),webPasteBox("길게 눌러 붙여넣기"))}
