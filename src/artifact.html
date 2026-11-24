@@ -2761,27 +2761,31 @@ let deck={cat:"all",order:[],i:0,flip:false};
 // words (tools/words.json): my own word mistakes from mock tests + frequent words for my survey topics; id "w:<word>" in S.cards
 const WORDS=/*WORDS_JSON*/[].map(w=>Object.assign({id:"w:"+w.en.toLowerCase().replace(/[^a-z]+/g,"_")},w));
 const WCAT={mine:"내가 자주 틀린 단어",work:"직장",home:"집·동네",movies:"영화",park:"공원",music:"음악",jogging:"조깅",gym:"헬스",dtravel:"국내 여행",otravel:"해외 여행",vacation:"휴가",common:"묘사·공통"};
+// advanced words for higher scores (tools/words_adv.json), id "a:<word>"
+const ADVW=/*ADV_JSON*/[].map(w=>Object.assign({id:"a:"+w.en.toLowerCase().replace(/[^a-z]+/g,"_")},w));
+const ACAT={work:"직장",home:"집·동네",movies:"영화",park:"공원",music:"음악",jogging:"조깅",gym:"헬스",dtravel:"국내 여행",otravel:"해외 여행",vacation:"휴가",describe:"묘사",feel:"감정",change:"변화·비교",opinion:"의견·논리",flow:"연결·전개",role:"롤플레이",issue:"사회 이슈 (돌발)"};
+let deckA={cat:"all",order:[],i:0,flip:false};
 let deckW={cat:"mine",order:[],i:0,flip:false};let cardKind=(()=>{try{return localStorage.getItem("oss_cardkind")||"sent"}catch(e){return "sent"}})();
 function vCards(m){
-  const isW=cardKind==="word";const D=isW?deckW:deck;
-  const all=isW?WORDS:[...CARDS,...S.custom];const cats=isW?["all",...Object.keys(WCAT).filter(k=>WORDS.some(w=>w.c===k))]:["all",...Object.keys(CAT),...(S.custom.length?["custom"]:[])];
+  const isA=cardKind==="adv",isW=cardKind==="word"||isA;const D=isA?deckA:isW?deckW:deck;const WL=isA?ADVW:WORDS,WC=isA?ACAT:WCAT;
+  const all=isW?WL:[...CARDS,...S.custom];const cats=isW?["all",...Object.keys(WC).filter(k=>WL.some(w=>w.c===k))]:["all",...Object.keys(CAT),...(S.custom.length?["custom"]:[])];
   const filtered=all.filter(c=>D.cat==="all"?true:c.c===D.cat);
   if(!D.order.length||D.order.some(id=>!filtered.find(c=>c.id===id))){D.order=pick(filtered.map(c=>c.id),filtered.length);D.i=0;D.flip=false}
-  const card=filtered.find(c=>c.id===D.order[D.i]);const known=Object.keys(S.cards).filter(k=>S.cards[k]==="known"&&(isW?k.startsWith("w:"):!k.startsWith("w:"))).length;
-  const sel=h("select",{id:"cardcat",onchange:e=>{D.cat=e.target.value;D.order=[];render()}},...cats.map(c=>h("option",{value:c,selected:D.cat===c},c==="all"?"전체 ("+all.length+")":isW?WCAT[c]+" ("+WORDS.filter(x=>x.c===c).length+")":c==="custom"?"내가 추가한 표현 ("+S.custom.length+")":CAT[c]+" ("+CARDS.filter(x=>x.c===c).length+")")));
+  const card=filtered.find(c=>c.id===D.order[D.i]);const known=Object.keys(S.cards).filter(k=>S.cards[k]==="known"&&(isA?k.startsWith("a:"):cardKind==="word"?k.startsWith("w:"):!/^[wa]:/.test(k))).length;
+  const sel=h("select",{id:"cardcat",onchange:e=>{D.cat=e.target.value;D.order=[];render()}},...cats.map(c=>h("option",{value:c,selected:D.cat===c},c==="all"?"전체 ("+all.length+")":isW?WC[c]+" ("+WL.filter(x=>x.c===c).length+")":c==="custom"?"내가 추가한 표현 ("+S.custom.length+")":CAT[c]+" ("+CARDS.filter(x=>x.c===c).length+")")));
   const fl=h("div",{class:"flash"+(D.flip?" flip":""),onclick:()=>{D.flip=!D.flip;fl.classList.toggle("flip",D.flip)}},h("div",{class:"in"},
-    isW?h("div",{class:"face"},h("span",{class:"eyebrow"},(WCAT[card?.c]||"단어")+(card?.pos?" · "+card.pos:"")),h("span",{class:"big en"},card?.en||"—"),h("span",{class:"muted small"},"뜻을 떠올려 보고 탭해서 확인")):
+    isW?h("div",{class:"face"},h("span",{class:"eyebrow"},(isA?"고급 · ":"")+(WC[card?.c]||"단어")+(card?.pos?" · "+card.pos:"")),h("span",{class:"big en"},card?.en||"—"),h("span",{class:"muted small"},"뜻을 떠올려 보고 탭해서 확인")):
     h("div",{class:"face"},h("span",{class:"eyebrow"},CAT[card?.c]||"추가 표현"),h("span",{class:"big"},card?.en||"—"),card?.ex?h("div",{class:"exb"},h("span",{class:"e"},"예) "+card.ex)):null,h("span",{class:"muted small"},"탭해서 뜻 보기")),
-    isW?h("div",{class:"face back"},h("span",{class:"big"},card?.ko||"—"),h("span",{class:"muted small en"},card?.en||""),card?.ex?h("div",{class:"exb"},h("span",{class:"e"},"예) "+card.ex),card.exko?h("span",{class:"muted"},card.exko):null):null,card?.note?h("span",{class:"small",style:"color:var(--bad)"},card.note):null,h("span",{class:"muted small"},"예문까지 소리 내어 말해 보세요")):
+    isW?h("div",{class:"face back"},h("span",{class:"big"},card?.ko||"—"),h("span",{class:"muted small en"},card?.en||""),card?.basic&&card.basic!=="-"?h("span",{class:"small",style:"color:var(--accent)"},"⬆ "+card.basic+" 대신 쓰면 좋아요"):null,card?.ex?h("div",{class:"exb"},h("span",{class:"e"},"예) "+card.ex),card.exko?h("span",{class:"muted"},card.exko):null):null,card?.note?h("span",{class:"small",style:"color:var(--bad)"},card.note):null,h("span",{class:"muted small"},"예문까지 소리 내어 말해 보세요")):
     h("div",{class:"face back"},h("span",{class:"big"},card?.ko||"—"),card?.ex?h("div",{class:"exb"},h("span",{class:"e"},"예) "+card.ex),card.exko?h("span",{class:"muted"},card.exko):null):null,card?.src?h("span",{class:"muted small"},"출처: "+card.src):null,h("span",{class:"muted small"},"소리 내어 3번 말해 보세요"))));
   const mark=v=>{if(!card)return;S.cards[card.id]=v;(S.cardsAt=S.cardsAt||{})[card.id]=Date.now();S.today.cards++;save();D.i=(D.i+1)%D.order.length;D.flip=false;render()};
-  const kindTabs=h("div",{class:"segs",style:"margin-bottom:8px"},...[["sent","문장 ("+(CARDS.length+S.custom.length)+")"],["word","단어 ("+WORDS.length+")"]].map(([k,t])=>h("button",{class:"seg"+(cardKind===k?" on":""),onclick:()=>{if(cardKind===k)return;cardKind=k;try{localStorage.setItem("oss_cardkind",k)}catch(e){}render()}},t)));
-  put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},(isW?"Words · 외운 단어 ":"Expression cards · 외운 표현 ")+known),h("h1",{},"표현카드")),h("div",{style:"min-width:170px"},sel)),kindTabs,
+  const kindTabs=h("div",{class:"segs",style:"margin-bottom:8px"},...[["sent","문장 ("+(CARDS.length+S.custom.length)+")"],["word","단어 ("+WORDS.length+")"],["adv","고급 어휘 ("+ADVW.length+")"]].map(([k,t])=>h("button",{class:"seg"+(cardKind===k?" on":""),onclick:()=>{if(cardKind===k)return;cardKind=k;try{localStorage.setItem("oss_cardkind",k)}catch(e){}render()}},t)));
+  put(m,h("div",{class:"hdr"},h("div",{},h("p",{class:"eyebrow"},(isA?"Advanced words · 외운 어휘 ":isW?"Words · 외운 단어 ":"Expression cards · 외운 표현 ")+known),h("h1",{},"표현카드")),h("div",{style:"min-width:170px"},sel)),kindTabs,
     h("p",{class:"muted small mono"},(D.i+1)+" / "+D.order.length+(card&&S.cards[card.id]==="known"?" · 외움":card&&S.cards[card.id]==="again"?" · 다시":"")),
     fl,
     h("div",{class:"row"},spkBtn(card?.en||"",null,card?.id),h("button",{class:"btn grow",onclick:()=>mark("again")},"다시 볼래요"),h("button",{class:"btn primary grow",onclick:()=>mark("known")},"외웠어요")),
     isW?null:(()=>{const u=card&&allUnits().find(x=>x.card===card.id);return u?h("details",{class:"card"},h("summary",{},"🎯 응용 문장 · 미니 답변"),...unitBody(u,null),h("div",{class:"row",style:"margin-top:8px"},h("button",{class:"btn sm primary",onclick:()=>{go("listen");unitPlay(u.id,true)}},"🔁 듣기에서 반복"))):null})(),
-    h("div",{class:"note"},isW?"앞면의 단어를 보고 뜻을 떠올린 다음 뒤집어 확인하고, 예문까지 소리 내어 읽어요. '내가 자주 틀린 단어'는 모의시험에서 실제로 틀린 것들이에요.":"카드 앞면을 보고 먼저 입으로 말한 다음 뒤집어 확인하세요. AI 피드백에서 '표현카드에 추가'를 누르면 내 표현이 여기 쌓입니다."),
+    h("div",{class:"note"},isA?"IH 이상에서 점수를 가르는 건 'good, very, a lot' 대신 상황에 딱 맞는 단어예요. 뒷면의 ⬆ 줄은 이 단어로 바꿔 쓸 수 있는 기본 표현이에요. 주제별로 2–3개씩만 골라 내 답변에 넣어 보세요.":isW?"앞면의 단어를 보고 뜻을 떠올린 다음 뒤집어 확인하고, 예문까지 소리 내어 읽어요. '내가 자주 틀린 단어'는 모의시험에서 실제로 틀린 것들이에요.":"카드 앞면을 보고 먼저 입으로 말한 다음 뒤집어 확인하세요. AI 피드백에서 '표현카드에 추가'를 누르면 내 표현이 여기 쌓입니다."),
     isW?null:(()=>{const ws=unitList().filter(x=>x.u.src==="weak");return ws.length?h("details",{class:"card"},h("summary",{},"🎯 내 약점 표현 ("+ws.length+") · 모의시험에서 자주 틀린 것"),h("div",{class:"list",style:"margin-top:8px"},...ws.map(x=>{const ms=unitMistakes(x.u);return h("div",{class:"li",style:"flex-direction:column;align-items:stretch;gap:2px"},
       h("div",{class:"row"},h("span",{class:"grow en",style:"font-weight:600"},x.u.core),h("button",{class:"btn sm ghost",onclick:()=>{go("listen");unitPlay(x.u.id,true)}},"🔁 듣기")),
       h("span",{class:"muted small"},x.u.title+(ms.length?" · 실수 "+ms.length+"회":"")),h("details",{},h("summary",{class:"small"},"내용 보기"),...unitBody(x.u,ms)))}))):null})(),
