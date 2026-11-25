@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261125-135505-38d94a" data-rel="287">
+<html lang="ko" data-build="20261125-135912-a7f22d" data-rel="288">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -2059,7 +2059,15 @@ async function lectureMake(l0,btn){if(!sample){toast(ERR.not_granted);return}con
   job.onHide=()=>lecTrace(l0,"화면 꺼짐/앱 벗어남");
   const head=`You are a warm, experienced OPIc speaking coach. You are writing part of an AUDIO LECTURE in Korean about this learner's mock test (overall ${l0.lvRaw||l0.level||"?"}, target ${tgt()}); the learner listens while working, without looking at the screen.`;
   try{for(let gi=0;gi<groups.length;gi++){L=live();if(L.lecDraft&&L.lecDraft.parts[gi])continue;prog(gi+1);
+      /* one continuous lecture written in pieces: tell each piece where it sits and how the previous piece ended */
+      const prevSecs=groups.slice(0,gi).flatMap((_,k)=>(live().lecDraft&&live().lecDraft.parts[k])||[]);const prevLast=prevSecs.length?prevSecs[prevSecs.length-1]:null;
+      const prevKo=prevLast?(prevLast.parts.filter(x=>x.ko&&!x.rep).slice(-1)[0]||{}).ko||"":"";
       const p=`${head}
+This lecture is ONE continuous talk. You are writing the MIDDLE part ${gi+1} of ${groups.length} (questions ${groups[gi][0]+1}–${groups[gi][groups[gi].length-1]+1}). The opening is already given before part 1 and the closing comes after the last part.
+${prevLast?`The previous part ended with the section "${prevLast.title}", whose last line was: ${prevKo}
+Start with a short, natural transition from there (e.g. "다음은 여섯 번째 질문이에요").`:"Start right after the opening: go straight into the first question (e.g. \"먼저 첫 번째 질문부터 볼게요\")."}
+DO NOT: greet, say 오늘/수고했어요/잘하셨어요 as a wrap-up, summarize the lecture, say 마지막으로 or 끝으로, or tell the learner what to remember from today — the closing section does that. End each section on its last teaching point.
+Section titles: "Q번호 · 짧은 주제" (e.g. "Q6 · 직장 생활 변화 비교") so numbering stays consistent across parts.
 Write the sections for these questions only (one section per question worth discussing; skip or merge solid answers; at most 3 sections). In each: say what the question asked (in Korean), quote what the learner said that was wrong, give the corrected English for the learner to repeat, explain why in Korean in one or two sentences; if the ending was weak, give a closing to repeat. About ${Math.round(9/groups.length)} minutes when read aloud in total.
 ${LEC_RULES}
 
@@ -2068,11 +2076,14 @@ ${groups[gi].map(i=>lecQText(pq[i],i)).join("\n\n")}
 Reply with ONLY JSON: {"sections":[{"title":"섹션 제목","parts":[{"ko":"..."},{"en":"..."},{"rep":"...","ko":"..."}]}]}`;
       lecTrace(l0,(gi+1)+"단계 요청");const t1=Date.now();const r=await aiRetry(()=>sample.json(p,{cache:false}),"음성 강의 "+(gi+1)+"/"+nSteps);if(stale()){lecTrace(l0,(gi+1)+"단계 응답 (이미 새로 시작돼 버림)");return}lecTrace(l0,(gi+1)+"단계 완료 "+Math.round((Date.now()-t1)/1000)+"초");
       L=live();L.lecDraft=L.lecDraft&&L.lecDraft.n===pq.length?L.lecDraft:{n:pq.length,parts:{},at:Date.now()};L.lecDraft.parts[gi]=lecNorm(r&&r.sections);L.lecDraft.at=Date.now();save()}
-    prog(nSteps);L=live();const body=groups.flatMap((_,gi)=>L.lecDraft.parts[gi]||[]);if(!body.length)throw new Error("빈 대본");
+    prog(nSteps);L=live();const body=groups.flatMap((_,gi)=>L.lecDraft.parts[gi]||[]).map(sec=>({title:sec.title,parts:sec.parts.filter(x=>!(x.ko&&!x.rep&&/수고(했|하셨|많)|오늘 (공부|강의)는 여기까지|오늘은 .{0,20}(만|두 가지|세 가지).{0,6}기억하세요/.test(x.ko)))}));if(!body.length)throw new Error("빈 대본");
     const reps=body.flatMap(x=>x.parts.filter(p=>p.rep).map(p=>p.rep)).slice(0,30);const pat=(l0.pat||[]).map(x=>`- ${x.issue}${x.ex?" | "+x.ex:""}${x.fix?" | "+x.fix:""}`).join("\n");
     const p2=`${head}
-The question-by-question sections are already written. Now write the OPENING and the CLOSING, and a short title.
-- 오프닝: overall result in one or two sentences and the 2-3 habits to fix first${pat?" (use the repeated mistakes below)":""}.
+The question-by-question sections are already written (titles below, in order). Now write the OPENING and the CLOSING, and a short title.
+- 오프닝: overall result in one or two sentences and the 2-3 habits to fix first${pat?" (use the repeated mistakes below)":""} — they must be habits that the sections below actually cover. End with one line that leads into the first section.
+- The closing is the only place for a wrap-up, praise and encouragement.
+Sections in order:
+${body.map(x=>"- "+x.title).join("\n")}
 - 마무리: the 3-5 most useful English sentences from today (pick from the list below) to repeat once more, and one line of encouragement.
 ${LEC_RULES}
 ${pat?"Repeated mistakes:\n"+pat+"\n":""}${l0.sum?"Overall comment: "+l0.sum+"\n":""}Sentences used in the lecture:
@@ -2252,7 +2263,8 @@ function lectureBox(l0){if(!l0||l0.kind!=="mock"||!(l0.pq||[]).length)return nul
     h("p",{class:"muted small"},"아직 음성 강의가 없어요. 자세한 피드백은 있으니 강의만 만들 수 있어요 (네 단계, 단계마다 저장돼요)."),lecStatusLine(l0),(l0.lecLog||[]).length?h("details",{},h("summary",{class:"small"},"진행 기록 ("+l0.lecLog.length+")"),h("pre",{class:"small mono",style:"white-space:pre-wrap;font-size:11px;margin:4px 0"},l0.lecLog.join("\n"))):null,
     h("div",{class:"row"},recBusy(l0.ts)?busyBtn(l0.ts,"primary"):h("button",{class:"btn primary sm",onclick:e=>{lectureMake(S.log.find(y=>y.ts===l0.ts)||l0,e.currentTarget).then(()=>unitsFromMock()).catch(()=>{})}},l0.lecDraft?"강의 이어서 만들기":"강의만 만들기")))}
   return h("div",{class:"card"},h("h3",{},"🎧 "+lec.title),h("p",{class:"muted small"},"약 "+lectureMins(lec)+"분 · "+lec.secs.length+"개 파트 · 화면을 꺼도 이어서 재생돼요 (웹)"),
-    h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>lecturePlay(l0)},"▶ 강의 듣기"),window.claude?.use?webLink("웹 앱에서 듣기 →","btn","l"):null,null),
+    h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>lecturePlay(l0)},"▶ 강의 듣기"),window.claude?.use?webLink("웹 앱에서 듣기 →","btn","l"):null,
+      CLAUDE_ONLY()&&(l0.pq||[]).some(q=>q&&(q.fx||q.t))?(recBusy(l0.ts)?busyBtn(l0.ts):h("button",{class:"btn sm ghost",title:"피드백은 그대로 두고 강의 대본만 새로 써요",onclick:e=>{const x=S.log.find(y=>y.ts===l0.ts)||l0;delete x.lecDraft;lectureMake(x,e.currentTarget).catch(()=>{})}},"↻ 강의만 다시 만들기")):null),
     h("details",{},h("summary",{class:"small"},"대본 보기"),...lec.secs.map((x,i)=>h("div",{style:"margin-top:8px"},h("p",{class:"small",style:"font-weight:600"},h("button",{class:"btn sm ghost",onclick:()=>lecturePlay(l0,i)},"▶"),(i+1)+". "+x.title),
       ...x.parts.map(p=>p.rep?h("p",{class:"small",style:"color:var(--accent)"},"🗣 "+p.rep+(p.ko?" — "+p.ko:"")):p.en?h("p",{class:"small mono"},p.en):h("p",{class:"small"},p.ko))))))}
 async function vMockResult(m){
