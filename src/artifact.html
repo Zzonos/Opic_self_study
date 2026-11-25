@@ -2154,6 +2154,16 @@ async function lecPrebuild(){if(LECBG.on||!WEB||!TTS_URL||!navigator.onLine)retu
     catch(e){LECBG.err="음성 만들기 실패: "+String(e.message||e).slice(0,60);audLog.push("강의 미리 만들기 실패: "+(e.message||e))}
     LECBG.done++}
   LECBG.on=false;LECBG.cur="";LECBG.curKey="";lecBgUpd();lecGC()}
+// check the lecture files saved on this device: which speeds they were voiced at, and the measured Korean / English speaking rate
+async function lecCheck(){const cache=await caches.open("oss-clips");const keys=(await cache.keys()).map(r=>new URL(r.url).pathname).filter(p=>/^\/lec\/\d+_v4_[\d.]+_[\d.]+_\w$/.test(p));
+  const rows=["현재 설정: 한국어 "+lecKo().toFixed(1)+"배 (서버 "+pct(lecKo(),LEC_BASE.ko)+") · 영어 "+lecEn().toFixed(1)+"배 (서버 "+pct(lecEn(),LEC_BASE.en)+") · 전체 배속 "+lecRate()+"배","앱 기본 1배 = 한국어 서버 -5% · 영어 서버 -8%"];
+  if(!keys.length){rows.push("이 기기에 저장된 강의 음성 파일이 없어요");return rows}
+  for(const k of keys){const m=k.match(/^\/lec\/(\d+)_v4_([\d.]+)_([\d.]+)_(\w)$/);if(!m){rows.push(k);continue}
+    const l=S.log.find(x=>x.lec&&String(x.lec.ts)===m[1]);let meta=null;try{const r=await cache.match(k+"_m");meta=r&&await r.json()}catch(e){}
+    let ks=0,kt=0,es=0,et=0;const L=(meta&&meta.lines)||[];for(let i=0;i+1<L.length;i++){const x=L[i],d=L[i+1].t-x.t;if(!(d>0.3&&d<30))continue;const hn=(x.s.match(/[가-힣]/g)||[]).length;if(hn>8&&!x.rep&&L[i+1]&&/[가-힣]/.test(L[i+1].s)&&!L[i+1].rep){ks+=hn;kt+=d}}
+    const sz=await (await cache.match(k)).blob().then(b=>b.size).catch(()=>0);
+    rows.push((l?(l.date||"")+" "+(l.lec.title||""):"(지워진 강의 "+m[1]+")")+" → 한국어 "+(+m[2]).toFixed(1)+"배 · 영어 "+(+m[3]).toFixed(1)+"배로 만든 파일"+(kt?" · 실측 한국어 "+(ks/kt).toFixed(1)+"음절/초":"")+(meta&&meta.dur?" · "+Math.round(meta.dur/60)+"분":"")+" · "+(sz/1048576).toFixed(1)+"MB")}
+  rows.push("참고: 앱 기본 1배 한국어는 약 5.3음절/초, 1.1배는 약 5.8, 1.2배는 약 6.4음절/초예요 (문장 사이 쉼 포함 시 조금 낮게 나와요)");return rows}
 // storage cleanup: keep only the finished file of each current lecture (current speed/voice).
 // Removes files of rewritten or deleted lectures, files at old speeds/voices, and the per-sentence pieces once a lecture's full file exists.
 async function lecGC(){if(LECBG.on||Object.keys(LECP).length||!self.caches)return;let cache;try{cache=await caches.open("oss-clips")}catch(e){return}
@@ -2729,6 +2739,7 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
   const lectureOpts=[h("div",{class:"row"},h("label",{class:"f"},"한 강의 반복",h("select",{onchange:e=>{o.lrep=+e.target.value;saveO()}},...[1,2,3,5,0].map(v=>h("option",{value:v,selected:lecRep()===v},v?v+"번":"무한")))),
       h("label",{class:"f"},"끝나면",h("select",{onchange:e=>{o.lorder=e.target.value;saveO()}},...[["seq","다음 강의 (차례대로)"],["rand","다음 강의 (무작위)"],["stop","멈춤"]].map(([v,t])=>h("option",{value:v,selected:(o.lorder||"seq")===v},t))))),
     h("p",{class:"eyebrow"},"모의시험 음성 강의 "+withL.length+"개"),WEB&&withL.length?h("div",{id:"lecbg",style:"margin:-2px 0 6px"},lecBgStatus()):null,
+    WEB&&withL.length?h("div",{style:"margin:0 0 8px"},h("button",{class:"btn sm ghost",onclick:async e=>{const b=e.currentTarget;b.disabled=true;b.textContent="확인 중…";const box=$("#leccheck");try{box.replaceChildren(...(await lecCheck()).map(t=>h("div",{},t)))}catch(x){box.textContent="확인 실패: "+(x.message||x)}b.disabled=false;b.textContent="🔍 저장된 강의 음성 확인"}},"🔍 저장된 강의 음성 확인"),h("div",{id:"leccheck",class:"small muted",style:"margin-top:4px"})):null,
     withL.length?h("div",{class:"list"},...withL.map(lecRow)):h("p",{class:"muted small"},"아직 만든 강의가 없어요. 아래 모의시험에서 만들거나, 모의시험 결과·기록 화면의 '🎧 음성 강의 만들기'를 누르세요."),
     noL.length?h("div",{},h("p",{class:"eyebrow",style:"margin-top:10px"},"강의가 없는 모의시험"),...noL.map(l=>h("div",{class:"row",style:"margin-top:6px"},h("span",{class:"grow small"},l.date+" · "+(l.title||"모의시험")+(l.lvRaw||l.level?" · "+(l.lvRaw||l.level):"")),
       CLAUDE_ONLY()?(()=>{const hasD=(l.pq||[]).some(q=>q&&(q.fx||q.t));if(recBusy(l.ts))return busyBtn(l.ts);return h("button",{class:"btn sm",onclick:e=>{const x=S.log.find(y=>y.ts===l.ts)||l;if(hasD){lectureMake(x,e.currentTarget).then(()=>unitsFromMock()).catch(()=>{})}else mockDetail(x,x,e.currentTarget)}},hasD?(l.lecDraft?"강의 이어서 만들기":"강의 만들기"):"피드백 + 강의 만들기")})():null,
