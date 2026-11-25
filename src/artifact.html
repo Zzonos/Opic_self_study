@@ -2689,10 +2689,9 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
         h("button",{class:"btn sm ghost",onclick:()=>unitEasy(u.id,!easy)},easy?"↩ 다시 자주 듣기":"익숙해요 ✓")),
       h("details",{},h("summary",{class:"small"},"내용 보기"),...unitBody(u,ms)))};
   const nCardTodo=unitCardsTodo().length,nUncov=unitUncovered().length;
+  const speedSel=()=>WEB?h("label",{class:"f"},"배속",h("select",{onchange:e=>{player.opts.lecX=+e.target.value;saveO();const it=player.items[player.i];if(player.on&&it&&(it.kind==="LF"||it.kind==="UF")&&AUD.el){AUD.el.playbackRate=lecRate();try{AUD.el.preservesPitch=true}catch(x){}}renderMini()}},...[0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.75,2].map(v=>h("option",{value:v,selected:lecRate()===v},v+"배")))):null;
   const sentOpts=[o.uonly&&ownTab()?h("div",{class:"note",style:"align-items:center"},h("span",{class:"grow"},"🔁 한 표현만 반복 중"),h("button",{class:"btn sm",onclick:()=>playerStart(false)},"▶ 전체 듣기")):null,
-    h("div",{class:"row"},h("label",{class:"f"},"한 표현 반복",h("select",{onchange:e=>{o.urep=+e.target.value;saveO()}},...[1,2,3,5,0].map(v=>h("option",{value:v,selected:unitRep()===v},v?v+"번 듣고 다음":"무한 (다음 누를 때까지)")))),
-      WEB?h("label",{class:"f"},"한국어 속도",h("select",{onchange:e=>{o.lecKo=+e.target.value;saveO();toast("다음 표현부터 적용돼요");setTimeout(()=>lecPrebuild(),3000)}},...[0.9,1,1.1,1.2,1.3,1.4,1.5].map(v=>h("option",{value:v,selected:lecKo()===v},v.toFixed(1)+"배")))):null,
-      WEB?h("label",{class:"f"},"영어 속도",h("select",{onchange:e=>{o.lecEn=+e.target.value;saveO();toast("다음 표현부터 적용돼요");setTimeout(()=>lecPrebuild(),3000)}},...[0.8,0.9,1,1.1,1.2].map(v=>h("option",{value:v,selected:lecEn()===v},v.toFixed(1)+"배")))):null),
+    h("div",{class:"row"},h("label",{class:"f"},"한 표현 반복",h("select",{onchange:e=>{o.urep=+e.target.value;saveO()}},...[1,2,3,5,0].map(v=>h("option",{value:v,selected:unitRep()===v},v?v+"번 듣고 다음":"무한 (다음 누를 때까지)")))),speedSel()),
     WEB?h("div",{id:"unitbg",class:"small muted",style:"margin:2px 0 6px"},unitBgStatus()):null,
     h("p",{class:"eyebrow",style:"margin-top:6px"},"내 약점 표현 "+UL.length+"개 · 약한 순서"),
     h("div",{class:"list"},...UL.map(urow)),
@@ -2727,7 +2726,7 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
     h("span",{class:"muted small"},l.date+" · "+(l.title||"모의시험")+(l.lvRaw||l.level?" · "+(l.lvRaw||l.level):"")+(WEB?" · ":""),WEB?h("span",{"data-lecready":lecKey(l.lec)},LECBG.ready[lecKey(l.lec)]?"🔊 음성 준비됨":"음성 준비 전"):null),
     h("details",{},h("summary",{class:"small"},"파트 고르기"),...l.lec.secs.map((x,i)=>h("div",{class:"row",style:"margin-top:6px"},h("button",{class:"btn sm ghost",onclick:()=>lecturePlay(l,i)},"▶"),h("span",{class:"small"},(i+1)+". "+x.title)))),
     LEC_MISS[l.lec.ts]&&LEC_MISS[l.lec.ts].size?h("span",{class:"small",style:"color:var(--bad)"},"⚠️ 음성을 받지 못한 문장 "+LEC_MISS[l.lec.ts].size+"개 — 재생 중 대본에 빨간색으로 표시돼요"):null)};
-  const lectureOpts=[h("div",{class:"row"},h("label",{class:"f"},"한 강의 반복",h("select",{onchange:e=>{o.lrep=+e.target.value;saveO()}},...[1,2,3,5,0].map(v=>h("option",{value:v,selected:lecRep()===v},v?v+"번":"무한")))),
+  const lectureOpts=[h("div",{class:"row"},h("label",{class:"f"},"한 강의 반복",h("select",{onchange:e=>{o.lrep=+e.target.value;saveO()}},...[1,2,3,5,0].map(v=>h("option",{value:v,selected:lecRep()===v},v?v+"번":"무한")))),speedSel(),
       h("label",{class:"f"},"끝나면",h("select",{onchange:e=>{o.lorder=e.target.value;saveO()}},...[["seq","다음 강의 (차례대로)"],["rand","다음 강의 (무작위)"],["stop","멈춤"]].map(([v,t])=>h("option",{value:v,selected:(o.lorder||"seq")===v},t))))),
     h("p",{class:"eyebrow"},"모의시험 음성 강의 "+withL.length+"개"),WEB&&withL.length?h("div",{id:"lecbg",style:"margin:-2px 0 6px"},lecBgStatus()):null,
     withL.length?h("div",{class:"list"},...withL.map(lecRow)):h("p",{class:"muted small"},"아직 만든 강의가 없어요. 아래 모의시험에서 만들거나, 모의시험 결과·기록 화면의 '🎧 음성 강의 만들기'를 누르세요."),
@@ -2735,8 +2734,7 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
       CLAUDE_ONLY()?(()=>{const hasD=(l.pq||[]).some(q=>q&&(q.fx||q.t));if(recBusy(l.ts))return busyBtn(l.ts);return h("button",{class:"btn sm",onclick:e=>{const x=S.log.find(y=>y.ts===l.ts)||l;if(hasD){lectureMake(x,e.currentTarget).then(()=>unitsFromMock()).catch(()=>{})}else mockDetail(x,x,e.currentTarget)}},hasD?(l.lecDraft?"강의 이어서 만들기":"강의 만들기"):"피드백 + 강의 만들기")})():null,
       lecStatusLine(l),false&&l.lecErr?h("div",{class:"small",style:"flex-basis:100%;color:var(--bad)"},"⚠️ 지난번 강의 만들기 실패 ("+new Date(l.lecErr.t).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})+") · "+l.lecErr.m+(l.lecErr.bg?" · 만드는 중에 앱을 벗어났어요":"")):null))):null,
     CLAUDE_ONLY()?null:h("p",{class:"muted small"},"강의 만들기는 Claude 앱에서만 돼요. 만든 강의는 '웹으로 통합'하면 여기서도 들을 수 있어요."),
-    WEB?h("div",{class:"row"},h("label",{class:"f"},"전체 배속",h("select",{onchange:e=>{player.opts.lecX=+e.target.value;saveO();const it=player.items[player.i];if(player.on&&it&&(it.kind==="LF"||it.kind==="UF")&&AUD.el){AUD.el.playbackRate=lecRate();try{AUD.el.preservesPitch=true}catch(x){}}renderMini()}},...[0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.75,2].map(v=>h("option",{value:v,selected:lecRate()===v},v+"배"))))):null,
-    WEB?h("p",{class:"muted small"},"강의 음성은 한국어 "+lecKo().toFixed(1)+"배 · 영어 "+lecEn().toFixed(1)+"배로 고정해서 만들어요. 전체 배속은 만들어 둔 음성을 빠르게/느리게 재생해서 바로 적용돼요."):null,
+    WEB?h("p",{class:"muted small"},"강의 음성은 한국어 "+lecKo().toFixed(1)+"배 · 영어 "+lecEn().toFixed(1)+"배로 고정해서 만들어요. 배속은 만들어 둔 음성을 빠르게/느리게 재생해서 바로 적용돼요."):null,
     WEB?null:h("div",{class:"note",style:"flex-direction:column;align-items:stretch;gap:6px"},h("span",{},"Claude 앱 안에서는 휴대폰 기본 음성으로 읽어서, 화면이 꺼지거나 다른 앱으로 가면 멈춰요(돌아오면 이어서 재생). 일하면서 들으려면 웹 앱에서 들으세요 — 기록과 강의가 같이 넘어가요."),window.claude?.use?webLink("웹 앱에서 듣기 →","btn primary","l"):null),
     h("div",{class:"note"},"한국어 설명 → 영어 → 따라 말할 시간 순서로 나와요. 정한 횟수만큼 반복한 뒤 다음 강의로 넘어가요. 중간에 다른 걸 들으면 다음에는 처음부터 나와요. 웹에서는 화면을 꺼도 이어서 재생되고, 잠금화면에서 다음 파트로 넘길 수 있어요.")];
   const own=ownTab();const lecMode=o.mode==="lecture";if((lecMode||o.mode==="sent")&&own&&player.lecTs)setTimeout(()=>lecMark(true),80);if((lecMode||o.mode==="sent")&&WEB)setTimeout(()=>lecPrebuild(),1500);
