@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261124-234832-47ec86" data-rel="285">
+<html lang="ko" data-build="20261125-134937-4e1b6c" data-rel="286">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -158,6 +158,7 @@ svg.chart{width:100%;height:auto;display:block}
 .mini{position:fixed;left:0;right:0;bottom:calc(58px + env(safe-area-inset-bottom,0px));background:var(--accent);color:var(--accent-ink);padding:8px 14px;display:flex;align-items:center;gap:10px;z-index:6;font-size:13px}
 .mini .now{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mini button{background:rgba(255,255,255,.18);border:0;color:inherit;border-radius:8px;padding:0;width:38px;height:34px;display:inline-grid;place-items:center;cursor:pointer;flex:none}
+.lsl.cur,.lsl.cur *{color:#1d1d1b!important}
 .mini.lec{gap:6px;padding:8px 10px}.mini.lec button{width:34px}
 .mini button svg{width:18px;height:18px;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;fill:none}
 @media (min-width:900px){.mini{left:112px;bottom:0;padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))}}
@@ -2194,7 +2195,7 @@ function lecRetryMiss(lec,items){const id=lec.ts+"_"+lecKo()+"_"+lecEn();if(lecR
 const lecRate=()=>1;
 function lecMark(jump){const it=player.items[player.i];if(!player.on||!it||(it.kind!=="LF"&&it.kind!=="UF"))return;const a=AUD.el;const t=a&&a.currentTime||0;let k=-1;(it.lines||[]).forEach((x,i)=>{if(x.t<=t+0.2)k=i});
   for(const box of document.querySelectorAll('.lecscript[data-ts="'+player.lecTs+'"]')){const prev=box.querySelector(".lsl.cur");const cur=box.querySelector('.lsl[data-li="'+k+'"]');if(prev===cur&&!jump)continue;
-    if(prev){prev.classList.remove("cur");prev.style.background="";prev.style.boxShadow=""}if(cur){cur.classList.add("cur");cur.style.background="var(--card,#fff)";cur.style.boxShadow="inset 4px 0 0 var(--accent)";if(box.offsetParent){const d=cur.getBoundingClientRect().top-box.getBoundingClientRect().top;box.scrollTop=Math.max(0,box.scrollTop+d-box.clientHeight/3)}}}}
+    if(prev){prev.classList.remove("cur");prev.style.background="";prev.style.boxShadow=""}if(cur){cur.classList.add("cur");cur.style.background="#fff3b0";cur.style.boxShadow="inset 4px 0 0 #d99a00";if(box.offsetParent){const d=cur.getBoundingClientRect().top-box.getBoundingClientRect().top;box.scrollTop=Math.max(0,box.scrollTop+d-box.clientHeight/3)}}}}
 // lecture script shown inside the green now-playing box: one scrolling list, the line being heard is marked and kept in view
 function lecScriptBox(l,onPart){const miss=LEC_MISS[l.lec.ts];let li=0;onPart=onPart||(i=>lecturePlay(l,i));
   const row=(t,el)=>h("div",{class:"lsl","data-li":li++,style:"padding:3px 6px;border-radius:6px"+(miss&&miss.has(t)?";border-left:3px solid var(--bad)":"")},el,miss&&miss.has(t)?h("span",{class:"small",style:"color:var(--bad)"},"⚠️ 이 문장은 음성을 받지 못해 빠졌어요"):null);
