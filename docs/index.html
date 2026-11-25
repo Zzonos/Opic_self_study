@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261125-140451-16e33c" data-rel="290">
+<html lang="ko" data-build="20261125-140656-d45a22" data-rel="291">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -2753,10 +2753,8 @@ function vPlayer(){const o=player.opts;o.mtopics=o.mtopics||[];const saveO=()=>{
       CLAUDE_ONLY()?(()=>{const hasD=(l.pq||[]).some(q=>q&&(q.fx||q.t));if(recBusy(l.ts))return busyBtn(l.ts);return h("button",{class:"btn sm",onclick:e=>{const x=S.log.find(y=>y.ts===l.ts)||l;if(hasD){lectureMake(x,e.currentTarget).then(()=>unitsFromMock()).catch(()=>{})}else mockDetail(x,x,e.currentTarget)}},hasD?(l.lecDraft?"강의 이어서 만들기":"강의 만들기"):"피드백 + 강의 만들기")})():null,
       lecStatusLine(l),false&&l.lecErr?h("div",{class:"small",style:"flex-basis:100%;color:var(--bad)"},"⚠️ 지난번 강의 만들기 실패 ("+new Date(l.lecErr.t).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})+") · "+l.lecErr.m+(l.lecErr.bg?" · 만드는 중에 앱을 벗어났어요":"")):null))):null,
     CLAUDE_ONLY()?null:h("p",{class:"muted small"},"강의 만들기는 Claude 앱에서만 돼요. 만든 강의는 '웹으로 통합'하면 여기서도 들을 수 있어요."),
-    WEB?h("div",{class:"row"},h("label",{class:"f"},"한국어 속도",h("select",{onchange:e=>{player.opts.lecKo=+e.target.value;saveO();if(player.on&&player.lecture)toast("다음 재생부터 적용돼요");setTimeout(()=>{lecPrebuild().then(()=>{if(view==="listen")lecBgUpd()})},3000);lecBgUpd()}},...[0.9,1,1.1,1.2,1.3,1.4,1.5].map(v=>h("option",{value:v,selected:lecKo()===v},v.toFixed(1)+"배")))),
-      h("label",{class:"f"},"영어 속도",h("select",{onchange:e=>{player.opts.lecEn=+e.target.value;saveO();if(player.on&&player.lecture)toast("다음 재생부터 적용돼요");setTimeout(()=>{lecPrebuild().then(()=>{if(view==="listen")lecBgUpd()})},3000);lecBgUpd()}},...[0.8,0.9,1,1.1,1.2].map(v=>h("option",{value:v,selected:lecEn()===v},v.toFixed(1)+"배")))),
-      h("label",{class:"f"},"전체 배속",h("select",{onchange:e=>{player.opts.lecX=+e.target.value;saveO();const it=player.items[player.i];if(player.on&&it&&(it.kind==="LF"||it.kind==="UF")&&AUD.el){AUD.el.playbackRate=lecRate();try{AUD.el.preservesPitch=true}catch(x){}}renderMini()}},...[0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.75,2].map(v=>h("option",{value:v,selected:lecRate()===v},v+"배"))))):null,
-    WEB?h("p",{class:"muted small"},"전체 배속은 만들어 둔 음성을 빠르게/느리게 재생해서 바로 적용돼요(새로 안 만듦). 한국어·영어 속도는 둘 사이 비율을 바꾸는 설정이라, 바꾸면 그 속도로 음성을 새로 만들어요."):null,
+    WEB?h("div",{class:"row"},h("label",{class:"f"},"전체 배속",h("select",{onchange:e=>{player.opts.lecX=+e.target.value;saveO();const it=player.items[player.i];if(player.on&&it&&(it.kind==="LF"||it.kind==="UF")&&AUD.el){AUD.el.playbackRate=lecRate();try{AUD.el.preservesPitch=true}catch(x){}}renderMini()}},...[0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.75,2].map(v=>h("option",{value:v,selected:lecRate()===v},v+"배"))))):null,
+    WEB?h("p",{class:"muted small"},"강의 음성은 한국어 "+lecKo().toFixed(1)+"배 · 영어 "+lecEn().toFixed(1)+"배로 고정해서 만들어요. 전체 배속은 만들어 둔 음성을 빠르게/느리게 재생해서 바로 적용돼요."):null,
     WEB?null:h("div",{class:"note",style:"flex-direction:column;align-items:stretch;gap:6px"},h("span",{},"Claude 앱 안에서는 휴대폰 기본 음성으로 읽어서, 화면이 꺼지거나 다른 앱으로 가면 멈춰요(돌아오면 이어서 재생). 일하면서 들으려면 웹 앱에서 들으세요 — 기록과 강의가 같이 넘어가요."),window.claude?.use?webLink("웹 앱에서 듣기 →","btn primary","l"):null),
     h("div",{class:"note"},"한국어 설명 → 영어 → 따라 말할 시간 순서로 나와요. 정한 횟수만큼 반복한 뒤 다음 강의로 넘어가요. 중간에 다른 걸 들으면 다음에는 처음부터 나와요. 웹에서는 화면을 꺼도 이어서 재생되고, 잠금화면에서 다음 파트로 넘길 수 있어요.")];
   const own=ownTab();const lecMode=o.mode==="lecture";if((lecMode||o.mode==="sent")&&own&&player.lecTs)setTimeout(()=>lecMark(true),80);if((lecMode||o.mode==="sent")&&WEB)setTimeout(()=>lecPrebuild(),1500);
