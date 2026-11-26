@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261126-202708-68d012" data-rel="298">
+<html lang="ko" data-build="20261126-203840-c8cf65" data-rel="299">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -522,7 +522,7 @@ function dedupeLog(){const by=new Map();let n=0;const keep=[];
     for(const f of ["lec","pat","pron","model","str"])if(win[f]==null&&lose[f]!=null)win[f]=lose[f];
     if(!(win.pq||[]).some(q=>q&&(q.fx||q.t))&&(lose.pq||[]).some(q=>q&&(q.fx||q.t))){win.pq=lose.pq;win.pat=win.pat||lose.pat}
     if(!win.a&&lose.a)win.a=lose.a;
-    const rg=(lose.regAt||0)>(win.regAt||0)?lose:null;if(rg){for(const f of RATING_F)if(rg[f]!=null)win[f]=rg[f];
+    const rg=(lose.regAt||0)>(win.regAt||0)?lose:null;if(rg){for(const f of [...RATING_F,...(win.kind==="practice"?["str","model","fixes"]:[])])if(rg[f]!=null)win[f]=rg[f];
       if(win.pq&&rg.pq)win.pq=win.pq.map((q,i)=>rg.pq[i]?Object.assign({},q,{l:rg.pq[i].l,c:rg.pq[i].c||q.c}):q)}
     if(win!==cur){keep[keep.indexOf(cur)]=win;by.set(k,win)}}
   if(n){S.log=keep;audLog.push("같은 기록 "+n+"건 하나로 합침")}return n}
@@ -531,7 +531,9 @@ function mergeState(o,fromCloud){if(!o||typeof o!=="object")return;mergeUsage(o.
   setTimeout(()=>{if(dedupeLog()){save();render()}},0);
   if(Array.isArray(o.del)&&o.del.length){const d=new Set(S.del||[]);o.del.forEach(k=>d.add(k));S.del=[...d].slice(-3000)}const dead=new Set(S.del||[]);if(dead.size)S.log=S.log.filter(l=>!logDead(dead,l));
   const seen=new Set([...S.log.map(key),...dead]);const byKey=new Map(S.log.map(l=>[key(l),l]));
-  for(const l of (o.log||[])){if(logDead(dead,l))continue;const k=key(l);if(!seen.has(k)){S.log.push(l);seen.add(k);continue}const cur=byKey.get(k);const hasDet2=x=>!!(x&&(x.pq||[]).some(q=>q&&(q.fx||q.t)));if(cur&&((l.detAt||0)>(cur.detAt||0)||hasDet2(l)&&!hasDet2(cur)||l.lec&&!cur.lec)){const keepRate=(cur.regAt||0)>(l.regAt||0)?RATING_F.reduce((o,f)=>(o[f]=cur[f],o),{}):null;for(const f of ["pq","pat","fixes","detAt","level","lvRaw","lvPrev","score","sum","tier","perq","regAt","lec"])if(l[f]!=null)cur[f]=l[f];if(keepRate){Object.assign(cur,keepRate);if(cur.pq&&keepRate.perq)cur.pq=cur.pq.map((q,i)=>keepRate.perq[i]?Object.assign({},q,{l:keepRate.perq[i].level||q.l}):q)}if(l.a&&(!cur.a||l.a.length>cur.a.length))cur.a=l.a}}S.log.sort((a,b)=>a.date<b.date?-1:1);
+  for(const l of (o.log||[])){if(logDead(dead,l))continue;const k=key(l);if(!seen.has(k)){S.log.push(l);seen.add(k);continue}const cur=byKey.get(k);const hasDet2=x=>!!(x&&(x.pq||[]).some(q=>q&&(q.fx||q.t)));if(cur&&((l.detAt||0)>(cur.detAt||0)||hasDet2(l)&&!hasDet2(cur)||l.lec&&!cur.lec)){const keepRate=(cur.regAt||0)>(l.regAt||0)?RATING_F.reduce((o,f)=>(o[f]=cur[f],o),{}):null;for(const f of ["pq","pat","fixes","detAt","level","lvRaw","lvPrev","score","sum","tier","perq","regAt","lec"])if(l[f]!=null)cur[f]=l[f];if(keepRate){Object.assign(cur,keepRate);if(cur.pq&&keepRate.perq)cur.pq=cur.pq.map((q,i)=>keepRate.perq[i]?Object.assign({},q,{l:keepRate.perq[i].level||q.l}):q)}if(l.a&&(!cur.a||l.a.length>cur.a.length))cur.a=l.a}
+    // a newer re-grade / re-analysis (regAt) wins for the rating fields even when the details did not change
+    else if(cur&&(l.regAt||0)>(cur.regAt||0)){for(const f of [...RATING_F,"str","model","fixes"])if(l[f]!=null)cur[f]=l[f];if(cur.pq&&l.pq)cur.pq=cur.pq.map((q,i)=>l.pq[i]?Object.assign({},q,{l:l.pq[i].l||q.l,c:l.pq[i].c||q.c,b:l.pq[i].b||q.b}):q);if(l.a&&(!cur.a||l.a.length>cur.a.length))cur.a=l.a}}S.log.sort((a,b)=>a.date<b.date?-1:1);
   // newer wins (exact time when known); a record sent from Claude also wins a tie, since scripts are made there
   const stamp=x=>x?(x.ts||(x.date?Date.parse(x.date):0)||0):0;const newer=(v,cur)=>!cur||stamp(v)>stamp(cur)||(!fromCloud&&stamp(v)===stamp(cur)&&JSON.stringify(v)!==JSON.stringify(cur));
   for(const [k,v] of Object.entries(o.scripts||{}))if(newer(v,S.scripts[k]))S.scripts[k]=v;
@@ -549,7 +551,9 @@ function ensureToday(){if(S.today.date!==todayStr()){S.today={date:todayStr(),ca
 const WEB_URL="https://zzonos.github.io/Opic_self_study/";
 const b64u=b=>{const u=new Uint8Array(b);let bin="";for(let i=0;i<u.length;i+=0x8000)bin+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")};
 const unb64u=t=>{t=t.replace(/-/g,"+").replace(/_/g,"/");t+="=".repeat((4-t.length%4)%4);const bin=atob(t);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u};
-function syncPayload(){if(!window.claude?.use&&!S.webFull283){S.webFull283=true;S.syncFull=true;try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}
+// one-time: practice re-analyses made with v298 were skipped by the web merge; mark them changed so the next '웹으로 통합' carries them again
+function fixPracRegrade(){if(S.pracFix299)return;S.pracFix299=true;const now=Date.now();for(const l of S.log)if(l&&l.kind==="practice"&&l.regAt&&!l.detAt)l.detAt=now}
+function syncPayload(){fixPracRegrade();if(!window.claude?.use&&!S.webFull283){S.webFull283=true;S.syncFull=true;try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}
   if(!S.syncedAt||S.syncFull)return fullPayload();
   /* only what changed since the last completed send (2 minute margin); a record counts as changed when feedback, a lecture or polished answers were added */
   const since=S.syncedAt-120e3;const st=x=>x?(x.ts||(x.date?Date.parse(x.date):0)||0):0;
@@ -2035,7 +2039,7 @@ async function practiceRegrade(l0,l,btn){if(!sample){toast(ERR.not_granted);retu
   try{const r=await aiRetry(()=>evaluate(l.q,a,l.secs||Math.round(a.split(/\s+/).length/2.3),({text})=>{btn.textContent="다시 분석 중… "+(text||"").length+"자"},l.pron||null),"질문연습 분석");
     if(!r||!r.level)throw new Error("빈 응답");
     l0.lvPrev=l0.lvPrev||(l.lvRaw||l.level);l0.level=lvNorm(r.level)||r.level;l0.lvRaw=r.level;l0.score=r.score;l0.sum=r.summary||"";l0.str=(r.strengths||[]).slice(0,3);
-    l0.model=r.model_target||l0.model||"";l0.fixes=(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}));l0.tier=r._tier;l0.regAt=Date.now();
+    l0.model=r.model_target||l0.model||"";l0.fixes=(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}));l0.tier=r._tier;l0.regAt=Date.now();l0.detAt=Date.now();
     if(r.model_target){S.models=S.models||{};S.models[l.q]=r.model_target;S.modelsAt=S.modelsAt||{};S.modelsAt[l.q]=Date.now()}
     l0.a=a;if(l.secs&&!l0.secs)l0.secs=l.secs;if(l.pron&&!l0.pron)l0.pron=l.pron;if(HIST[l0.ts])Object.assign(HIST[l0.ts],l0);save();toast("다시 분석했어요: "+(l0.lvPrev&&l0.lvPrev!==r.level?l0.lvPrev+" → ":"")+r.level);render()}
   catch(e){btn.disabled=false;btn.textContent=t0;toast("분석하지 못했어요: "+errMsg(e))}}
