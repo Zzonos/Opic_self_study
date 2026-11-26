@@ -1930,7 +1930,7 @@ function vMock(m){
   if(!mock){put(m,h("div",{},h("p",{class:"eyebrow"},"Mock test · Self Assessment 1–6"),h("h1",{},"모의시험")),aiNote(),
     h("div",{class:"card"},h("h3",{},"난이도 선택 (Self Assessment)"),h("p",{class:"muted small"},"실제 오픽처럼 시작 전에 난이도를 고르고, 7번 문항 뒤에 한 번 더 '쉽게 / 비슷하게 / 어렵게'를 고를 수 있어요. 기본값은 목표 레벨에 맞춰져 있어요."),diffPicker(diffDefault(),v=>{S.profile.mockDiff=v;S.profile.mockDiffT=tgt();save();render()})),surveyCard(),
     h("div",{class:"card"},h("p",{},"난이도 "+diffDefault()+" 구성: "+DIFF_INFO[diffDefault()]+". 문항당 최대 2분."),h("p",{class:"muted small"},"끝나면 Claude가 전체를 한 번에 채점해 종합 레벨과 문항별 피드백을 줍니다. 중간에 나가면 진행 내용은 사라져요."),
-      h("label",{class:"row",style:"cursor:pointer"},h("input",{type:"checkbox",id:"mock_listen",checked:tts.ok}),"실전 듣기 모드 — 질문을 음성으로만 듣고 답하기 (텍스트 숨김, 2회 재생)"),h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{const sel=mockSel();mock={lv:diffDefault(),sel,items:buildMock(diffDefault(),[],sel),i:0,result:null,listen:$("#mock_listen").checked&&tts.ok};mockRemember(mock.items);render()}},"시험 시작"))),
+      h("label",{class:"row",style:"cursor:pointer"},h("input",{type:"checkbox",id:"mock_listen",checked:tts.ok}),"실전 듣기 모드 — 질문을 음성으로만 듣고 답하기 (텍스트 숨김, 2회 재생)"),h("div",{class:"row"},h("button",{class:"btn primary",onclick:()=>{timerStop();timer.secs=0;const sel=mockSel();mock={lv:diffDefault(),sel,items:buildMock(diffDefault(),[],sel),i:0,result:null,listen:$("#mock_listen").checked&&tts.ok};mockRemember(mock.items);render()}},"시험 시작"))),
     S.log.filter(l=>l.kind==="mock").length?h("div",{class:"card"},h("h3",{},"지난 모의시험"),h("div",{class:"list"},...S.log.filter(l=>l.kind==="mock").slice(-5).reverse().map(l=>h("div",{class:"li"},h("span",{class:"d"},l.date),h("span",{class:"grow"},l.title),lvChip(l.level))))):null);return}
   if(mock.result)return vMockResult(m);
   if(mock.i===7&&!mock.adjusted&&mock.items.length>8){const cur=mock.lv;const b=(d,label,sub)=>h("button",{class:"btn"+(d===0?" primary":""),style:"flex:1;flex-direction:column;min-width:96px",disabled:cur+d<1||cur+d>6,onclick:()=>mockAdjust(d)},h("b",{},label),h("span",{class:"small muted"},cur+d>=1&&cur+d<=6?"난이도 "+(cur+d):"—"));
@@ -1962,7 +1962,7 @@ function vMock(m){
   reb();if(mic&&!mic._az){const oc=mic.onclick;mic.onclick=()=>{const was=micOn();oc();if(!was&&micOn()){if(!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild)}else timerBind(tEl,bar.firstChild);sb.textContent="답변 끝"}else if(was&&!micOn()&&timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}}
   put(m,h("div",{},h("p",{class:"eyebrow"},"Question "+(mock.i+1)+" / "+n+" · 난이도 "+mockDiffLabel()+" · "+it.kind),nav,qText,hid,h("div",{class:"row",style:"margin-top:8px"},replay,reveal)),
     h("div",{class:"card"},h("div",{class:"row"},tEl,h("div",{class:"grow"},bar),sb),ta,mic?h("div",{class:"row"},mic):SR_OK?null:h("div",{class:"row"},micLink("🎤 마이크로 답하기")),
-      h("div",{class:"row"},h("button",{class:"btn primary",onclick:next},mock.i<n-1?"다음 문항 →":"제출하고 채점"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"시험 중단"))));
+      h("div",{class:"row"},h("button",{class:"btn primary",onclick:next},mock.i<n-1?"다음 문항 →":"제출하고 채점"),h("button",{class:"btn ghost",onclick:async()=>{timerStop();timer.secs=0;try{if(mic&&mic._kill)await mic._kill()}catch(x){}try{speechSynthesis.cancel()}catch(x){}mock=null;render()}},"시험 중단"))));
 }
 // mock feedback pieces (result screen and history share them)
 function mockFixList(fx){fx=(fx||[]).filter(f=>f&&(f.original||f.o)&&(f.better||f.b));if(!fx.length)return null;
