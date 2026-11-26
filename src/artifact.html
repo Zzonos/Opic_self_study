@@ -1485,6 +1485,9 @@ function vHistory(m){const KIND={practice:"연습",mock:"모의시험",chat:"대
       (l.str||[]).length?h("div",{},h("p",{class:"eyebrow"},"잘한 점"),...l.str.map(x=>h("p",{class:"small"},"✓ "+x))):null,
       fx.length?h("div",{},h("p",{class:"eyebrow"},l.kind==="mock"?"개선 포인트":"고칠 부분"),...fx.map(x=>x.o||x.b?h("div",{class:"fix"},x.o?h("span",{class:"o"},x.o):null,x.b?h("span",{class:"b"},x.b):null,x.w?h("span",{class:"w"},x.w):null):h("p",{class:"small"},"• "+x.w))):null,
       l.model?h("div",{},h("p",{class:"eyebrow"},"모범답안"+(l.modelLatest?" · 이 질문의 최근 모범답안":"")),h("div",{class:"model"},l.model),h("div",{class:"row",style:"margin-top:6px"},spkBtn(l.model),h("button",{class:"btn sm",onclick:()=>go("listen",{text:l.model,title:l.title})},"쉐도잉"))):null,
+      l.kind==="practice"&&l.a&&String(l.a).trim().length>=20?h("div",{},l.lvPrev?h("p",{class:"muted small"},"다시 분석됨 · 처음 판정 "+l.lvPrev):null,
+        h("div",{class:"row"},h("button",{class:"btn sm",onclick:e=>practiceRegrade(l0,l,e.currentTarget)},"다시 분석")),
+        h("p",{class:"muted small"},"저장된 답변으로 레벨·총평·고칠 부분·모범답안을 새로 받아요. 설정의 '채점·분석 모델'"+(S.profile.aiTier==="complex"?" (지금: 최고 성능)":" (지금: 기본)")+"을 써요.")):null,
       l.kind==="mock"&&(l.pq||[]).length?lectureBox(l0):null,
       l.kind==="mock"&&(l.pq||[]).length?h("div",{},
         mockOld&&CLAUDE_ONLY()?h("p",{class:"muted small"},"이 모의시험은 예전 방식으로 채점돼 틀린 표현·팁이 없어요. 아래 버튼으로 저장된 답변에 대한 자세한 피드백과 음성 강의를 한 번에 받을 수 있어요 (레벨·점수는 그대로)."):null,
@@ -2007,6 +2010,16 @@ async function mockDetailNow(r,btn){if(!sample){toast(ERR.not_granted);return}bt
     const l0=S.log.find(x=>x.kind==="mock"&&x.ts===r._ts);if(l0&&l0.pq)mockDetailSave(l0,l0.pq.map((x,i)=>Object.assign({},x,{a:((mock.items[i]||{}).a||x.a||"").slice(0,3000)})),D);
     render();await detailThenLecture(l0)}
   catch(e){btn.disabled=false;btn.textContent="자세한 피드백 + 음성 강의 받기";toast("만들지 못했어요: "+errMsg(e))}}
+// re-analyse a saved question-practice answer with the current model; updates the record in place (first verdict kept as lvPrev)
+async function practiceRegrade(l0,l,btn){if(!sample){toast(ERR.not_granted);return}const a=String(l.a||"").trim();if(a.length<20||!l.q)return;
+  btn.disabled=true;const t0=btn.textContent;btn.textContent="다시 분석 중… (10–40초)";
+  try{const r=await aiRetry(()=>evaluate(l.q,a,l.secs||Math.round(a.split(/\s+/).length/2.3),({text})=>{btn.textContent="다시 분석 중… "+(text||"").length+"자"},l.pron||null),"질문연습 분석");
+    if(!r||!r.level)throw new Error("빈 응답");
+    l0.lvPrev=l0.lvPrev||(l.lvRaw||l.level);l0.level=lvNorm(r.level)||r.level;l0.lvRaw=r.level;l0.score=r.score;l0.sum=r.summary||"";l0.str=(r.strengths||[]).slice(0,3);
+    l0.model=r.model_target||l0.model||"";l0.fixes=(r.fixes||[]).slice(0,5).map(f=>({o:f.original,b:f.better,w:f.why}));l0.tier=r._tier;l0.regAt=Date.now();
+    if(r.model_target){S.models=S.models||{};S.models[l.q]=r.model_target;S.modelsAt=S.modelsAt||{};S.modelsAt[l.q]=Date.now()}
+    l0.a=a;if(l.secs&&!l0.secs)l0.secs=l.secs;if(l.pron&&!l0.pron)l0.pron=l.pron;if(HIST[l0.ts])Object.assign(HIST[l0.ts],l0);save();toast("다시 분석했어요: "+(l0.lvPrev&&l0.lvPrev!==r.level?l0.lvPrev+" → ":"")+r.level);render()}
+  catch(e){btn.disabled=false;btn.textContent=t0;toast("분석하지 못했어요: "+errMsg(e))}}
 async function mockRegrade(l0,l,btn){if(!sample){toast(ERR.not_granted);return}const pq=(l.pq||[]).filter(x=>x);if(!pq.length)return;
   btn.disabled=true;const t0=btn.textContent;btn.textContent="다시 채점 중… (30–90초)";
   try{const items=pq.map((x,i)=>({q:x.q,a:x.a,kind:((l.perq||[])[i]||{}).kind||"",secs:x.s||0,pron:x.pr||null}));const r=await aiRetry(()=>evalMock(items,null,l.diff),"모의시험 채점");
