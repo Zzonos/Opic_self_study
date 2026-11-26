@@ -1,0 +1,128 @@
+{
+ "more": {
+  "dtravel": [
+   {"t":"exp","q":"Tell me about a trip in your country that did not go as planned. What went wrong, and what did you do?","k":"계획대로 되지 않았던 국내 여행에 대해 말해 주세요. 무엇이 잘못됐고 어떻게 했나요?"},
+   {"t":"routine","q":"Who do you usually travel with in your country, and how do you decide where to go?","k":"국내 여행은 보통 누구와 가고, 갈 곳은 어떻게 정하나요?"},
+   {"t":"compare","q":"Compare traveling in your country with traveling abroad. What are the good and bad points of each?","k":"국내 여행과 해외 여행을 비교해 주세요. 각각의 좋은 점과 나쁜 점은 무엇인가요?"}
+  ],
+  "otravel": [
+   {"t":"exp","q":"Tell me about the most memorable thing you saw or did on a trip abroad.","k":"해외 여행에서 보거나 했던 가장 기억에 남는 일을 말해 주세요."},
+   {"t":"desc","q":"Which country would you most like to visit next, and why? What would you like to do there?","k":"다음에 가장 가 보고 싶은 나라는 어디이고 왜 그런가요? 거기서 무엇을 하고 싶나요?"},
+   {"t":"exp","q":"Tell me about a time you had trouble communicating with local people on a trip abroad. What happened?","k":"해외 여행 중 현지 사람들과 의사소통이 어려웠던 때에 대해 말해 주세요. 무슨 일이 있었나요?"}
+  ],
+  "beach": [
+   {"t":"desc","q":"Who do you usually go to the beach with, and what do you like most about going there?","k":"해변은 보통 누구와 가고, 해변에 가는 것의 어떤 점이 가장 좋나요?"},
+   {"t":"exp","q":"Tell me about a problem you had at the beach, such as bad weather or losing something. What did you do?","k":"해변에서 겪은 문제, 예를 들어 나쁜 날씨나 물건을 잃어버린 일에 대해 말해 주세요. 어떻게 했나요?"},
+   {"t":"compare","q":"Compare going to the beach in summer with going in another season. Which do you prefer, and why?","k":"여름에 해변에 가는 것과 다른 계절에 가는 것을 비교해 주세요. 어느 쪽이 더 좋고 왜 그런가요?"}
+  ],
+  "music": [
+   {"t":"routine","q":"How do you usually find new music? Tell me about the apps or ways you use.","k":"새로운 음악은 보통 어떻게 찾나요? 사용하는 앱이나 방법을 말해 주세요."},
+   {"t":"exp","q":"Tell me about a song that has a special meaning to you. When did you first hear it, and why is it special?","k":"당신에게 특별한 의미가 있는 노래에 대해 말해 주세요. 처음 들은 건 언제이고 왜 특별한가요?"},
+   {"t":"compare","q":"Compare the music you liked when you were a teenager with the music you like now. How has it changed?","k":"10대 때 좋아했던 음악과 지금 좋아하는 음악을 비교해 주세요. 어떻게 달라졌나요?"}
+  ],
+  "jogging": [
+   {"t":"exp","q":"Tell me about a time you could not go jogging or walking for a while. What happened, and how did you get back to it?","k":"한동안 조깅이나 걷기를 못 했던 때에 대해 말해 주세요. 무슨 일이 있었고 어떻게 다시 시작했나요?"},
+   {"t":"desc","q":"Describe a good place for jogging or walking near your home. Why do you like it?","k":"집 근처에 조깅이나 걷기에 좋은 장소를 묘사해 주세요. 왜 그곳이 좋나요?"},
+   {"t":"compare","q":"Compare jogging alone with jogging with other people. Which do you prefer, and why?","k":"혼자 조깅하는 것과 다른 사람과 함께 조깅하는 것을 비교해 주세요. 어느 쪽이 더 좋고 왜 그런가요?"}
+  ],
+  "singing": [
+   {"t":"routine","q":"How do you practice or prepare when you want to sing a new song?","k":"새로운 노래를 부르고 싶을 때 어떻게 연습하거나 준비하나요?"},
+   {"t":"desc","q":"Describe a singing room or karaoke place you often go to. What does it look like inside?","k":"자주 가는 노래방을 묘사해 주세요. 안은 어떻게 생겼나요?"},
+   {"t":"exp","q":"Tell me about the last time you went to a singing room. Who were you with, and what happened?","k":"마지막으로 노래방에 갔던 때에 대해 말해 주세요. 누구와 함께 갔고 무슨 일이 있었나요?"},
+   {"t":"exp","q":"Tell me about a time something funny or embarrassing happened while you were singing.","k":"노래하다가 재미있거나 창피한 일이 있었던 때에 대해 말해 주세요."}
+  ],
+  "soccer": [
+   {"t":"desc","q":"Describe the place where you usually play. What does it look like, and what facilities are there?","k":"보통 경기하는 장소를 묘사해 주세요. 어떻게 생겼고 어떤 시설이 있나요?"},
+   {"t":"exp","q":"Tell me about a time you got hurt or had a problem while playing. What happened?","k":"경기하다가 다치거나 문제가 생겼던 때에 대해 말해 주세요. 무슨 일이 있었나요?"},
+   {"t":"routine","q":"How do you and your teammates usually organize a game? Tell me how you decide the time, place, and teams.","k":"팀원들과 보통 경기를 어떻게 준비하나요? 시간, 장소, 팀을 어떻게 정하는지 말해 주세요."},
+   {"t":"compare","q":"How has the way people enjoy team sports in your country changed over the years?","k":"당신 나라에서 사람들이 팀 스포츠를 즐기는 방식은 수년 동안 어떻게 바뀌었나요?"}
+  ],
+  "work": [
+   {"t":"desc","q":"Tell me about the people you work with. What are your coworkers or your boss like?","k":"함께 일하는 사람들에 대해 말해 주세요. 동료나 상사는 어떤 사람들인가요?"},
+   {"t":"exp","q":"Tell me about a time you made a mistake at work, or had a disagreement with a coworker. How did you handle it?","k":"회사에서 실수를 했거나 동료와 의견이 맞지 않았던 때에 대해 말해 주세요. 어떻게 대처했나요?"}
+  ],
+  "housework": [
+   {"t":"exp","q":"Tell me about a time something went wrong while you were doing housework. What happened, and how did you fix it?","k":"집안일을 하다가 일이 잘못됐던 때에 대해 말해 주세요. 무슨 일이 있었고 어떻게 해결했나요?"}
+  ],
+  "weather": [
+   {"t":"exp","q":"Tell me about a day when the weather was very memorable, such as a big storm, heavy snow, or a heat wave.","k":"큰 태풍, 폭설, 폭염처럼 날씨가 아주 기억에 남았던 날에 대해 말해 주세요."}
+  ],
+  "fashion": [
+   {"t":"compare","q":"What kinds of clothes or fashion items are popular among people in your country these days? Why do you think they are popular?","k":"요즘 당신 나라 사람들 사이에서 어떤 옷이나 패션 아이템이 인기 있나요? 왜 인기가 있다고 생각하나요?"}
+  ],
+  "food": [
+   {"t":"exp","q":"Tell me about a time you cooked or tried a new food for the first time. What was it like?","k":"새로운 음식을 처음 요리했거나 먹어 본 때에 대해 말해 주세요. 어땠나요?"}
+  ],
+  "furniture": [
+   {"t":"routine","q":"How do you usually take care of or clean your furniture?","k":"가구는 보통 어떻게 관리하거나 청소하나요?"},
+   {"t":"compare","q":"What kinds of furniture are popular these days, and how is that different from the past?","k":"요즘 어떤 가구가 인기 있고, 그것은 예전과 어떻게 다른가요?"}
+  ],
+  "appliance": [
+   {"t":"routine","q":"How do you use home appliances in your daily routine? Walk me through a normal day.","k":"하루 일과에서 가전제품을 어떻게 사용하나요? 평범한 하루를 순서대로 말해 주세요."},
+   {"t":"exp","q":"Tell me about the last time you bought a home appliance. How did you choose it?","k":"마지막으로 가전제품을 샀던 때에 대해 말해 주세요. 어떻게 골랐나요?"},
+   {"t":"compare","q":"Which home appliance has made the biggest difference in your life? Compare life before and after you had it.","k":"당신 생활을 가장 크게 바꾼 가전제품은 무엇인가요? 그것이 생기기 전과 후의 생활을 비교해 주세요."}
+  ],
+  "phone": [
+   {"t":"routine","q":"How do you use your phone from the morning until you go to bed? Describe a typical day.","k":"아침부터 잠자리에 들 때까지 휴대폰을 어떻게 사용하나요? 평범한 하루를 묘사해 주세요."},
+   {"t":"exp","q":"Tell me about the last time you bought a new phone. How did you choose it, and what did you like about it?","k":"마지막으로 새 휴대폰을 샀던 때에 대해 말해 주세요. 어떻게 골랐고 어떤 점이 마음에 들었나요?"}
+  ],
+  "appoint": [
+   {"t":"routine","q":"What do you usually do to make sure you are not late for an appointment?","k":"약속에 늦지 않으려고 보통 어떻게 하나요?"},
+   {"t":"compare","q":"How has the way people make plans with friends changed compared to the past?","k":"사람들이 친구와 약속을 잡는 방식은 예전과 비교해 어떻게 바뀌었나요?"},
+   {"t":"exp","q":"Tell me about a time someone was very late for an appointment with you. What happened?","k":"누군가 당신과의 약속에 크게 늦었던 때에 대해 말해 주세요. 무슨 일이 있었나요?"}
+  ],
+  "shopping": [
+   {"t":"exp","q":"Tell me about the last time you bought something online. What did you buy, and how was the delivery?","k":"마지막으로 온라인에서 물건을 샀던 때에 대해 말해 주세요. 무엇을 샀고 배송은 어땠나요?"},
+   {"t":"exp","q":"Tell me about a time you had to return or exchange something you bought. What happened?","k":"산 물건을 반품하거나 교환해야 했던 때에 대해 말해 주세요. 무슨 일이 있었나요?"}
+  ],
+  "restaurant": [
+   {"t":"routine","q":"How often do you eat out, and who do you usually go with? How do you choose a restaurant?","k":"외식은 얼마나 자주 하고 보통 누구와 가나요? 식당은 어떻게 고르나요?"},
+   {"t":"exp","q":"Tell me about the last time you ate out. Where did you go, and what did you eat?","k":"마지막으로 외식했던 때에 대해 말해 주세요. 어디에 갔고 무엇을 먹었나요?"},
+   {"t":"compare","q":"Compare eating at a restaurant with ordering food for delivery. Which do you prefer, and why?","k":"식당에서 먹는 것과 배달 음식을 시키는 것을 비교해 주세요. 어느 쪽이 더 좋고 왜 그런가요?"}
+  ],
+  "homeimp": [
+   {"t":"routine","q":"What do you usually do to keep your home clean and comfortable?","k":"집을 깨끗하고 편안하게 유지하려고 보통 무엇을 하나요?"},
+   {"t":"desc","q":"Describe your favorite room in your home. What does it look like, and what would you like to change?","k":"집에서 가장 좋아하는 방을 묘사해 주세요. 어떻게 생겼고 무엇을 바꾸고 싶나요?"},
+   {"t":"exp","q":"Tell me about a time you moved, or helped someone move. How did it go?","k":"이사했거나 누군가의 이사를 도왔던 때에 대해 말해 주세요. 어떻게 됐나요?"}
+  ],
+  "youth": [
+   {"t":"exp","q":"Tell me about a young person you know. What do they do in their free time, and what are they interested in?","k":"아는 젊은 사람 한 명에 대해 말해 주세요. 여가 시간에 무엇을 하고 무엇에 관심이 있나요?"},
+   {"t":"desc","q":"What do young people in your country spend their money on these days?","k":"요즘 당신 나라 젊은이들은 어디에 돈을 쓰나요?"},
+   {"t":"exp","q":"Tell me about something you learned from a younger person, such as a new app, trend, or way of thinking.","k":"새로운 앱, 유행, 사고방식처럼 젊은 사람에게서 배운 것에 대해 말해 주세요."}
+  ]
+ },
+ "roleplays": [
+  {"id":"rp_hotel","ko":"호텔 예약","q11":"I'd like to give you a situation and ask you to act it out. You are planning a trip and want to stay at a hotel. Call the hotel and ask three or four questions about the rooms and services.","k11":"상황을 드릴게요. 여행을 계획 중이고 호텔에 묵고 싶습니다. 호텔에 전화해 객실과 서비스에 대해 서너 가지 질문하세요.","q12":"I'm sorry, but there is a problem. When you arrive at the hotel, they say your reservation is not in the system. Explain the situation to the staff and offer two or three ways to solve it.","k12":"문제가 생겼어요. 호텔에 도착하니 예약이 시스템에 없다고 합니다. 직원에게 상황을 설명하고 해결 방법을 두세 가지 제안하세요.","q13":"That's the end of the situation. Have you ever had a problem with a reservation, such as at a hotel or restaurant? Tell me what happened and how it was solved.","k13":"호텔이나 식당 등에서 예약 문제가 생긴 적이 있나요? 무슨 일이 있었고 어떻게 해결됐는지 말해 주세요."},
+  {"id":"rp_concert","ko":"콘서트 티켓","q11":"I'd like to give you a situation and ask you to act it out. You want to go to a concert this weekend. Call the ticket office and ask three or four questions about the concert.","k11":"상황을 드릴게요. 이번 주말에 콘서트에 가고 싶습니다. 매표소에 전화해 콘서트에 대해 서너 가지 질문하세요.","q12":"I'm sorry, but there is a problem. You bought tickets, but you just found out you cannot go because of an urgent matter. Call the ticket office, explain the situation, and suggest two or three solutions.","k12":"문제가 생겼어요. 표를 샀는데 급한 일로 갈 수 없게 됐습니다. 매표소에 전화해 상황을 설명하고 해결책을 두세 가지 제안하세요.","q13":"That's the end of the situation. Have you ever missed an event you were looking forward to? Tell me what happened.","k13":"기대하던 행사를 놓친 적이 있나요? 무슨 일이 있었는지 말해 주세요."},
+  {"id":"rp_rent","ko":"집 구하기","q11":"I'd like to give you a situation and ask you to act it out. You are looking for a new apartment. Call a real estate agent and ask three or four questions about an apartment you are interested in.","k11":"상황을 드릴게요. 새 아파트를 구하고 있습니다. 부동산 중개인에게 전화해 관심 있는 집에 대해 서너 가지 질문하세요.","q12":"I'm sorry, but there is a problem. You moved in, but the heating or hot water does not work. Call the building manager, explain the problem, and ask for two or three solutions.","k12":"문제가 생겼어요. 이사를 했는데 난방이나 온수가 나오지 않습니다. 관리인에게 전화해 문제를 설명하고 해결책을 두세 가지 요청하세요.","q13":"That's the end of the situation. Have you ever had a problem in a place you lived? Tell me what happened and how it was solved.","k13":"살던 곳에서 문제가 생긴 적이 있나요? 무슨 일이 있었고 어떻게 해결됐는지 말해 주세요."},
+  {"id":"rp_rental","ko":"렌터카","q11":"I'd like to give you a situation and ask you to act it out. You want to rent a car for a trip. Call the rental company and ask three or four questions about renting a car.","k11":"상황을 드릴게요. 여행을 위해 차를 빌리고 싶습니다. 렌터카 회사에 전화해 차를 빌리는 것에 대해 서너 가지 질문하세요.","q12":"I'm sorry, but there is a problem. The car you rented broke down on the road. Call the rental company, explain the situation, and suggest two or three ways to solve it.","k12":"문제가 생겼어요. 빌린 차가 길에서 고장 났습니다. 렌터카 회사에 전화해 상황을 설명하고 해결 방법을 두세 가지 제안하세요.","q13":"That's the end of the situation. Have you ever had car trouble or a problem with transportation during a trip? Tell me what happened.","k13":"여행 중 차 고장이나 교통 문제를 겪은 적이 있나요? 무슨 일이 있었는지 말해 주세요."},
+  {"id":"rp_shop","ko":"옷 교환","q11":"I'd like to give you a situation and ask you to act it out. You want to buy a gift for a friend at a clothing store. Ask the clerk three or four questions to find a good gift.","k11":"상황을 드릴게요. 옷 가게에서 친구 선물을 사려고 합니다. 점원에게 좋은 선물을 고르기 위해 서너 가지 질문하세요.","q12":"I'm sorry, but there is a problem. Your friend says the clothes do not fit. Go back to the store, explain the situation, and suggest two or three solutions.","k12":"문제가 생겼어요. 친구가 옷이 맞지 않는다고 합니다. 가게에 다시 가서 상황을 설명하고 해결책을 두세 가지 제안하세요.","q13":"That's the end of the situation. Have you ever bought something that turned out to be wrong or broken? Tell me what happened.","k13":"산 물건이 잘못됐거나 고장 난 적이 있나요? 무슨 일이 있었는지 말해 주세요."},
+  {"id":"rp_doctor","ko":"병원 예약","q11":"I'd like to give you a situation and ask you to act it out. You want to see a doctor. Call the clinic and ask three or four questions to make an appointment.","k11":"상황을 드릴게요. 진료를 받고 싶습니다. 병원에 전화해 예약하기 위해 서너 가지 질문하세요.","q12":"I'm sorry, but there is a problem. Something urgent came up and you cannot go to your appointment. Call the clinic, explain the situation, and suggest two or three alternatives.","k12":"문제가 생겼어요. 급한 일이 생겨 예약한 시간에 갈 수 없습니다. 병원에 전화해 상황을 설명하고 대안을 두세 가지 제안하세요.","q13":"That's the end of the situation. Have you ever had to change an important appointment at the last minute? Tell me what happened.","k13":"중요한 약속을 막판에 바꿔야 했던 적이 있나요? 무슨 일이 있었는지 말해 주세요."},
+  {"id":"rp_class","ko":"수업 등록","q11":"I'd like to give you a situation and ask you to act it out. You want to take a class, such as cooking or English. Call the school and ask three or four questions about the class.","k11":"상황을 드릴게요. 요리나 영어 같은 수업을 듣고 싶습니다. 학원에 전화해 수업에 대해 서너 가지 질문하세요.","q12":"I'm sorry, but there is a problem. You registered, but the class time changed and you cannot attend. Call the school, explain the situation, and suggest two or three solutions.","k12":"문제가 생겼어요. 등록했는데 수업 시간이 바뀌어 들을 수 없습니다. 학원에 전화해 상황을 설명하고 해결책을 두세 가지 제안하세요.","q13":"That's the end of the situation. Tell me about a class or something you tried to learn, and any problem you had with it.","k13":"배우려고 했던 수업이나 무언가에 대해, 그리고 그때 겪었던 문제에 대해 말해 주세요."},
+  {"id":"rp_party","ko":"파티 준비","q11":"I'd like to give you a situation and ask you to act it out. A friend is having a birthday party. Call your friend and ask three or four questions about the party.","k11":"상황을 드릴게요. 친구가 생일 파티를 엽니다. 친구에게 전화해 파티에 대해 서너 가지 질문하세요.","q12":"I'm sorry, but there is a problem. On the day of the party, you cannot go because you got sick. Call your friend, explain the situation, and suggest two or three ways to make it up.","k12":"문제가 생겼어요. 파티 당일 아파서 갈 수 없게 됐습니다. 친구에게 전화해 상황을 설명하고 만회할 방법을 두세 가지 제안하세요.","q13":"That's the end of the situation. Tell me about a memorable party or celebration you went to.","k13":"기억에 남는 파티나 축하 자리에 대해 말해 주세요."},
+  {"id":"rp_delivery","ko":"배송 문제","q11":"I'd like to give you a situation and ask you to act it out. You want to order furniture online. Call the store and ask three or four questions about the product and delivery.","k11":"상황을 드릴게요. 온라인으로 가구를 주문하고 싶습니다. 가게에 전화해 제품과 배송에 대해 서너 가지 질문하세요.","q12":"I'm sorry, but there is a problem. The furniture arrived, but it is damaged. Call the store, explain the problem, and suggest two or three solutions.","k12":"문제가 생겼어요. 가구가 도착했는데 파손되어 있습니다. 가게에 전화해 문제를 설명하고 해결책을 두세 가지 제안하세요.","q13":"That's the end of the situation. Have you ever had a problem with a delivery or online order? Tell me what happened.","k13":"배송이나 온라인 주문에 문제가 생긴 적이 있나요? 무슨 일이 있었는지 말해 주세요."},
+  {"id":"rp_flight","ko":"항공편","q11":"I'd like to give you a situation and ask you to act it out. You want to fly overseas. Call the airline and ask three or four questions about flights.","k11":"상황을 드릴게요. 해외로 비행기를 타고 가려고 합니다. 항공사에 전화해 항공편에 대해 서너 가지 질문하세요.","q12":"I'm sorry, but there is a problem. At the airport, you are told your flight has been canceled. Talk to the airline staff, explain your situation, and suggest two or three alternatives.","k12":"문제가 생겼어요. 공항에서 항공편이 취소됐다는 말을 들었습니다. 항공사 직원에게 상황을 설명하고 대안을 두세 가지 제안하세요.","q13":"That's the end of the situation. Have you ever had a flight delayed or canceled? Tell me what happened and what you did.","k13":"비행기가 지연되거나 취소된 적이 있나요? 무슨 일이 있었고 어떻게 했는지 말해 주세요."},
+  {"id":"rp_repair","ko":"수리 맡기기","q11":"I'd like to give you a situation and ask you to act it out. Your laptop is not working well. Call a repair shop and ask three or four questions about fixing it.","k11":"상황을 드릴게요. 노트북이 잘 작동하지 않습니다. 수리점에 전화해 수리에 대해 서너 가지 질문하세요.","q12":"I'm sorry, but there is a problem. You picked up your laptop, but the same problem happened again. Call the shop, explain the situation, and suggest two or three solutions.","k12":"문제가 생겼어요. 노트북을 찾아왔는데 같은 문제가 또 생겼습니다. 수리점에 전화해 상황을 설명하고 해결책을 두세 가지 제안하세요.","q13":"That's the end of the situation. Tell me about a time something important to you broke. What did you do?","k13":"당신에게 중요한 물건이 고장 났던 때에 대해 말해 주세요. 어떻게 했나요?"},
+  {"id":"rp_neighbor","ko":"이웃 문제","q11":"I'd like to give you a situation and ask you to act it out. A new neighbor moved in next door. Introduce yourself and ask your neighbor three or four questions.","k11":"상황을 드릴게요. 옆집에 새 이웃이 이사 왔습니다. 자신을 소개하고 이웃에게 서너 가지 질문하세요.","q12":"I'm sorry, but there is a problem. Your neighbor is making a lot of noise late at night. Talk to your neighbor, explain the problem, and suggest two or three solutions.","k12":"문제가 생겼어요. 이웃이 밤늦게 시끄럽게 합니다. 이웃에게 문제를 설명하고 해결책을 두세 가지 제안하세요.","q13":"That's the end of the situation. Have you ever had a problem with a neighbor? Tell me what happened and how it was solved.","k13":"이웃과 문제가 있었던 적이 있나요? 무슨 일이 있었고 어떻게 해결됐는지 말해 주세요."}
+ ],
+ "advanced": [
+  {"q":"Many people these days work from home. Compare working from home with working at the office. What are the advantages and disadvantages of each?","k":"요즘 많은 사람들이 재택근무를 합니다. 재택근무와 사무실 근무를 비교해 주세요. 각각의 장단점은 무엇인가요?"},
+  {"q":"Artificial intelligence is changing many jobs. How do you think AI will affect people's work in the future? What concerns do people have?","k":"인공지능이 많은 직업을 바꾸고 있습니다. AI가 앞으로 사람들의 일에 어떤 영향을 줄 거라고 생각하나요? 사람들은 어떤 우려를 갖고 있나요?"},
+  {"q":"Housing prices are a big issue in many countries. What do people in your country think about housing prices, and what is being done about it?","k":"집값은 많은 나라에서 큰 문제입니다. 당신 나라 사람들은 집값에 대해 어떻게 생각하고, 이에 대해 어떤 조치가 취해지고 있나요?"},
+  {"q":"Compare the way people shop today with the way they shopped ten years ago. What changes have happened, and what problems have come with them?","k":"오늘날 사람들의 쇼핑 방식을 10년 전과 비교해 주세요. 어떤 변화가 있었고 그에 따라 어떤 문제가 생겼나요?"},
+  {"q":"Some people say social media brings people together, while others say it makes people lonely. What is your opinion?","k":"SNS가 사람들을 가깝게 해 준다는 사람도 있고 외롭게 만든다는 사람도 있습니다. 당신의 생각은 어떤가요?"},
+  {"q":"What are some products or services that people in your country are buying a lot these days? Why are they so popular?","k":"요즘 당신 나라 사람들이 많이 사는 제품이나 서비스는 무엇인가요? 왜 그렇게 인기가 있나요?"},
+  {"q":"Compare the jobs that were popular when you were young with the jobs that are popular today. Why have they changed?","k":"당신이 어렸을 때 인기 있던 직업과 오늘날 인기 있는 직업을 비교해 주세요. 왜 바뀌었나요?"},
+  {"q":"Electric cars are becoming more common. What do people in your country think about electric cars, and what problems still need to be solved?","k":"전기차가 점점 흔해지고 있습니다. 당신 나라 사람들은 전기차에 대해 어떻게 생각하고, 아직 해결해야 할 문제는 무엇인가요?"},
+  {"q":"Many countries have an aging population. What problems does this cause in your country, and how are people dealing with them?","k":"많은 나라가 고령화되고 있습니다. 이것이 당신 나라에 어떤 문제를 일으키고, 사람들은 어떻게 대처하고 있나요?"},
+  {"q":"Compare how families spend time together today with how they did when you were a child. What has changed, and why?","k":"오늘날 가족이 함께 시간을 보내는 방식을 당신이 어렸을 때와 비교해 주세요. 무엇이 바뀌었고 왜 그런가요?"},
+  {"q":"Some people think it is important to save money for the future, while others prefer to enjoy life now. Which side are you on, and why?","k":"미래를 위해 저축하는 게 중요하다는 사람도 있고 지금 인생을 즐기는 걸 선호하는 사람도 있습니다. 당신은 어느 쪽이고 왜 그런가요?"},
+  {"q":"Tell me about a recent piece of news in your country that people talked about a lot. What happened, and how did people react?","k":"최근 당신 나라에서 사람들이 많이 이야기했던 뉴스에 대해 말해 주세요. 무슨 일이 있었고 사람들은 어떻게 반응했나요?"},
+  {"q":"Online learning has become very popular. Compare learning online with learning in a classroom. Which is more effective, in your opinion?","k":"온라인 학습이 매우 인기를 얻고 있습니다. 온라인 학습과 교실 수업을 비교해 주세요. 어느 쪽이 더 효과적이라고 생각하나요?"},
+  {"q":"Many people worry about their personal information being leaked online. What problems have happened, and what should people or companies do about it?","k":"많은 사람들이 온라인에서 개인정보가 유출될까 걱정합니다. 어떤 문제가 있었고, 사람이나 기업은 이에 대해 무엇을 해야 할까요?"},
+  {"q":"Compare the work culture in your country today with the way it was in the past. What has improved, and what still needs to change?","k":"오늘날 당신 나라의 직장 문화를 예전과 비교해 주세요. 무엇이 나아졌고 무엇이 아직 바뀌어야 하나요?"},
+  {"q":"Delivery apps and fast delivery services are very common now. What are the good points and bad points of these services for society?","k":"배달 앱과 빠른 배송 서비스가 이제 아주 흔합니다. 이런 서비스가 사회에 주는 좋은 점과 나쁜 점은 무엇인가요?"},
+  {"q":"What do you think is the most important invention of the last 20 years? Explain how it has changed people's lives.","k":"지난 20년간 가장 중요한 발명품은 무엇이라고 생각하나요? 그것이 사람들의 삶을 어떻게 바꿨는지 설명해 주세요."},
+  {"q":"Many young people in your country are choosing not to get married or have children. Why do you think this is happening, and what effects could it have?","k":"당신 나라의 많은 젊은이들이 결혼이나 출산을 하지 않기로 선택하고 있습니다. 왜 이런 일이 일어난다고 생각하고, 어떤 영향이 있을 수 있나요?"}
+ ]
+}

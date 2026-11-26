@@ -14,6 +14,8 @@ words = json.dumps(json.loads((root / "tools/words.json").read_text(encoding="ut
 body = body.replace("/*WORDS_JSON*/[]", words)
 adv = json.dumps(json.loads((root / "tools/words_adv.json").read_text(encoding="utf-8")), ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
 body = body.replace("/*ADV_JSON*/[]", adv)
+qb = json.dumps(json.loads((root / "tools/qbank_more.json").read_text(encoding="utf-8")), ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+body = body.replace("/*QBANK_MORE*/{}", qb)
 head = """<!doctype html>
 <html lang="ko" data-build="BUILD_ID" data-rel="REL_NO">
 <head>
