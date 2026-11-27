@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261126-222544-3f42ba" data-rel="300">
+<html lang="ko" data-build="20261127-111447-5a879d" data-rel="301">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1167,7 +1167,7 @@ Reply with ONLY one JSON object: {"scripts":[{"n":1,"answer":"..."}]}`;
 }
 const prLine=p=>p&&p.pron!=null?`\n[Azure 0-100: overall ${p.pron}, accuracy ${p.acc}, fluency ${p.flu}${p.pros!=null?", prosody "+p.pros:""}${p.low&&p.low.length?"; mispronounced: "+p.low.map(x=>x.w+" ("+x.s+")").join(", "):""}]`:"";
 async function evalMock(items,onText,diff){
-  const body=items.map((it,i)=>`Q${i+1}${it.kind?" ("+it.kind+")":""}: ${it.q}\nA${i+1}${it.secs?" ("+it.secs+"s)":""}: ${it.a||"(no answer)"}${prLine(it.pron||it.pr)}`).join("\n\n")+(items.some(it=>it.pron||it.pr)?"\n\n(Answers marked [Azure] were recorded with Azure speech recognition: the transcript is verbatim, and the numbers measure that recording. Use them only as evidence for pronunciation and fluency, never for content.)":"");
+  const body=items.map((it,i)=>it.skip?`Q${i+1}${it.kind?" ("+it.kind+")":""}: ${it.q}\nA${i+1}: (skipped by the learner on purpose — NOT part of the test: leave it out of the overall rating and of per_question)`:`Q${i+1}${it.kind?" ("+it.kind+")":""}: ${it.q}\nA${i+1}${it.secs?" ("+it.secs+"s)":""}: ${it.a||"(no answer)"}${prLine(it.pron||it.pr)}`).join("\n\n")+(items.some(it=>it.pron||it.pr)?"\n\n(Answers marked [Azure] were recorded with Azure speech recognition: the transcript is verbatim, and the numbers measure that recording. Use them only as evidence for pronunciation and fluency, never for content.)":"");
   const prompt=`${RUBRIC()}
 
 This is a full ${items.length}-question OPIc mock test taken at self-assessment difficulty ${diff||(mock?mockDiffLabel():"?")} (scale 1-6; 1-2 = easy 12-question form, 3-4 = standard, 5-6 = hardest form with advanced questions 14-15). Judge only what was demonstrated: easier forms give less evidence of IH/AL-level ability, so do not reward an easy form beyond what the answers show. Rate the overall level as a real OPIc rater would: one holistic rating for the whole sample, set by the highest level the learner sustains across the test (the floor), not by the best single answer. Per-question levels are only diagnostic. Watch for the same memorized story or template reused across questions. Then give short per-question feedback.
@@ -1177,8 +1177,12 @@ ${body}
 
 Reply with ONLY one JSON object:
 {"level":"IM2","score":60,"summary":"한국어 총평 3-4문장 (레벨 판정 근거, 다음 목표)","top_fixes":["가장 시급한 개선점 3개, 한국어"],"rehearsed":"none | some | heavy","rehearsed_note":"한국어 한 줄 (some/heavy일 때만)","per_question":[{"n":1,"level":"IM2","comment":"한국어 한 줄 코멘트","better":"One improved English sentence the learner could have said"}]}`;
-  return sample.json(prompt,{...(typeof onText==="function"?{onText}:{}),cache:false});
+  const r=await sample.json(prompt,{...(typeof onText==="function"?{onText}:{}),cache:false});if(r)r.per_question=perqAlign(items,r.per_question);return r;
 }
+// per_question aligned to the items (index i = question i+1); skipped questions get a placeholder that is never rated
+function perqAlign(items,P){P=(P||[]).filter(Boolean);const hasN=P.length&&P.every(p=>+p.n>0);const rest=P.filter(p=>!(hasN&&p.n));let k=0;
+  return items.map((it,i)=>{if(it.skip)return {n:i+1,level:"",comment:"건너뜀 · 종합평가에 반영 안 함",better:"",skip:true};
+    const d=hasN?P.find(p=>+p.n===i+1):(P.length===items.length?P[i]:P[k++]);return Object.assign({},d||{level:"",comment:"",better:""},{n:i+1})})}
 
 /* ============ RECORDED AUDIO (Kokoro neural voices, pre-rendered) ============ */
 const AUD={tags:{m:"남성 · Andrew",f:"여성 · Ava"},man:{},tag:"m",el:null,ready:false};
@@ -1518,7 +1522,7 @@ function vHistory(m){const KIND={practice:"연습",mock:"모의시험",chat:"대
         h("div",{class:"row"},CLAUDE_ONLY()?(recBusy(l0.ts)?busyBtn(l0.ts,"primary"):h("button",{class:"btn primary sm",onclick:e=>mockDetail(l0,l,e.currentTarget)},mockOld?"자세한 피드백 + 음성 강의 받기":"자세한 피드백 + 음성 강의 다시 받기")):null,h("button",{class:"btn sm",onclick:e=>mockRegrade(l0,l,e.currentTarget)},"다시 채점"),
           CLAUDE_ONLY()&&(l0.pq||[]).some(x=>x&&x.fx)&&(l0.pq||[]).some(x=>x&&x.a&&x.a.trim().length>20&&!x.pol)&&!recBusy(l0.ts)?h("button",{class:"btn sm",onclick:e=>polishMake(S.log.find(y=>y.ts===l0.ts)||l0,e.currentTarget)},(l0.pq||[]).some(x=>x&&x.pol)?"✨ 남은 답변 다듬기":"✨ 내 답변 다듬은 모범답안 만들기"):null),CLAUDE_ONLY()?null:claudeOnlyNote(),
         h("p",{class:"muted small"},"저장된 답변으로 다시 분석해요. 설정의 '채점·분석 모델'"+(S.profile.aiTier==="complex"?" (지금: 최고 성능)":" (지금: 기본)")+"을 써요."+((l.pq||[]).some(x=>x&&x.a&&x.a.length===600)?" 이 시험은 답변이 600자까지만 저장돼 긴 답변은 뒷부분이 빠진 채로 분석돼요.":""))):null,
-      (l.pq||[]).length?h("details",{open:!!(l.pq||[]).some(x=>x&&x.fx)},h("summary",{},"문항별 피드백 ("+l.pq.length+")"),mockPatterns(l.pat),...l.pq.map((x,i)=>h("div",{style:"margin-top:10px;display:flex;flex-direction:column;gap:4px"},h("p",{class:"small",style:"font-weight:600"},(i+1)+". "+(x.q||"")+(x.l?" · "+x.l:"")),x.a?h("p",{class:"muted small"},x.a):null,x.pr&&x.pr.pron!=null?h("p",{class:"muted small"},"🎙 Azure 발음 "+x.pr.pron+" · 정확도 "+x.pr.acc+" · 유창성 "+x.pr.flu+(x.pr.pros!=null?" · 억양 "+x.pr.pros:"")+(x.s?" · "+fmt(x.s):"")):null,x.c?h("p",{class:"small"},x.c):null,x.g?h("p",{class:"small",style:"color:var(--good)"},"👍 "+x.g):null,mockFixList(x.fx),mockClosing(x.cl),x.t?h("p",{class:"small"},h("b",{},"💡 다음에는 "),x.t):null,x.b?h("p",{class:"small",style:"color:var(--accent)"},"→ "+x.b):null,polBox(x)))):null,
+      (l.pq||[]).length?h("details",{open:!!(l.pq||[]).some(x=>x&&x.fx)},h("summary",{},"문항별 피드백 ("+l.pq.length+")"),mockPatterns(l.pat),...l.pq.map((x,i)=>x&&x.sk?h("div",{style:"margin-top:8px",class:"muted small"},"Q"+(i+1)+" "+(x.q||"").slice(0,60)+"… · 건너뜀 (종합평가 제외)"):h("div",{style:"margin-top:10px;display:flex;flex-direction:column;gap:4px"},h("p",{class:"small",style:"font-weight:600"},(i+1)+". "+(x.q||"")+(x.l?" · "+x.l:"")),x.a?h("p",{class:"muted small"},x.a):null,x.pr&&x.pr.pron!=null?h("p",{class:"muted small"},"🎙 Azure 발음 "+x.pr.pron+" · 정확도 "+x.pr.acc+" · 유창성 "+x.pr.flu+(x.pr.pros!=null?" · 억양 "+x.pr.pros:"")+(x.s?" · "+fmt(x.s):"")):null,x.c?h("p",{class:"small"},x.c):null,x.g?h("p",{class:"small",style:"color:var(--good)"},"👍 "+x.g):null,mockFixList(x.fx),mockClosing(x.cl),x.t?h("p",{class:"small"},h("b",{},"💡 다음에는 "),x.t):null,x.b?h("p",{class:"small",style:"color:var(--accent)"},"→ "+x.b):null,polBox(x)))):null,
       l.recovered&&!l.a?h("p",{class:"muted small"},"예전 기록이라 내 답변·총평은 저장돼 있지 않아요."):!hasDet(l)&&!fx.length?h("p",{class:"muted small"},HIST["_"+l0.ts]&&!HIST[l0.ts]&&cloud.ref?"세부 내용을 불러오는 중이거나, 세부 내용이 저장되기 전에 만든 기록이에요.":"세부 내용이 저장되기 전에 만든 기록이라 점수만 남아 있어요."):null,
       h("div",{class:"row"},t&&q?h("button",{class:"btn sm primary",onclick:()=>go("practice",{topic:t,q,kind:QT[q.t]})},"이 질문 다시 연습"):null,(()=>{const b=h("button",{class:"btn sm ghost",style:"color:var(--bad);margin-left:auto",onclick:()=>{if(b.dataset.ok){histDelete([l0])}else{b.dataset.ok=1;b.textContent="한 번 더 누르면 삭제";setTimeout(()=>{if(b.isConnected){delete b.dataset.ok;b.textContent="🗑 이 기록 삭제"}},3000)}}},"🗑 이 기록 삭제");return b})()));
     return h("div",{},head,det)};
@@ -1981,6 +1985,7 @@ function vMock(m){
   reb();if(mic&&!mic._az){const oc=mic.onclick;mic.onclick=()=>{const was=micOn();oc();if(!was&&micOn()){if(!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild)}else timerBind(tEl,bar.firstChild);sb.textContent="답변 끝"}else if(was&&!micOn()&&timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}}
   put(m,h("div",{},h("p",{class:"eyebrow"},"Question "+(mock.i+1)+" / "+n+" · 난이도 "+mockDiffLabel()+" · "+it.kind),nav,qText,hid,h("div",{class:"row",style:"margin-top:8px"},replay,reveal)),
     h("div",{class:"card"},h("div",{class:"row"},tEl,h("div",{class:"grow"},bar),sb),ta,mic?h("div",{class:"row"},mic):SR_OK?null:h("div",{class:"row"},micLink("🎤 마이크로 답하기")),
+      mock.i===0?h("div",{class:"row"},h("button",{class:"btn ghost",onclick:async()=>{timerStop();timer.secs=0;try{if(mic&&mic._kill)await mic._kill()}catch(x){}try{speechSynthesis.cancel()}catch(x){}it.skip=true;it.a="";it.secs=0;delete it.pron;mock.i++;mock.fromMic=false;render()}},"1번 건너뛰기 →"),h("span",{class:"muted small"},"자기소개는 건너뛰면 종합평가에서 빠져요")):null,
       h("div",{class:"row"},h("button",{class:"btn primary",onclick:next},mock.i<n-1?"다음 문항 →":"제출하고 채점"),h("button",{class:"btn ghost",onclick:async()=>{timerStop();timer.secs=0;try{if(mic&&mic._kill)await mic._kill()}catch(x){}try{speechSynthesis.cancel()}catch(x){}mock=null;render()}},"시험 중단"))));
 }
 // mock feedback pieces (result screen and history share them)
@@ -1990,7 +1995,7 @@ function mockClosing(c){if(!c||!c.en)return null;return h("div",{class:"fix",sty
 function mockPatterns(ps){ps=(ps||[]).filter(x=>x&&x.issue);if(!ps.length)return null;
   return h("div",{class:"card"},h("h3",{},"반복된 실수 · 습관"),h("p",{class:"muted small"},"여러 문항에서 되풀이된 것들이에요. 이것부터 고치면 전체 레벨이 올라가요."),
     ...ps.map(x=>h("div",{class:"fix",style:"border-left-color:var(--warn)"},h("span",{class:"b"},x.issue),x.ex?h("span",{class:"small mono"},x.ex):null,x.fix?h("span",{class:"w"},"→ "+x.fix):null)))}
-function mockQCard(p,it){const fx=(p.fixes||[]).filter(f=>f&&f.original&&f.better);
+function mockQCard(p,it){if(p&&p.skip)return h("div",{class:"card"},h("p",{class:"eyebrow"},"Q"+p.n+(it&&it.kind?" · "+it.kind:"")),h("p",{class:"muted small"},"건너뜀 · 종합평가에 반영 안 함"));const fx=(p.fixes||[]).filter(f=>f&&f.original&&f.better);
   const save=fx.length||p.better||p.closing?h("button",{class:"btn sm",onclick:e=>{addCards([...fx.map(f=>({en:f.better,ko:f.why||"",why:"모의시험 Q"+p.n+": "+f.original})),...(p.better?[{en:p.better,ko:"",why:"모의시험 Q"+p.n+" 모범 문장"}]:[]),...(p.closing?[{en:p.closing.en,ko:p.closing.ko,why:"모의시험 Q"+p.n+" 마무리"}]:[])],"mock");e.currentTarget.disabled=true}},"고친 표현 카드로 저장"):null;
   return h("div",{class:"card"},h("div",{class:"row"},h("span",{class:"mono small muted"},"Q"+p.n),h("span",{class:"grow small"},it.kind||""),lvChip(p.level)),
     it.q?h("p",{class:"small",style:"font-weight:600"},it.q):null,
@@ -2004,7 +2009,7 @@ const CLAUDE_ONLY=()=>!!window.claude?.use;
 const claudeOnlyNote=()=>h("p",{class:"muted small"},"자세한 피드백과 음성 강의는 Claude 앱에서 만들 수 있어요. Claude에서 만든 뒤 '웹으로 통합'하면 여기서도 보고 들을 수 있어요.");
 // after the detail is saved, the lecture is made from it right away
 async function detailThenLecture(l0,btn){if(!l0)return;const b=btn||document.createElement("button");b.disabled=true;b.textContent="음성 강의 만드는 중… (1–2분)";toast("자세한 피드백 완료 — 이어서 음성 강의를 만들어요");await lectureMake(l0,b);try{await polishMake(l0)}catch(e){}try{await unitsFromMock()}catch(e){}}
-async function mockDetailAI(pq,lvl){const body=pq.map((x,i)=>`Q${i+1}: ${x.q||""}\nA${i+1}${x.s?" ("+x.s+"s)":""}: ${x.a||"(no answer)"}${prLine(x.pr||x.pron)}`).join("\n\n");
+async function mockDetailAI(pq,lvl){const body=pq.map((x,i)=>x.sk?`Q${i+1}: ${x.q||""}\nA${i+1}: (skipped by the learner on purpose — NOT part of the test: leave it out of the overall rating and of per_question)`:`Q${i+1}: ${x.q||""}\nA${i+1}${x.s?" ("+x.s+"s)":""}: ${x.a||"(no answer)"}${prLine(x.pr||x.pron)}`).join("\n\n");
   const prompt=`You are an experienced OPIc rater and speaking coach for a Korean learner (target ${tgt()}). Below are the questions and the learner's answers (voice-dictated) from a mock test that was already rated ${lvl||"?"} overall. Do NOT re-rate; give feedback the learner can act on.
 - "fixes": up to 3 real mistakes per answer, most important first. "original" = the learner's exact words copied from the answer (short span), "better" = the natural corrected version, "why" = 한국어 한 줄. Grammar, wrong word, Korean-style phrasing, tense etc. Skip misheard names and fillers. No fixes for a solid answer.
 - "good": 한국어 한 줄, one specific thing done well. "comment": 한국어 1-2문장. "tip": 한국어 1-2문장, how to build this answer better next time (구성, 더 넣을 디테일, 쓸 표현). "better": one improved English sentence.
@@ -2045,7 +2050,7 @@ async function practiceRegrade(l0,l,btn){if(!sample){toast(ERR.not_granted);retu
   catch(e){btn.disabled=false;btn.textContent=t0;toast("분석하지 못했어요: "+errMsg(e))}}
 async function mockRegrade(l0,l,btn){if(!sample){toast(ERR.not_granted);return}const pq=(l.pq||[]).filter(x=>x);if(!pq.length)return;
   btn.disabled=true;const t0=btn.textContent;btn.textContent="다시 채점 중… (30–90초)";
-  try{const items=pq.map((x,i)=>({q:x.q,a:x.a,kind:((l.perq||[])[i]||{}).kind||"",secs:x.s||0,pron:x.pr||null}));const r=await aiRetry(()=>evalMock(items,null,l.diff),"모의시험 채점");
+  try{const items=pq.map((x,i)=>({q:x.q,a:x.a,kind:((l.perq||[])[i]||{}).kind||"",secs:x.s||0,pron:x.pr||null,skip:!!x.sk}));const r=await aiRetry(()=>evalMock(items,null,l.diff),"모의시험 채점");
     if(!r||!r.level)throw new Error("빈 응답");
     l0.lvPrev=l0.lvPrev||(l.lvRaw||l.level);l0.level=lvNorm(r.level)||r.level;l0.lvRaw=r.level;l0.score=r.score;l0.sum=r.summary||l0.sum;l0.tier=r._tier;l0.regAt=Date.now();
     l0.pq=pq.map((x,i)=>{const d=(r.per_question||[]).find(p=>+p.n===i+1)||(r.per_question||[])[i]||{};return Object.assign({},x,{l:d.level||x.l,c:d.comment||x.c,b:d.better||x.b})});
@@ -2058,7 +2063,7 @@ async function mockRegradeNow(btn){if(!sample){toast(ERR.not_granted);return}con
     r._ts=r0._ts;r._prev=r0._prev||r0.level;mock.result=r;
     const l0=S.log.find(x=>x.kind==="mock"&&x.ts===r0._ts);
     if(l0){l0.lvPrev=l0.lvPrev||(l0.lvRaw||l0.level);l0.level=lvNorm(r.level)||r.level;l0.lvRaw=r.level;l0.score=r.score;l0.sum=r.summary||l0.sum;l0.tier=r._tier;l0.regAt=Date.now();
-      l0.pq=(r.per_question||[]).map((x,i)=>({q:(mock.items[i]||{}).q||"",a:((mock.items[i]||{}).a||"").slice(0,3000),s:(mock.items[i]||{}).secs||0,pr:(mock.items[i]||{}).pron||null,l:x.level,c:x.comment,b:x.better}));
+      l0.pq=(r.per_question||[]).map((x,i)=>({...((mock.items[i]||{}).skip?{sk:1}:{}),q:(mock.items[i]||{}).q||"",a:((mock.items[i]||{}).a||"").slice(0,3000),s:(mock.items[i]||{}).secs||0,pr:(mock.items[i]||{}).pron||null,l:x.level,c:x.comment,b:x.better}));
       l0.perq=(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}));delete l0.pat;l0.fixes=(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)}));l0.detAt=Date.now();save()}
     toast("다시 채점했어요: "+(r._prev!==r.level?r._prev+" → ":"")+r.level);render()}
   catch(e){btn.disabled=false;btn.textContent=t0;toast("채점하지 못했어요: "+errMsg(e))}}
@@ -2070,7 +2075,7 @@ const LEC_RULES=`AUDIO RULES — each part is read by a separate voice:
 - {"en":"..."}: English the learner should just hear (e.g. what they said wrong).
 - {"rep":"...","ko":"뜻"}: English sentence for the learner to repeat out loud — a pause follows. Keep each under 20 words.
 Keep Korean parts short (1-3 sentences each). Spoken Korean (해요체), friendly 1:1 tutor, short sentences, natural transitions. No double quotes inside strings.`;
-function lecQText(x,i){const fx=(x.fx||[]).map(f=>`  - "${f.o}" → "${f.b}" (${f.w||""})`).join("\n");
+function lecQText(x,i){if(x&&x.sk)return `Q${i+1}: ${x.q||""}\n(The learner skipped this question on purpose. Do not teach it; if its section comes up, say in one short Korean line that it was skipped and move on.)`;const fx=(x.fx||[]).map(f=>`  - "${f.o}" → "${f.b}" (${f.w||""})`).join("\n");
   return `Q${i+1}${x.l?" ["+x.l+"]":""}: ${x.q||""}\nAnswer: ${(x.a||"(no answer)").slice(0,1500)}${x.c?"\nComment: "+x.c:""}${fx?"\nCorrections:\n"+fx:""}${x.t?"\nTip: "+x.t:""}${x.cl&&x.cl.en?"\nBetter closing: "+x.cl.en+(x.cl.i?" ("+x.cl.i+")":""):""}${x.b?"\nModel sentence: "+x.b:""}`}
 const lecNorm=arr=>(arr||[]).map(x=>({title:String(x&&x.title||""),parts:((x&&x.parts)||[]).map(p=>p&&p.rep?{rep:String(p.rep),ko:String(p.ko||"")}:p&&p.en?{en:String(p.en)}:p&&p.ko?{ko:String(p.ko)}:null).filter(Boolean)})).filter(x=>x.parts.length);
 const lecGroups=n=>{const g=[];for(let i=0;i<n;i+=5)g.push(Array.from({length:Math.min(5,n-i)},(_,k)=>i+k));return g};
@@ -2312,7 +2317,7 @@ async function vMockResult(m){
   if(mock.result==="pending"){const box=h("div",{class:"card"},h("div",{class:"thinking"},h("i"),h("i"),h("i"),h("span",{class:"muted small",style:"margin-left:6px"},"15문항 채점 중… (30–90초)")));
     put(m,h("h1",{},"채점 중"),box);
     if(!sample){box.replaceChildren(h("p",{},ERR.not_granted),h("button",{class:"btn",onclick:()=>{mock=null;render()}},"닫기"));return}
-    try{const r=await evalMock(mock.items,null);{const ap=new Set();for(const it of mock.items){const nf=fixNames(it.a,r.name_fixes);if(nf.applied.length){it.a=nf.text;nf.applied.forEach(x=>ap.add(x))}}r._nfix=[...ap]}mock.result=r;r._ts=Date.now();S.log.push({date:todayStr(),ts:r._ts,kind:"mock",tier:r._tier,qt:"mock",sum:r.summary||"",pq:(r.per_question||[]).map((x,i)=>({q:(mock.items[i]||{}).q||"",a:((mock.items[i]||{}).a||"").slice(0,3000),s:(mock.items[i]||{}).secs||0,pr:(mock.items[i]||{}).pron||null,l:x.level,c:x.comment,b:x.better,g:x.good||"",t:x.tip||"",fx:(x.fixes||[]).filter(f=>f&&f.original&&f.better).slice(0,3).map(f=>({o:f.original,b:f.better,w:f.why||""}))})),pat:(r.patterns||[]).slice(0,3),title:"모의시험 "+mock.items.length+"문항 · 난이도 "+mockDiffLabel(),diff:mockDiffLabel(),level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+x.secs,0),fixes:[...(r.per_question||[]).flatMap(x=>(x.fixes||[]).filter(f=>f&&f.original&&f.better).map(f=>({o:f.original,b:f.better,w:f.why||""}))),...(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)}))],perq:(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}))});save();render()}
+    try{const r=await evalMock(mock.items,null);{const ap=new Set();for(const it of mock.items){const nf=fixNames(it.a,r.name_fixes);if(nf.applied.length){it.a=nf.text;nf.applied.forEach(x=>ap.add(x))}}r._nfix=[...ap]}mock.result=r;r._ts=Date.now();S.log.push({date:todayStr(),ts:r._ts,kind:"mock",tier:r._tier,qt:"mock",sum:r.summary||"",pq:(r.per_question||[]).map((x,i)=>({...((mock.items[i]||{}).skip?{sk:1}:{}),q:(mock.items[i]||{}).q||"",a:((mock.items[i]||{}).a||"").slice(0,3000),s:(mock.items[i]||{}).secs||0,pr:(mock.items[i]||{}).pron||null,l:x.level,c:x.comment,b:x.better,g:x.good||"",t:x.tip||"",fx:(x.fixes||[]).filter(f=>f&&f.original&&f.better).slice(0,3).map(f=>({o:f.original,b:f.better,w:f.why||""}))})),pat:(r.patterns||[]).slice(0,3),title:"모의시험 "+mock.items.length+"문항 · 난이도 "+mockDiffLabel(),diff:mockDiffLabel(),level:(lvNorm(r.level)||r.level),lvRaw:r.level,score:r.score,secs:mock.items.reduce((a,x)=>a+(x.secs||0),0),fixes:[...(r.per_question||[]).flatMap(x=>(x.fixes||[]).filter(f=>f&&f.original&&f.better).map(f=>({o:f.original,b:f.better,w:f.why||""}))),...(r.top_fixes||[]).slice(0,5).map(t=>({o:"",b:"",w:String(t)}))],perq:(r.per_question||[]).map(p=>({n:p.n,level:p.level,kind:(mock.items[(p.n||1)-1]||{}).kind}))});save();render()}
     catch(e){box.replaceChildren(h("p",{style:"color:var(--bad)"},errMsg(e)),h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{render()}},"다시 시도"),h("button",{class:"btn ghost",onclick:()=>{mock=null;render()}},"닫기")))}
     return}
   const r=mock.result;
