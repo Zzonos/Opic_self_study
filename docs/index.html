@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261128-174043-73e2ca" data-rel="309">
+<html lang="ko" data-build="20261128-174806-7026d7" data-rel="310">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -553,19 +553,22 @@ const b64u=b=>{const u=new Uint8Array(b);let bin="";for(let i=0;i<u.length;i+=0x
 const unb64u=t=>{t=t.replace(/-/g,"+").replace(/_/g,"/");t+="=".repeat((4-t.length%4)%4);const bin=atob(t);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u};
 // one-time: practice re-analyses made with v298 were skipped by the web merge; mark them changed so the next '웹으로 통합' carries them again
 function fixPracRegrade(){if(S.pracFix299)return;S.pracFix299=true;const now=Date.now();for(const l of S.log)if(l&&l.kind==="practice"&&l.regAt&&!l.detAt)l.detAt=now}
-function markSent(){const t=Date.now();S.syncHist=[...(S.syncHist||[]),S.syncedAt||t].filter(Boolean).slice(-3);S.syncedAt=t;S.syncFull=false}
+function markSent(){const t=Date.now();if(S.rsFrom){delete S.rsFrom;delete S.rsN}S.syncHist=[...(S.syncHist||[]),S.syncedAt||t].filter(Boolean).slice(-3);S.syncedAt=t;S.syncFull=false}
 // one-time (v309): earlier sends could be lost (the link did not open, or an older web app ignored re-grades) — resend the last 14 days
-function resync309(){if(S.rs309||!window.claude?.use)return;S.rs309=true;S.syncHist=[Date.now()-14*864e5]}
+function resync309(){if(S.rs309||!window.claude?.use)return;S.rs309=true;S.rsFrom=Date.now()-14*864e5;S.rsN=0}
 function syncPayload(){fixPracRegrade();resync309();if(!window.claude?.use&&!S.webFull283){S.webFull283=true;S.syncFull=true;try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}
   if(!S.syncedAt||S.syncFull)return fullPayload();
   /* only what changed since the last completed send (2 minute margin); a record counts as changed when feedback, a lecture or polished answers were added */
-  const hist=(S.syncHist||[]).filter(Boolean);const since=Math.min(S.syncedAt,...(hist.length?[hist[0]]:[]))-120e3;const st=x=>x?(x.ts||(x.date?Date.parse(x.date):0)||0):0;
+  const hist=(S.syncHist||[]).filter(Boolean);const real=Math.min(S.syncedAt,...(hist.length?[hist[0]]:[]))-120e3;const since=Math.min(real,S.rsFrom||Infinity);const st=x=>x?(x.ts||(x.date?Date.parse(x.date):0)||0):0;
   const pick=o=>Object.fromEntries(Object.entries(o||{}).filter(([k,v])=>st(v)>since));
   const scripts=pick(S.scripts),samples=pick(S.samples);const models=Object.fromEntries(Object.entries(S.models||{}).filter(([q])=>((S.modelsAt||{})[q]||0)>since));
   let trans={};if((S.transAllAt||0)>since)trans=S.trans||{};else{const sents=new Set();const add=t=>splitSent(t).forEach(x=>sents.add(x));
     for(const sc of [...Object.values(scripts),...Object.values(samples)])for(const x of (sc.scripts||[]))add(x&&x.answer);for(const m of Object.values(models))add(m);
     for(const x of sents)if(S.trans[x])trans[x]=S.trans[x]}
-  return {delta:true,del:S.del||[],log:S.log.filter(l=>Math.max(l.ts||Date.parse(l.date)||0,l.detAt||0,l.regAt||0,l.lec&&l.lec.ts||0)>since),scripts,samples,models,modelsAt:S.modelsAt||{},trans,custom:S.custom,delC:S.delC||[],texts:S.texts||[],cards:S.cards,cardsAt:S.cardsAt||{},profile:S.profile,profileAt:S.profileAt||0,today:S.today,analysis:S.analysis||null,usage:S.usage||{},transVer:S.transVer||1,transAllAt:S.transAllAt||0,drill:S.drill||{p:{}},units:S.units||{},unitSt:S.unitSt||{},updatedAt:S.updatedAt}}
+  /* lecture scripts and polished answers only when they changed within the last three sends; the one-time 14-day resend
+     carries the ratings, levels, answers and feedback — keeps the link short (a long link opens slowly in the Claude app) */
+  const big=real,slim=l=>{const x=Object.assign({},l);if(x.lec&&(x.lec.ts||0)<=big)delete x.lec;if(x.pq)x.pq=x.pq.map(q=>q&&q.pol&&(q.pol.at||0)<=big?Object.assign({},q,{pol:undefined}):q);return x};
+  return {delta:true,del:S.del||[],log:S.log.filter(l=>Math.max(l.ts||Date.parse(l.date)||0,l.detAt||0,l.regAt||0,l.lec&&l.lec.ts||0)>real||(S.rsFrom&&(l.regAt||0)>S.rsFrom)).map(slim),scripts,samples,models,modelsAt:S.modelsAt||{},trans,custom:S.custom,delC:S.delC||[],texts:S.texts||[],cards:S.cards,cardsAt:S.cardsAt||{},profile:S.profile,profileAt:S.profileAt||0,today:S.today,analysis:S.analysis||null,usage:S.usage||{},transVer:S.transVer||1,transAllAt:S.transAllAt||0,drill:S.drill||{p:{}},units:S.units||{},unitSt:S.unitSt||{},updatedAt:S.updatedAt}}
 function fullPayload(){return {del:S.del||[],log:S.log,scripts:S.scripts,samples:S.samples||{},models:S.models||{},modelsAt:S.modelsAt||{},trans:S.trans||{},custom:S.custom,delC:S.delC||[],texts:S.texts||[],cards:S.cards,cardsAt:S.cardsAt||{},profile:S.profile,profileAt:S.profileAt||0,today:S.today,analysis:S.analysis||null,usage:S.usage||{},transVer:S.transVer||1,transAllAt:S.transAllAt||0,drill:S.drill||{p:{}},units:S.units||{},unitSt:S.unitSt||{},updatedAt:S.updatedAt}}
 function packStateSync(){return "r"+b64u(new TextEncoder().encode(JSON.stringify(syncPayload())).buffer)}
 const SYNC_LIM=180000;
