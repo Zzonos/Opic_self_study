@@ -534,10 +534,13 @@ const b64u=b=>{const u=new Uint8Array(b);let bin="";for(let i=0;i<u.length;i+=0x
 const unb64u=t=>{t=t.replace(/-/g,"+").replace(/_/g,"/");t+="=".repeat((4-t.length%4)%4);const bin=atob(t);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u};
 // one-time: practice re-analyses made with v298 were skipped by the web merge; mark them changed so the next '웹으로 통합' carries them again
 function fixPracRegrade(){if(S.pracFix299)return;S.pracFix299=true;const now=Date.now();for(const l of S.log)if(l&&l.kind==="practice"&&l.regAt&&!l.detAt)l.detAt=now}
-function syncPayload(){fixPracRegrade();if(!window.claude?.use&&!S.webFull283){S.webFull283=true;S.syncFull=true;try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}
+function markSent(){const t=Date.now();S.syncHist=[...(S.syncHist||[]),S.syncedAt||t].filter(Boolean).slice(-3);S.syncedAt=t;S.syncFull=false}
+// one-time (v309): earlier sends could be lost (the link did not open, or an older web app ignored re-grades) — resend the last 14 days
+function resync309(){if(S.rs309||!window.claude?.use)return;S.rs309=true;S.syncHist=[Date.now()-14*864e5]}
+function syncPayload(){fixPracRegrade();resync309();if(!window.claude?.use&&!S.webFull283){S.webFull283=true;S.syncFull=true;try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}
   if(!S.syncedAt||S.syncFull)return fullPayload();
   /* only what changed since the last completed send (2 minute margin); a record counts as changed when feedback, a lecture or polished answers were added */
-  const since=S.syncedAt-120e3;const st=x=>x?(x.ts||(x.date?Date.parse(x.date):0)||0):0;
+  const hist=(S.syncHist||[]).filter(Boolean);const since=Math.min(S.syncedAt,...(hist.length?[hist[0]]:[]))-120e3;const st=x=>x?(x.ts||(x.date?Date.parse(x.date):0)||0):0;
   const pick=o=>Object.fromEntries(Object.entries(o||{}).filter(([k,v])=>st(v)>since));
   const scripts=pick(S.scripts),samples=pick(S.samples);const models=Object.fromEntries(Object.entries(S.models||{}).filter(([q])=>((S.modelsAt||{})[q]||0)>since));
   let trans={};if((S.transAllAt||0)>since)trans=S.trans||{};else{const sents=new Set();const add=t=>splitSent(t).forEach(x=>sents.add(x));
@@ -582,11 +585,11 @@ const SYNC_DONE=new Set();function syncDoneLoad(){try{const o=JSON.parse(localSt
 function syncDoneSave(){try{localStorage.setItem("oss_syncdone",JSON.stringify({sig:syncSig(),done:[...SYNC_DONE]}))}catch(e){}}
 function syncPartsHint(){return syncParts&&syncVer===stVer&&syncParts.length>1?h("p",{class:"muted small",style:"flex-basis:100%;margin:4px 0 0"},"기록이 커서 "+syncParts.length+"번에 나눠 보내요. 1번부터 차례대로 누르고, 웹에서 '통합 완료'가 뜨면 다음 번호를 눌러 주세요."):null}
 function webLink(label,cls,mode="s"){if(syncParts&&syncVer===stVer&&syncParts.length>1){const n=syncParts.length;syncDoneLoad();return h("span",{"data-syncparts":"1",style:"display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center"},...syncParts.map((c,i)=>h("a",{class:cls+(SYNC_DONE.has(i)?" ghost":""),href:WEB_URL+"#"+mode+"_"+c,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",
-    onclick:e=>{SYNC_DONE.add(i);syncDoneSave();e.currentTarget.classList.add("ghost");if(SYNC_DONE.size>=n){S.syncedAt=Date.now();S.syncFull=false;SYNC_DONE.clear();try{localStorage.removeItem("oss_syncdone")}catch(e){}save();toast("마지막 부분이에요 · 웹에서 완료되면 끝이에요")}else toast((i+1)+"/"+n+" 보냄 · 웹에서 완료되면 Claude로 돌아와 나머지도 눌러 주세요")}},(SYNC_DONE.has(i)?"✓ ":"")+label+" "+(i+1)+"/"+n)))}
-  const url=webUrl(mode);if(!url){prepSyncCode();return h("a",{class:cls,href:"#","data-weblink":mode,style:"text-decoration:none;white-space:nowrap",target:"_blank",rel:"noopener",onclick:e=>{if(e.currentTarget.getAttribute("href")==="#"){e.preventDefault();toast("보낼 기록을 준비하는 중이에요. 1–2초 뒤 다시 눌러 주세요");prepSyncCode()}else{S.syncedAt=Date.now();S.syncFull=false;save()}}},label)}
-  return h("a",{class:cls,href:url,"data-weblink":mode,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",onclick:()=>{S.syncedAt=Date.now();S.syncFull=false;save();setTimeout(()=>toast(mode==="x"?"통합이 끝나면 '완료' 화면이 떠요. 그다음 홈 화면 앱을 열면 반영돼 있어요":"웹 앱이 열리면 로그인 후 자동으로 통합돼요"),200)}},label)}
+    onclick:e=>{SYNC_DONE.add(i);syncDoneSave();e.currentTarget.classList.add("ghost");if(SYNC_DONE.size>=n){markSent();SYNC_DONE.clear();try{localStorage.removeItem("oss_syncdone")}catch(e){}save();toast("마지막 부분이에요 · 웹에서 완료되면 끝이에요")}else toast((i+1)+"/"+n+" 보냄 · 웹에서 완료되면 Claude로 돌아와 나머지도 눌러 주세요")}},(SYNC_DONE.has(i)?"✓ ":"")+label+" "+(i+1)+"/"+n)))}
+  const url=webUrl(mode);if(!url){prepSyncCode();return h("a",{class:cls,href:"#","data-weblink":mode,style:"text-decoration:none;white-space:nowrap",target:"_blank",rel:"noopener",onclick:e=>{if(e.currentTarget.getAttribute("href")==="#"){e.preventDefault();toast("보낼 기록을 준비하는 중이에요. 1–2초 뒤 다시 눌러 주세요");prepSyncCode()}else{markSent();save()}}},label)}
+  return h("a",{class:cls,href:url,"data-weblink":mode,target:"_blank",rel:"noopener",style:"text-decoration:none;white-space:nowrap",onclick:()=>{markSent();save();setTimeout(()=>toast(mode==="x"?"통합이 끝나면 '완료' 화면이 떠요. 그다음 홈 화면 앱을 열면 반영돼 있어요":"웹 앱이 열리면 로그인 후 자동으로 통합돼요"),200)}},label)}
 function syncToWeb(){try{const url=webUrl();if(!url){toast("기록이 너무 커서 링크로 못 보내요. 설정의 기록 코드를 사용해 주세요");return}
-  const w=window.open(url,"_blank","noopener");S.syncedAt=Date.now();save();toast(w?"웹 앱이 열리면 로그인 후 자동으로 통합돼요":"팝업이 차단됐어요. 브라우저에서 팝업을 허용해 주세요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
+  const w=window.open(url,"_blank","noopener");markSent();save();toast(w?"웹 앱이 열리면 로그인 후 자동으로 통합돼요":"팝업이 차단됐어요. 브라우저에서 팝업을 허용해 주세요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
 function unsyncedCount(){const t=S.syncedAt||0;return S.log.filter(l=>(l.ts||0)>t||(!l.ts&&t===0)).length}
 function lastSyncLine(){let v="";try{v=localStorage.getItem("oss_lastsync")||""}catch(e){}if(!v)return null;const [t,...m]=v.split("|");return h("p",{class:"muted small"},"마지막 Claude 통합: "+new Date(+t).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})+" · "+m.join("|"))}
 function syncCard(){if(window.claude?.use===undefined)return null;const n=unsyncedCount();
@@ -620,7 +623,7 @@ function syncToClaude(){try{const code=curSyncCode();
   // everything below must stay synchronous: Safari only allows clipboard + new window inside the click itself
   let p=null;try{p=navigator.clipboard.writeText(code)}catch(e){}
   const url=IS_ANDROID&&!window.claude?.use?ART_URL:ART_URL_WEB+(code.length<50000?"#s_"+code:"");const w=IS_ANDROID?(location.href=url,true):window.open(url,"_blank","noopener");
-  S.syncedAt=Date.now();save();
+  markSent();save();
   const done=ok=>toast(ok?"기록 코드를 복사했어요 ("+Math.round(code.length/1024)+"KB). Claude 앱에서 '클립보드에서 가져오기'를 누르세요":"복사가 막혔어요. 설정 → '기록 코드 복사'를 눌러 수동으로 옮겨 주세요");
   if(p&&p.then)p.then(()=>done(true),()=>done(false));else done(false);
   if(!w)toast("팝업이 차단됐어요. 브라우저에서 팝업을 허용해 주세요")}catch(e){toast("보내기에 실패했어요: "+(e.message||e))}}
