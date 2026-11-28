@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261128-172452-e92604" data-rel="307">
+<html lang="ko" data-build="20261128-172658-3e4307" data-rel="308">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1604,7 +1604,7 @@ function vAnswer(m,s){
     finally{stopBtn.hidden=true}
   }},"AI 평가 받기");
   const stopBtn=h("button",{class:"btn",hidden:true,onclick:()=>ctl?.abort()},"중지");
-  const mic=(azOn()?azMicBtn:micBtn)(ta,{assess:()=>PRON_ON,onFinal:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}},onStart:()=>{if(!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild)}else timerBind(tEl,bar.firstChild);startBtn.textContent="답변 끝"}});ta.addEventListener("input",()=>{ta._lastInput=Date.now()});
+  const mic=(azOn()?azMicBtn:micBtn)(ta,{resume:true,assess:()=>PRON_ON,onFinal:()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}},onStart:()=>{if(!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild)}else timerBind(tEl,bar.firstChild);startBtn.textContent="답변 끝"}});ta.addEventListener("input",()=>{ta._lastInput=Date.now()});
   if(mic)mic._onStopTap=()=>{if(timer.on){secs=timerStop();startBtn.textContent="다시 시작"}};
   if(timerBind(tEl,bar.firstChild)){ta._timed=true;startBtn.textContent="답변 끝"}
   const scr=S.scripts[topic.id];const sIdx=topic.qs?topic.qs.indexOf(q):-1;const myScript=scr&&sIdx>=0?scr.scripts?.[sIdx]?.answer:null;
@@ -1986,7 +1986,7 @@ function vMock(m){
     if(sb.textContent==="다시 시작"){try{if(mic&&mic._abort)await mic._abort()}catch(e){}ta.value="";it.a="";it.secs=0;try{mic&&mic._reset&&mic._reset()}catch(e){}}ta._timed=true;timerStart(tEl,bar.firstChild);sb.textContent="답변 끝";
     if(mic){if(mic._az)mic._start();else if(!micOn())mic.onclick()}else ta.focus()}},"말하기 시작");autoTimer(ta,sb);
   const mic=azOn()?azMicBtn(ta,{label:"🎙 마이크로 답하기 (Azure)",assess:true,onStart:()=>{if(!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild)}else timerBind(tEl,bar.firstChild);sb.textContent="답변 끝"},onFinal:()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}})
-    :SR_OK?micBtn(ta,{label:"🎤 마이크로 답하기",onFinal:()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}}):null;
+    :SR_OK?micBtn(ta,{label:"🎤 마이크로 답하기",resume:true,onFinal:()=>{if(timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}}):null;
   reb();if(mic&&!mic._az){const oc=mic.onclick;mic.onclick=()=>{const was=micOn();oc();if(!was&&micOn()){if(!timer.on){ta._timed=true;timerStart(tEl,bar.firstChild)}else timerBind(tEl,bar.firstChild);sb.textContent="답변 끝"}else if(was&&!micOn()&&timer.on){it.secs=timerStop();sb.textContent="다시 시작"}}}
   put(m,h("div",{},h("p",{class:"eyebrow"},"Question "+(mock.i+1)+" / "+n+" · 난이도 "+mockDiffLabel()+" · "+it.kind),nav,qText,hid,h("div",{class:"row",style:"margin-top:8px"},replay,reveal)),
     h("div",{class:"card"},h("div",{class:"row"},tEl,h("div",{class:"grow"},bar),sb),ta,mic?h("div",{class:"row"},mic):SR_OK?null:h("div",{class:"row"},micLink("🎤 마이크로 답하기")),
@@ -3344,7 +3344,7 @@ function srNew(){const R=window.SpeechRecognition||window.webkitSpeechRecognitio
     r.addEventListener("result",e=>{const s=st();s.r=(s.r||0)+1;try{s.ch=Array.from(e.results).map(x=>x[0].transcript).join(" ").length}catch(x){}});
     r.addEventListener("end",()=>{r._live=false;const s=r._st;r._st=null;s&&s.end&&s.end()})}return r}const srLog=t=>{audLog.push("휴대폰 음성인식 "+t);if(audLog.length>30)audLog.shift()};
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")SR_BG=true});
-function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false,gate=null,onHeard=null}={}){if(!SR_OK)return null;const b=h("button",{class:"btn primary"},label);MIC_BTNS.add(b);let on=false;let waitEnd=null;let t0s=0,retried=false,wdN=0,wdInt=false;
+function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false,gate=null,onHeard=null,resume=false}={}){if(!SR_OK)return null;const b=h("button",{class:"btn primary"},label);MIC_BTNS.add(b);let on=false;let waitEnd=null;let t0s=0,retried=false,wdN=0,wdInt=false;
   b._isOn=()=>on;b._finish=()=>new Promise(res=>{if(!on){res();return}waitEnd=res;try{rec?.stop()}catch(e){}setTimeout(()=>{if(waitEnd===res){waitEnd=null;if(on)stop();res()}},2500)});
   const stop=()=>{on=false;b.textContent=label;b.classList.remove("rec");try{rec?.stop()}catch(e){}rec=null};
   let base="",fin="",from=0,seen=0;
@@ -3380,7 +3380,8 @@ function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false,gate=nul
       // failed right at the start (typically after coming back from the background): start once more on a fresh recogniser
       if(!keepAlive&&on&&!retried&&Date.now()-t0s<2000&&/audio-capture|aborted|network/.test(e.error)){retried=true;stop();setTimeout(()=>{if(b.isConnected&&!on)b.onclick()},350);return}
       if(e.error==="not-allowed")toast("마이크 권한을 허용해 주세요 (설정 → Safari → 마이크)");else if(e.error!=="no-speech"&&e.error!=="aborted")toast("음성인식이 멈췄어요 ("+e.error+") — 다시 눌러 주세요");stop()};
-    rec.onend=()=>{if(on&&keepAlive&&!waitEnd){// the browser closed the session by itself: keep what was heard and listen again
+    rec.onend=()=>{if(on&&resume&&!keepAlive&&!waitEnd&&b.isConnected){const sec=Math.round((Date.now()-t0s)/1000);srLog("브라우저가 "+sec+"초에 끊음 → 이어서 다시 듣기");try{dlog("브라우저 음성인식 "+sec+"초에 종료 → 자동 재시작")}catch(x){}}
+      if(on&&(keepAlive||resume)&&!waitEnd){// the browser closed the session by itself: keep what was heard and listen again
         pend="";if(settled){const s2=settled;settled=null;setTimeout(s2,0)}
         base=ta.value?ta.value.replace(/\s+$/,"")+" ":"";fin="";from=0;seen=0;const old=rec;setTimeout(()=>{if(!on||rec!==old)return;try{rec.start();rec._live=true}catch(e){try{const R2=window.SpeechRecognition||window.webkitSpeechRecognition;const n=new R2();n.lang="en-US";n.continuous=true;n.interimResults=true;n.onresult=old.onresult;n.onerror=old.onerror;n.onend=old.onend;rec=n;SR_ALL.add(n);n.start()}catch(x){stop()}}},150);return}
       if(on){stop();ta.value=(base+fin).trim();ta.dispatchEvent(new Event("input"));onFinal&&onFinal(ta.value)}if(waitEnd){const w=waitEnd;waitEnd=null;w()}};
