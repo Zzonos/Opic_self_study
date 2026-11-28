@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261128-152956-7b5ffe" data-rel="305">
+<html lang="ko" data-build="20261128-160004-b4a306" data-rel="306">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -998,10 +998,11 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
   b._flush=async()=>{for(let k=0;k<16&&live&&pend;k++)await new Promise(r=>setTimeout(r,150))};
   const unVad=()=>{if(vadStop){vadStop();vadStop=null}};
   const dropCl=()=>{if(cl){try{cl.getTracks().forEach(t=>t.stop())}catch(e){}cl=null}};
-  const stopRec=()=>new Promise(res=>{clearInterval(idleT);idleT=null;gen++;if(!rec){live=false;dropCl();paint();return res()}const r=rec;rec=null;try{if(AZ.lastStat){audLog.push(AZ.lastStat());if(audLog.length>30)audLog.shift();AZ.lastStat=null}}catch(x){}if(AZ.live.has(b)){azAdd((Date.now()-AZ.live.get(b))/1000);AZ.live.delete(b)}if(live){MIC.active=Math.max(0,MIC.active-1);MIC.last=Date.now()}live=false;paint();
+  const stopRec=()=>new Promise(res=>{clearInterval(idleT);idleT=null;gen++;if(!rec){live=false;dropCl();paint();return res()}const r=rec;rec=null;try{if(AZ.lastStat){try{dlog(AZ.lastStat())}catch(x){}audLog.push(AZ.lastStat());if(audLog.length>30)audLog.shift();AZ.lastStat=null}}catch(x){}if(AZ.live.has(b)){azAdd((Date.now()-AZ.live.get(b))/1000);AZ.live.delete(b)}if(live){MIC.active=Math.max(0,MIC.active-1);MIC.last=Date.now()}live=false;paint();
     try{r.stopContinuousRecognitionAsync(()=>{try{r.close()}catch(e){}dropCl();res()},()=>{dropCl();res()})}catch(e){dropCl();res()}});
   const startRec=async()=>{if(rec||starting)return;starting=true;paint();unVad();const c0=Date.now();
-    try{const {sdk,cfg}=await azConfig(2000);let audio;try{if(fresh){try{ttsStop()}catch(x){}if(!MIC.active)micRelease()}const ms=await micStream();dropCl();cl=ms.clone();audio=sdk.AudioConfig.fromStreamInput(cl)}catch(x){if(x&&x.name==="NotAllowedError")throw new Error("마이크 권한이 꺼져 있어요");audio=sdk.AudioConfig.fromDefaultMicrophoneInput()}
+    try{const {sdk,cfg}=await azConfig(2000);let audio;try{if(fresh){try{ttsStop()}catch(x){}if(!MIC.active)micRelease()}const ms=await micStream();dropCl();cl=ms.clone();audio=sdk.AudioConfig.fromStreamInput(cl);
+        try{const tr=cl.getAudioTracks()[0],myCl=cl;if(tr.muted)dlog("마이크 시작부터 음소거 상태");tr.addEventListener("mute",()=>{dlog("마이크 음소거됨 (기기가 마이크를 가져감)");setTimeout(()=>{if(cl===myCl&&tr.muted&&want&&rec){audLog.push("마이크 음소거 지속 → 새로 열기");dlog("음소거 지속 → 마이크 새로 열기");health(gen)}},1200)});tr.addEventListener("unmute",()=>dlog("마이크 음소거 풀림"));tr.addEventListener("ended",()=>dlog("마이크 트랙 끝남"))}catch(x){}}catch(x){if(x&&x.name==="NotAllowedError")throw new Error("마이크 권한이 꺼져 있어요");audio=sdk.AudioConfig.fromDefaultMicrophoneInput()}
       const A=typeof assess==="function"?!!assess():!!assess;if(!A)try{cfg.requestWordLevelTimestamps()}catch(x){}const r=new sdk.SpeechRecognizer(cfg,audio);const my=++gen;rec=r;skipPhrase=false;
       // (no phrase list: my proper nouns are given to the AI instead — see nameHint())
       // pronunciation scoring only where it is shown (practice / mock); a conversation only needs the words, fast
@@ -2197,12 +2198,14 @@ function lecBgStatus(){if(!WEB)return "";if(LECBG.on&&!String(LECBG.curKey||"").
   const n=S.log.filter(l=>l.kind==="mock"&&l.lec).length;const r=S.log.filter(l=>l.kind==="mock"&&l.lec&&LECBG.ready[lecKey(l.lec)]).length;
   const mb=LECBG.mb!=null?" · 앱 저장공간 "+LECBG.mb+"MB":"";
   return h("span",{class:"small "+(r===n?"":"muted")},(r===n?"🔊 강의 "+n+"개 모두 음성 준비됨 (현재 속도)":"🔊 음성 준비됨 "+r+"/"+n+(LECBG.err?" · "+LECBG.err:" · 앱이 열려 있는 동안 자동으로 만들어요"))+mb)}
-async function lecPrebuild(){if(LECBG.on||!WEB||!TTS_URL||!navigator.onLine)return;const cache=await (self.caches?caches.open("oss-clips").catch(()=>null):null);if(!cache)return;
+// background voicing waits while the learner is answering (mic on or a mock test running)
+const answering=()=>(typeof MIC!=="undefined"&&MIC.active>0)||(typeof mock!=="undefined"&&!!mock&&!mock.result);
+async function lecPrebuild(){if(LECBG.on||!WEB||!TTS_URL||!navigator.onLine||answering())return;const cache=await (self.caches?caches.open("oss-clips").catch(()=>null):null);if(!cache)return;
   const lecs=[...S.log.filter(l=>l.kind==="mock"&&l.lec).slice().reverse().map(l=>l.lec),...unitList().map(x=>unitLec(x.u))];const todo=[];
   for(const lec of lecs){const k=lecKey(lec);if(LECBG.ready[k])continue;try{if(await cache.match(k)&&await cache.match(k+"_m")){LECBG.ready[k]=1;continue}}catch(e){}todo.push(lec)}
   if(!todo.length){lecBgUpd();return}
   LECBG.on=true;LECBG.total=todo.length;LECBG.done=0;LECBG.err="";
-  for(const lec of todo){const k=lecKey(lec);LECBG.cur=lec.title;LECBG.curKey=k;lecBgUpd();
+  for(const lec of todo){while(answering())await new Promise(r=>setTimeout(r,30e3));const k=lecKey(lec);LECBG.cur=lec.title;LECBG.curKey=k;lecBgUpd();
     try{const had=!!LECF[k];const r=await lectureFile(lec);if(!r.miss)LECBG.ready[k]=1;else LECBG.err="음성 서버가 일부 문장을 거절해 나중에 다시 시도해요";
       if(!had&&LECF[k]&&!(player.on&&player.lecTs===lec.ts)){try{URL.revokeObjectURL(LECF[k].url)}catch(e){}delete LECF[k]}}
     catch(e){LECBG.err="음성 만들기 실패: "+String(e.message||e).slice(0,60);audLog.push("강의 미리 만들기 실패: "+(e.message||e))}
@@ -2244,7 +2247,7 @@ async function lectureFile0(lec,onProg){const key=lecKey(lec);if(LECF[key])retur
   LEC_DIAG=lec.title+" · "+Math.round(blob.size/1024)+"KB · "+Math.round(t/60)+"분 · 문장 "+voiced+"개 중 빠짐 "+miss+(miss?" ("+left.map(i=>(plan[i].ko||plan[i].en).slice(0,30)).join(" / ")+")":"");audLog.push("강의 파일 "+LEC_DIAG);if(!miss){LECF[key]=r;LECBG.ready[key]=1}else lecRetryMiss(lec,left.map(i=>plan[i]));return r}
 // sentences the voice server refused: keep trying in the background (each success is cached), so the next play has them
 function lecRetryMiss(lec,items){const id=lec.ts+"_"+lecKo()+"_"+lecEn();if(lecRetryMiss.on===id)return;lecRetryMiss.on=id;let left=items.slice();const W=ms=>new Promise(r=>setTimeout(r,ms));
-  (async()=>{for(const wait of [20e3,60e3,180e3,420e3]){await W(wait);if(lecRetryMiss.on!==id)return;const still=[];
+  (async()=>{for(const wait of [20e3,60e3,180e3,420e3]){await W(wait);while(answering())await W(30e3);if(lecRetryMiss.on!==id)return;const still=[];
       for(const x of left){try{const u8=x.ko?await lecClip(x.ko,"ko",lecKo()):await lecClip(x.en,"en",lecEn());if(!u8||u8.length<500)still.push(x)}catch(e){still.push(x)}}
       audLog.push("빠진 강의 음성 다시 받기: "+(left.length-still.length)+"/"+left.length+" 성공");left=still;
       const ms=LEC_MISS[lec.ts];if(ms){for(const x of items)if(!left.includes(x))ms.delete(x.ko||x.en)}
