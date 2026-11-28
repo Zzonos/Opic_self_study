@@ -609,19 +609,38 @@ let SYNC_RAW="";
 // the sync link is read when the page opens AND when an already-open page is handed a new link (the browser may reuse
 // the open tab and only change the part after #), or when the tab comes back to the front with such a link
 const SYNC_SEEN=new Set();
+// progress card shown from the moment a sync link arrives until it is saved (each step; a step stuck for 10 s says so)
+const SYNCUI={el:null,st:{},t:null};const SYNC_ORDER=[["recv","기록 받기"],["login","로그인 확인"],["merge","합치기"],["save","계정에 저장"]];
+function syncUI(k,txt,state){if(!SYNCUI.el){SYNCUI.el=h("div",{id:"syncov",style:"position:fixed;left:0;top:0;width:100%;height:100%;margin:0;padding:24px;box-sizing:border-box;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center"},
+    h("div",{class:"card",style:"text-align:left;min-width:260px;max-width:420px"},h("h3",{},"통합 중…"),h("div",{id:"syncsteps",class:"small",style:"line-height:1.9"}),h("p",{class:"muted small",id:"sdmsg"}),h("div",{id:"syncact",class:"row",style:"justify-content:center;margin-top:10px"})));document.body.append(SYNCUI.el)}
+  if(SYNCUI.el.style.display==="none"&&k!=="login"||k==="merge")SYNCUI.el.style.display="flex";if(k)SYNCUI.st[k]={txt,state};const box=SYNCUI.el.querySelector("#syncsteps");box.replaceChildren(...SYNC_ORDER.map(([key,name])=>{const x=SYNCUI.st[key];const ic=!x?"·":x.state==="ok"?"✓":x.state==="err"?"⚠":"…";return h("div",{style:x&&x.state==="err"?"color:var(--warn,#b45309)":x?"":"opacity:.5"},ic+" "+(x?x.txt:name))}));
+  clearTimeout(SYNCUI.t);if(state==="run")SYNCUI.t=setTimeout(()=>syncStall(k),10000)}
+function syncMsg(t){if(SYNCUI.el)SYNCUI.el.querySelector("#sdmsg").textContent=t}
+function syncAct(...btns){if(SYNCUI.el)SYNCUI.el.querySelector("#syncact").replaceChildren(...btns)}
+function syncReloadBtn(){return h("button",{class:"btn primary",onclick:()=>{try{if(SYNC_RAW)sessionStorage.setItem("oss_synchash",SYNC_RAW)}catch(e){}location.reload()}},"새로고침")}
+function syncStall(k){const why={recv:"받은 기록을 푸는 데 오래 걸리고 있어요",login:"로그인 확인이 늦어지고 있어요",merge:"합치는 데 오래 걸리고 있어요",save:"계정 저장이 늦어지고 있어요 (자동으로 계속 시도 중)"}[k]||"늦어지고 있어요";
+  syncMsg(why+" · 계속 멈춰 있으면 새로고침해 주세요. 받은 기록은 이 탭에 보관돼 있어 사라지지 않아요.");syncAct(syncReloadBtn());syncNote("통합 단계 지연: "+k)}
+function syncClose_(){clearTimeout(SYNCUI.t);if(SYNCUI.el)SYNCUI.el.remove();SYNCUI.el=null;SYNCUI.st={}}
+const unpackT=t=>Promise.race([unpackState(t),new Promise((_,no)=>setTimeout(()=>no(new Error("시간 초과")),10000))]);
 async function syncFromHash(first){let hs=location.hash;if(!/^#[sxl]_/.test(hs)){try{const k=sessionStorage.getItem("oss_synchash");if(k){hs=k;sessionStorage.removeItem("oss_synchash");syncNote("업데이트 후 링크 이어받음")}}catch(e){}}
-  const m=hs.match(/^#([sxl])_(.+)$/);if(!m)return;const sig=m[2].length+":"+m[2].slice(-32);if(SYNC_SEEN.has(sig)){try{history.replaceState(null,"",location.pathname+location.search)}catch(e){}return}SYNC_SEEN.add(sig);if(!first)syncNote("열려 있던 페이지에서 새 링크 받음");SYNC_RAW=hs;syncClose=m[1]==="x";syncListen=m[1]==="l";syncNote("링크 받음 ("+Math.round(m[2].length/1024)+"KB)");
-  try{pendingSync=await unpackState(m[2]);history.replaceState(null,"",location.pathname+location.search);syncNote("기록 "+((pendingSync.log||[]).length)+"건 읽음"+(syncReady?" → 바로 합치기":" → 로그인 확인 대기"));if(syncReady)applyPendingSync()}
-  catch(e){syncNote("링크 해독 실패: "+(e.message||e)+" — 링크가 잘렸을 수 있어요");toast("가져온 기록을 읽을 수 없어요 (링크가 잘렸을 수 있어요). Claude에서 다시 눌러 주세요")}}
-syncFromHash(true);
+  const m=hs.match(/^#([sxl])_(.+)$/);if(!m)return;const sig=m[2].length+":"+m[2].slice(-32);if(SYNC_SEEN.has(sig)){try{history.replaceState(null,"",location.pathname+location.search)}catch(e){}return}SYNC_SEEN.add(sig);if(!first)syncNote("열려 있던 페이지에서 새 링크 받음");SYNC_RAW=hs;syncClose=m[1]==="x";syncListen=m[1]==="l";syncNote("링크 받음 ("+Math.round(m[2].length/1024)+"KB)");try{sessionStorage.setItem("oss_synchash",hs)}catch(e){}
+  syncUI("recv","기록 받는 중… ("+Math.round(m[2].length/1024)+"KB)","run");
+  try{try{pendingSync=await unpackT(m[2])}catch(e1){if(!/시간 초과/.test(e1.message||""))throw e1;syncNote("기록 풀기 시간 초과 → 다시 시도");pendingSync=await unpackT(m[2])}
+    history.replaceState(null,"",location.pathname+location.search);const n=(pendingSync.log||[]).length;syncNote("기록 "+n+"건 읽음"+(syncReady?" → 바로 합치기":" → 로그인 확인 대기"));
+    syncUI("recv","기록 받음 ("+n+"건)","ok");if(syncReady)applyPendingSync();else syncUI("login","로그인 확인 중…","run")}
+  catch(e){syncNote("링크 해독 실패: "+(e.message||e)+" — 링크가 잘렸을 수 있어요");syncUI("recv","기록을 읽지 못했어요 ("+(e.message||e)+")","err");try{sessionStorage.removeItem("oss_synchash")}catch(x){}
+    syncMsg(/시간 초과/.test(e.message||"")?"기록을 푸는 데 너무 오래 걸려요. 새로고침해 보세요.":"링크가 잘렸을 수 있어요. Claude에서 '웹으로 통합'을 다시 눌러 주세요.");syncAct(...(/시간 초과/.test(e.message||"")?[syncReloadBtn()]:[]),h("button",{class:"btn ghost",onclick:syncClose_},"닫기"))}}
+setTimeout(()=>syncFromHash(true),0);// after the whole script has run (the progress card needs the page helpers)
 window.addEventListener("hashchange",()=>syncFromHash(false));
 window.addEventListener("pageshow",()=>syncFromHash(false));
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")syncFromHash(false)});
-function applyPendingSync(){syncReady=true;if(!pendingSync)return;SYNC_RAW="";try{sessionStorage.removeItem("oss_synchash")}catch(e){}const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;syncNote("기록 "+n+"건 합침"+(cloud.user?" · 계정에 저장 중":" · 이 기기에만 (로그인 안 됨)"));toast((window.claude?.use?"웹 계정 기록":"Claude 기록")+" "+n+"건을 합쳤어요");syncRender();if(syncClose)syncDone(n);if(syncListen){syncListen=false;player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}go("listen")}setTimeout(()=>clipSync(false),2000)}
-async function syncDone(n){const ov=h("div",{style:"position:fixed;left:0;top:0;width:100%;height:100%;margin:0;padding:24px;box-sizing:border-box;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center"},h("div",{class:"card",style:"text-align:center"},h("h3",{},"통합 중…"),h("p",{class:"muted small",id:"sdmsg"},"계정에 저장하고 있어요")));document.body.append(ov);
-  const msg=t=>{const el=$("#sdmsg");if(el)el.textContent=t};
-  try{if(cloud.ref)await cloudPush(true);syncNote(cloud.ref?"계정 저장 완료":"이 브라우저에만 저장 (로그인 안 됨)");ov.querySelector("h3").textContent="통합 완료 ✓";msg(cloud.ref?"기록 "+n+"건이 "+(cloud.user?.email||"계정")+"에 저장됐어요. 홈 화면의 OSS 앱을 열면 반영되어 있어요. 이 화면은 그냥 두고 Claude 앱으로 돌아가면 됩니다.":"이 기기(브라우저)에만 저장됐어요. 홈 화면 앱에 반영하려면 로그인이 필요해요.")}catch(e){syncNote("계정 저장 실패: "+(e.code||e.message));ov.querySelector("h3").textContent="저장 실패";msg((e.code||e.message||String(e))+" — 기록은 이 브라우저에 남아 있어요. 네트워크를 확인하고 아래 '다시 저장'을 눌러 주세요.");ov.querySelector(".card").append(h("button",{class:"btn primary",style:"margin-top:10px",onclick:()=>{ov.remove();syncDone(n)}},"다시 저장"));return}
-  ov.querySelector(".card").append(h("div",{class:"row",style:"justify-content:center;margin-top:10px"},h("a",{class:"btn primary",href:ART_URL,style:"text-decoration:none"},"Claude 앱으로 돌아가기"),h("button",{class:"btn ghost",onclick:()=>ov.remove()},"웹 앱 계속 보기")))}
+function applyPendingSync(){syncReady=true;if(!pendingSync)return;SYNC_RAW="";try{sessionStorage.removeItem("oss_synchash")}catch(e){}const n=(pendingSync.log||[]).length;
+  syncUI("login",cloud.user?"로그인 확인 ("+(cloud.user.email||"계정")+")":"로그인 없이 사용 중 (이 기기에만 저장)","ok");syncUI("merge","합치는 중…","run");mergeState(pendingSync,false);pendingSync=null;syncUI("merge","기록 "+n+"건 합침","ok");syncNote("기록 "+n+"건 합침"+(cloud.user?" · 계정에 저장 중":" · 이 기기에만 (로그인 안 됨)"));toast((window.claude?.use?"웹 계정 기록":"Claude 기록")+" "+n+"건을 합쳤어요");syncRender();if(syncClose)syncDone(n);else{syncMsg("웹 앱에 반영됐어요");setTimeout(syncClose_,1200);if(cloud.ref)syncUI("save","계정에 자동 저장돼요","ok")}if(syncListen){syncListen=false;player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}go("listen")}setTimeout(()=>clipSync(false),2000)}
+async function syncDone(n){syncUI("save",cloud.ref?"계정에 저장 중…":"이 기기(브라우저)에 저장","run");syncAct();
+  try{if(cloud.ref)await cloudPush(true);syncNote(cloud.ref?"계정 저장 완료":"이 브라우저에만 저장 (로그인 안 됨)");syncUI("save",cloud.ref?"계정에 저장됨":"이 기기에만 저장됨",cloud.ref?"ok":"err");
+    SYNCUI.el.querySelector("h3").textContent="통합 완료 ✓";syncMsg(cloud.ref?"기록 "+n+"건이 "+(cloud.user?.email||"계정")+"에 저장됐어요. 홈 화면의 OSS 앱을 열면 반영되어 있어요. 이 화면은 그냥 두고 Claude 앱으로 돌아가면 됩니다.":"이 기기(브라우저)에만 저장됐어요. 홈 화면 앱에 반영하려면 로그인이 필요해요.")}
+  catch(e){syncNote("계정 저장 실패: "+(e.code||e.message));syncUI("save","저장 실패: "+(e.code||e.message||e),"err");syncMsg("기록은 이 브라우저에 남아 있어요. 네트워크를 확인하고 '다시 저장'을 눌러 주세요.");syncAct(h("button",{class:"btn primary",onclick:()=>syncDone(n)},"다시 저장"));return}
+  syncAct(h("a",{class:"btn primary",href:ART_URL,style:"text-decoration:none"},"Claude 앱으로 돌아가기"),h("button",{class:"btn ghost",onclick:syncClose_},"웹 앱 계속 보기"))}
 // web → Claude: copy a packed code (and try the URL hash), then open the artifact
 let syncCode=null,syncCodeAt=0,syncVer=-1;
 // the prepared code is used only while nothing has changed since (a save here, or records merged in from the account)
@@ -669,8 +688,8 @@ try{cloud.skip=localStorage.getItem("oss_skiplogin")==="1"}catch(e){}
 function cloudInit(){if(!window.firebase?.initializeApp||!window.firebase?.auth)return;try{firebase.initializeApp(FB_CONFIG);cloud.ok=true;const auth=firebase.auth();auth.useDeviceLanguage();
   auth.onAuthStateChanged(async u=>{cloud.ready=true;if(cloud.unsub){cloud.unsub();cloud.unsub=null}cloud.user=u;cloud.ref=null;
     if(u&&cloud.signingUp){return} // signup writes the first document itself (with the invite code), then calls cloudAttach
-    if(u)await cloudAttach(u);else if(pendingSync&&!cloud.skip){syncNote("로그인 안 됨 → 로그인하면 합쳐요");toast("Claude 기록을 받았어요. 로그인하면 계정에 합쳐져요")}apiApply();render()})}catch(e){cloud.ok=false}}
-async function cloudAttach(u){cloud.user=u;cloud.ref=firebase.firestore().collection("users").doc(u.uid);try{await cloudPull(true)}catch(e){toast("클라우드 기록을 불러오지 못했어요: "+(e.code||e.message))}clipIdxLoad();
+    if(u)await cloudAttach(u);else if(pendingSync&&!cloud.skip){syncNote("로그인 안 됨 → 로그인하면 합쳐요");toast("Claude 기록을 받았어요. 로그인하면 계정에 합쳐져요");syncUI("login","로그인이 필요해요","err");syncMsg("로그인하면 받은 기록이 바로 합쳐져요.");syncAct(h("button",{class:"btn primary",onclick:()=>{if(SYNCUI.el)SYNCUI.el.style.display="none"}},"로그인하기"))}apiApply();render()})}catch(e){cloud.ok=false}}
+async function cloudAttach(u){cloud.user=u;cloud.ref=firebase.firestore().collection("users").doc(u.uid);if(pendingSync)applyPendingSync();try{await cloudPull(true)}catch(e){toast("클라우드 기록을 불러오지 못했어요: "+(e.code||e.message))}clipIdxLoad();
   setTimeout(applyPendingSync,300);
   if(cloud.unsub)cloud.unsub();cloud.unsub=cloud.ref.onSnapshot(snap=>{if(!snap.exists||snap.metadata.hasPendingWrites)return;cloudApply(snap.data())});}
 // another device (or the Claude → web sync page) saved: always merge — never skip because this copy was touched more recently,
