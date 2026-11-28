@@ -606,10 +606,17 @@ function syncNote(msg){try{audLog.push("통합: "+msg)}catch(e){}try{localStorag
 let syncListen=false;
 // a sync link survives the auto-update reload: the code is parked in this tab's sessionStorage and read back after the reload
 let SYNC_RAW="";
-(async()=>{let hs=location.hash;if(!/^#[sxl]_/.test(hs)){try{const k=sessionStorage.getItem("oss_synchash");if(k){hs=k;sessionStorage.removeItem("oss_synchash");syncNote("업데이트 후 링크 이어받음")}}catch(e){}}
-  const m=hs.match(/^#([sxl])_(.+)$/);if(!m)return;SYNC_RAW=hs;syncClose=m[1]==="x";syncListen=m[1]==="l";syncNote("링크 받음 ("+Math.round(m[2].length/1024)+"KB)");
+// the sync link is read when the page opens AND when an already-open page is handed a new link (the browser may reuse
+// the open tab and only change the part after #), or when the tab comes back to the front with such a link
+const SYNC_SEEN=new Set();
+async function syncFromHash(first){let hs=location.hash;if(!/^#[sxl]_/.test(hs)){try{const k=sessionStorage.getItem("oss_synchash");if(k){hs=k;sessionStorage.removeItem("oss_synchash");syncNote("업데이트 후 링크 이어받음")}}catch(e){}}
+  const m=hs.match(/^#([sxl])_(.+)$/);if(!m)return;const sig=m[2].length+":"+m[2].slice(-32);if(SYNC_SEEN.has(sig)){try{history.replaceState(null,"",location.pathname+location.search)}catch(e){}return}SYNC_SEEN.add(sig);if(!first)syncNote("열려 있던 페이지에서 새 링크 받음");SYNC_RAW=hs;syncClose=m[1]==="x";syncListen=m[1]==="l";syncNote("링크 받음 ("+Math.round(m[2].length/1024)+"KB)");
   try{pendingSync=await unpackState(m[2]);history.replaceState(null,"",location.pathname+location.search);syncNote("기록 "+((pendingSync.log||[]).length)+"건 읽음"+(syncReady?" → 바로 합치기":" → 로그인 확인 대기"));if(syncReady)applyPendingSync()}
-  catch(e){syncNote("링크 해독 실패: "+(e.message||e)+" — 링크가 잘렸을 수 있어요");toast("가져온 기록을 읽을 수 없어요 (링크가 잘렸을 수 있어요). Claude에서 다시 눌러 주세요")}})();
+  catch(e){syncNote("링크 해독 실패: "+(e.message||e)+" — 링크가 잘렸을 수 있어요");toast("가져온 기록을 읽을 수 없어요 (링크가 잘렸을 수 있어요). Claude에서 다시 눌러 주세요")}}
+syncFromHash(true);
+window.addEventListener("hashchange",()=>syncFromHash(false));
+window.addEventListener("pageshow",()=>syncFromHash(false));
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")syncFromHash(false)});
 function applyPendingSync(){syncReady=true;if(!pendingSync)return;SYNC_RAW="";try{sessionStorage.removeItem("oss_synchash")}catch(e){}const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;syncNote("기록 "+n+"건 합침"+(cloud.user?" · 계정에 저장 중":" · 이 기기에만 (로그인 안 됨)"));toast((window.claude?.use?"웹 계정 기록":"Claude 기록")+" "+n+"건을 합쳤어요");syncRender();if(syncClose)syncDone(n);if(syncListen){syncListen=false;player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}go("listen")}setTimeout(()=>clipSync(false),2000)}
 async function syncDone(n){const ov=h("div",{style:"position:fixed;left:0;top:0;width:100%;height:100%;margin:0;padding:24px;box-sizing:border-box;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center"},h("div",{class:"card",style:"text-align:center"},h("h3",{},"통합 중…"),h("p",{class:"muted small",id:"sdmsg"},"계정에 저장하고 있어요")));document.body.append(ov);
   const msg=t=>{const el=$("#sdmsg");if(el)el.textContent=t};
