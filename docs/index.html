@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261128-174806-7026d7" data-rel="310">
+<html lang="ko" data-build="20261128-175816-ed5e6d" data-rel="311">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -555,7 +555,7 @@ const unb64u=t=>{t=t.replace(/-/g,"+").replace(/_/g,"/");t+="=".repeat((4-t.leng
 function fixPracRegrade(){if(S.pracFix299)return;S.pracFix299=true;const now=Date.now();for(const l of S.log)if(l&&l.kind==="practice"&&l.regAt&&!l.detAt)l.detAt=now}
 function markSent(){const t=Date.now();if(S.rsFrom){delete S.rsFrom;delete S.rsN}S.syncHist=[...(S.syncHist||[]),S.syncedAt||t].filter(Boolean).slice(-3);S.syncedAt=t;S.syncFull=false}
 // one-time (v309): earlier sends could be lost (the link did not open, or an older web app ignored re-grades) — resend the last 14 days
-function resync309(){if(S.rs309||!window.claude?.use)return;S.rs309=true;S.rsFrom=Date.now()-14*864e5;S.rsN=0}
+function resync309(){if(S.rs310||!window.claude?.use)return;S.rs310=true;S.rs309=true;S.rsFrom=Date.now()-14*864e5;S.rsN=0}
 function syncPayload(){fixPracRegrade();resync309();if(!window.claude?.use&&!S.webFull283){S.webFull283=true;S.syncFull=true;try{localStorage.setItem("opic30",JSON.stringify(S))}catch(e){}}
   if(!S.syncedAt||S.syncFull)return fullPayload();
   /* only what changed since the last completed send (2 minute margin); a record counts as changed when feedback, a lecture or polished answers were added */
@@ -623,10 +623,13 @@ let syncClose=false;
 let syncReady=false; // true once this page knows whether it is signed in (or runs without an account)
 function syncNote(msg){try{audLog.push("통합: "+msg)}catch(e){}try{localStorage.setItem("oss_lastsync",Date.now()+"|"+msg)}catch(e){}}
 let syncListen=false;
-(async()=>{const m=location.hash.match(/^#([sxl])_(.+)$/);if(!m)return;syncClose=m[1]==="x";syncListen=m[1]==="l";syncNote("링크 받음 ("+Math.round(m[2].length/1024)+"KB)");
+// a sync link survives the auto-update reload: the code is parked in this tab's sessionStorage and read back after the reload
+let SYNC_RAW="";
+(async()=>{let hs=location.hash;if(!/^#[sxl]_/.test(hs)){try{const k=sessionStorage.getItem("oss_synchash");if(k){hs=k;sessionStorage.removeItem("oss_synchash");syncNote("업데이트 후 링크 이어받음")}}catch(e){}}
+  const m=hs.match(/^#([sxl])_(.+)$/);if(!m)return;SYNC_RAW=hs;syncClose=m[1]==="x";syncListen=m[1]==="l";syncNote("링크 받음 ("+Math.round(m[2].length/1024)+"KB)");
   try{pendingSync=await unpackState(m[2]);history.replaceState(null,"",location.pathname+location.search);syncNote("기록 "+((pendingSync.log||[]).length)+"건 읽음"+(syncReady?" → 바로 합치기":" → 로그인 확인 대기"));if(syncReady)applyPendingSync()}
   catch(e){syncNote("링크 해독 실패: "+(e.message||e)+" — 링크가 잘렸을 수 있어요");toast("가져온 기록을 읽을 수 없어요 (링크가 잘렸을 수 있어요). Claude에서 다시 눌러 주세요")}})();
-function applyPendingSync(){syncReady=true;if(!pendingSync)return;const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;syncNote("기록 "+n+"건 합침"+(cloud.user?" · 계정에 저장 중":" · 이 기기에만 (로그인 안 됨)"));toast((window.claude?.use?"웹 계정 기록":"Claude 기록")+" "+n+"건을 합쳤어요");syncRender();if(syncClose)syncDone(n);if(syncListen){syncListen=false;player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}go("listen")}setTimeout(()=>clipSync(false),2000)}
+function applyPendingSync(){syncReady=true;if(!pendingSync)return;SYNC_RAW="";try{sessionStorage.removeItem("oss_synchash")}catch(e){}const n=(pendingSync.log||[]).length;mergeState(pendingSync,false);pendingSync=null;syncNote("기록 "+n+"건 합침"+(cloud.user?" · 계정에 저장 중":" · 이 기기에만 (로그인 안 됨)"));toast((window.claude?.use?"웹 계정 기록":"Claude 기록")+" "+n+"건을 합쳤어요");syncRender();if(syncClose)syncDone(n);if(syncListen){syncListen=false;player.opts.mode="lecture";try{localStorage.setItem("opic30_player",JSON.stringify(player.opts))}catch(e){}go("listen")}setTimeout(()=>clipSync(false),2000)}
 async function syncDone(n){const ov=h("div",{style:"position:fixed;left:0;top:0;width:100%;height:100%;margin:0;padding:24px;box-sizing:border-box;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center"},h("div",{class:"card",style:"text-align:center"},h("h3",{},"통합 중…"),h("p",{class:"muted small",id:"sdmsg"},"계정에 저장하고 있어요")));document.body.append(ov);
   const msg=t=>{const el=$("#sdmsg");if(el)el.textContent=t};
   try{if(cloud.ref)await cloudPush(true);syncNote(cloud.ref?"계정 저장 완료":"이 브라우저에만 저장 (로그인 안 됨)");ov.querySelector("h3").textContent="통합 완료 ✓";msg(cloud.ref?"기록 "+n+"건이 "+(cloud.user?.email||"계정")+"에 저장됐어요. 홈 화면의 OSS 앱을 열면 반영되어 있어요. 이 화면은 그냥 두고 Claude 앱으로 돌아가면 됩니다.":"이 기기(브라우저)에만 저장됐어요. 홈 화면 앱에 반영하려면 로그인이 필요해요.")}catch(e){syncNote("계정 저장 실패: "+(e.code||e.message));ov.querySelector("h3").textContent="저장 실패";msg((e.code||e.message||String(e))+" — 기록은 이 브라우저에 남아 있어요. 네트워크를 확인하고 아래 '다시 저장'을 눌러 주세요.");ov.querySelector(".card").append(h("button",{class:"btn primary",style:"margin-top:10px",onclick:()=>{ov.remove();syncDone(n)}},"다시 저장"));return}
@@ -3398,7 +3401,7 @@ function micBtn(ta,{onFinal=null,label="🎤 말하기",keepAlive=false,gate=nul
     if(busy){const r=rec;setTimeout(()=>{if(on&&rec===r)go(r)},350)}else go(rec)};
   return b}
 // web build: auto-refresh when a newer version is deployed (home-screen apps cache the old page)
-(async()=>{if(window.claude?.use||!/github\.io|localhost/.test(location.host))return;try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)return;const v=(await r.json()).v;const cur=document.documentElement.dataset.build;if(cur&&v&&v!==cur){toast("새 버전으로 업데이트 중…");setTimeout(()=>location.reload(),800)}}catch(e){}})();
+(async()=>{if(window.claude?.use||!/github\.io|localhost/.test(location.host))return;try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)return;const v=(await r.json()).v;const cur=document.documentElement.dataset.build;if(cur&&v&&v!==cur){if(SYNC_RAW&&(pendingSync||!syncReady||syncClose)){try{sessionStorage.setItem("oss_synchash",SYNC_RAW)}catch(e){}}toast("새 버전으로 업데이트 중…");setTimeout(()=>{try{if(SYNC_RAW&&!sessionStorage.getItem("oss_synchash")&&pendingSync)sessionStorage.setItem("oss_synchash",SYNC_RAW)}catch(e){}location.reload()},800)}}catch(e){}})();
 loadLocal();if(dedupeLog())save();cloudInit();render();setTimeout(prepSyncCode,500);setTimeout(()=>{if(!cloud.ok||cloud.skip)applyPendingSync()},800);loadManifests().then(()=>{if(view==="listen"||view==="settings")render()});loadTextManifests();
 (async()=>{
   if(!window.claude?.use)return;
