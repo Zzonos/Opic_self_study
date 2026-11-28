@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build="20261128-160004-b4a306" data-rel="306">
+<html lang="ko" data-build="20261128-172452-e92604" data-rel="307">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache">
@@ -1012,10 +1012,13 @@ function azMicBtn(ta,{onFinal=null,label="🎙 말하기 (Azure)",onStart=null,i
       r.recognizing=(s,e)=>{if(my!==gen)return;lag(e);lastAct=Date.now();if(skipPhrase)return;if(gated()){gp=true;pend="";return}pend=gp?unEcho(e.result.text||""):(e.result.text||"");ta.value=base+fin+pend;ta.dispatchEvent(new Event("input"))};
       r.recognized=(s,e)=>{if(my!==gen)return;lag(e);if(lagMax>1.5){audLog.push("Azure 인식 지연 최대 "+lagMax.toFixed(1)+"초"+(A?" (발음평가 켬)":""));if(audLog.length>30)audLog.shift()}lagMax=0;lastAct=Date.now();MIC.last=Date.now();pend="";if(skipPhrase){skipPhrase=false;return}if(gated()){gp=false;return}if(e.result.reason!==sdk.ResultReason.RecognizedSpeech||!e.result.text){gp=false;zs.nm++;return}const said=gp?unEcho(e.result.text):e.result.text;if(gp&&said!==e.result.text)audLog.push("AI 목소리 겹침 제거: "+(e.result.text.split(/\s+/).length-(said?said.split(/\s+/).length:0))+"단어");gp=false;if(!said){ta.value=base+fin;ta.dispatchEvent(new Event("input"));return}healN=0;zs.n++;zs.ch+=said.length;fin+=said+" ";ta.value=base+fin;ta.dispatchEvent(new Event("input"));
         try{const j=JSON.parse(e.result.properties.getProperty(sdk.PropertyId.SpeechServiceResponse_JsonResult));const nb=(j.NBest||[])[0]||{};segs.push({text:e.result.text,dur:(j.Duration||0)/1e7,pa:nb.PronunciationAssessment||{},words:nb.Words||[]})}catch(x){}showDoubt()};
-      r.canceled=(s,e)=>{if(my!==gen||e.reason!==sdk.CancellationReason.Error)return;const d=String(e.errorDetails||"");audLog.push("azure canceled "+e.errorCode+" "+d.slice(0,80));
+      r.canceled=(s,e)=>{try{dlog("Azure 중단 · "+(e.reason===sdk.CancellationReason.Error?"오류 "+e.errorCode+" "+String(e.errorDetails||"").slice(0,70):"끝(EndOfStream)"))}catch(x){}if(my!==gen||e.reason!==sdk.CancellationReason.Error)return;const d=String(e.errorDetails||"");audLog.push("azure canceled "+e.errorCode+" "+d.slice(0,80));
         if(document.hidden){stopRec();return}
         if(/quota|429|1007|exceed/i.test(d)||e.errorCode===sdk.CancellationErrorCode.TooManyRequests){want=false;azDisable("무료 한도 소진")}else if(/401|403|auth/i.test(d)||e.errorCode===sdk.CancellationErrorCode.AuthenticationFailure){AZ.tok=null;toast("Azure 인증 오류 — 다시 눌러 주세요");want=false}else{toast("Azure 연결이 끊겼어요: "+d.slice(0,60));azErr(d);want=false}stopRec()};
+      r.sessionStopped=()=>{try{dlog("Azure 세션 종료 신호"+(want?" (말하기 중)":""))}catch(x){}};
       await new Promise((ok,bad)=>r.startContinuousRecognitionAsync(ok,bad));t0=Date.now();lastProg=Date.now();
+      // heartbeat while listening: when the text stops coming in, this shows whether the mic, the track or Azure went quiet
+      {const hb=setInterval(()=>{if(my!==gen||!rec){clearInterval(hb);return}try{const t=cl&&cl.getAudioTracks()[0];dlog("듣는 중 · 결과 "+zs.n+"개 "+zs.ch+"자 · 마지막 인식 "+Math.round((Date.now()-lastAct)/1000)+"초 전 · 트랙 "+(!t?"없음":t.readyState+(t.muted?"·음소거":""))+(t&&t.enabled===false?"·꺼짐":""))}catch(x){}},15000)}
       if(my!==gen){try{r.close()}catch(e){}starting=false;paint();return}
       live=true;want=true;MIC.active++;if(WEB)awakeOn();AZ.live.set(b,Date.now());lastAct=Date.now();starting=false;paint();{const cs=(Date.now()-c0)/1000;if(cs>0.8){audLog.push("Azure 연결 "+cs.toFixed(1)+"초");if(audLog.length>30)audLog.shift()}}st("listen");health(my);try{onStart&&onStart()}catch(x){}
       // long silence in a conversation: stop paying Azure, wake up again by the local voice detector
